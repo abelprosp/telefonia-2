@@ -1,0 +1,4087 @@
+openapi: 3.1.1
+info:
+  title: Luxus.Connect.Api | v1
+  version: 1.0.0
+servers:
+  - url: http://localhost:8002
+paths:
+  /v1/pre-signed-urls/upload:
+    post:
+      tags:
+        - PreSignedUrls
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePresignedUploadUrlInput'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/CreatePresignedUploadUrlInput'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/CreatePresignedUploadUrlInput'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PresignedUrlModel'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PresignedUrlModel'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/PresignedUrlModel'
+        '400':
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - Bearer: []
+  /v1/pre-signed-urls/download:
+    post:
+      tags:
+        - PreSignedUrls
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePresignedDownloadUrlInput'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/CreatePresignedDownloadUrlInput'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/CreatePresignedDownloadUrlInput'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PresignedUrlModel'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PresignedUrlModel'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/PresignedUrlModel'
+        '400':
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - Bearer: []
+  /v1/stats/dashboard:
+    get:
+      tags:
+        - Stats
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/DashboardStatsResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardStatsResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/DashboardStatsResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - Bearer: []
+  /v1/provider-invoices:
+    get:
+      tags:
+        - ProviderInvoices
+      parameters:
+        - name: page_index
+          in: query
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type: integer
+            format: int32
+        - name: page_size
+          in: query
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type: integer
+            format: int32
+        - name: processing_month_id
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PagedResponseOfListProviderInvoiceResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedResponseOfListProviderInvoiceResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/PagedResponseOfListProviderInvoiceResponse'
+        '400':
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - Bearer: []
+    post:
+      tags:
+        - ProviderInvoices
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProviderInvoiceImportRequestInput'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/ProviderInvoiceImportRequestInput'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/ProviderInvoiceImportRequestInput'
+        required: true
+      responses:
+        '201':
+          description: Created
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/RequestProviderInvoiceImportResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RequestProviderInvoiceImportResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/RequestProviderInvoiceImportResponse'
+        '400':
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - Bearer: []
+  /v1/provider-invoices/{id}:
+    get:
+      tags:
+        - ProviderInvoices
+      operationId: ProviderInvoicesController.GetById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/GetProviderInvoiceResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetProviderInvoiceResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/GetProviderInvoiceResponse'
+        '404':
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - Bearer: []
+  /v1/providers:
+    get:
+      tags:
+        - Providers
+      parameters:
+        - name: page_index
+          in: query
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type: integer
+            format: int32
+        - name: page_size
+          in: query
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type: integer
+            format: int32
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PagedResponseOfListProvidersResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedResponseOfListProvidersResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/PagedResponseOfListProvidersResponse'
+        '400':
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - Bearer: []
+    post:
+      tags:
+        - Providers
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProviderInput'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/CreateProviderInput'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/CreateProviderInput'
+        required: true
+      responses:
+        '201':
+          description: Created
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/CreateProviderResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateProviderResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/CreateProviderResponse'
+        '400':
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '409':
+          description: Conflict
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - Bearer: []
+  /v1/providers/{id}:
+    get:
+      tags:
+        - Providers
+      operationId: ProvidersController.GetById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/GetProviderResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetProviderResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/GetProviderResponse'
+        '404':
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - Bearer: []
+    patch:
+      tags:
+        - Providers
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProviderInput'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProviderInput'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/UpdateProviderInput'
+        required: true
+      responses:
+        '202':
+          description: Accepted
+        '400':
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '404':
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '409':
+          description: Conflict
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - Bearer: []
+    delete:
+      tags:
+        - Providers
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '202':
+          description: Accepted
+        '400':
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '404':
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - Bearer: []
+  /v1/processing-months:
+    get:
+      tags:
+        - ProcessingMonths
+      parameters:
+        - name: page_index
+          in: query
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type: integer
+            format: int32
+        - name: page_size
+          in: query
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type: integer
+            format: int32
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PagedResponseOfListProcessingMonthResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedResponseOfListProcessingMonthResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/PagedResponseOfListProcessingMonthResponse'
+        '400':
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - Bearer: []
+    post:
+      tags:
+        - ProcessingMonths
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProcessingMonthInput'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/CreateProcessingMonthInput'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/CreateProcessingMonthInput'
+        required: true
+      responses:
+        '201':
+          description: Created
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/GetProcessingMonthResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetProcessingMonthResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/GetProcessingMonthResponse'
+        '400':
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - Bearer: []
+  /v1/processing-months/{id}:
+    get:
+      tags:
+        - ProcessingMonths
+      operationId: ProcessingMonthsController.GetById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/GetProcessingMonthResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetProcessingMonthResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/GetProcessingMonthResponse'
+        '404':
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - Bearer: []
+  /v1/processing-months/{id}/close:
+    post:
+      tags:
+        - ProcessingMonths
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '202':
+          description: Accepted
+        '400':
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '404':
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '409':
+          description: Conflict
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - Bearer: []
+  /v1/processing-months/{id}/close-contingency:
+    post:
+      tags:
+        - ProcessingMonths
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CloseProcessingMonthInContingencyInput'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/CloseProcessingMonthInContingencyInput'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/CloseProcessingMonthInContingencyInput'
+        required: true
+      responses:
+        '202':
+          description: Accepted
+        '400':
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '404':
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '409':
+          description: Conflict
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - Bearer: []
+  /v1/phone-lines:
+    get:
+      tags:
+        - PhoneLines
+      parameters:
+        - name: page_index
+          in: query
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type: integer
+            format: int32
+        - name: page_size
+          in: query
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type: integer
+            format: int32
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PagedResponseOfListPhoneLineResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedResponseOfListPhoneLineResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/PagedResponseOfListPhoneLineResponse'
+        '400':
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - Bearer: []
+  /v1/phone-lines/{id}:
+    get:
+      tags:
+        - PhoneLines
+      operationId: PhoneLinesController.GetById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/GetPhoneLineResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetPhoneLineResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/GetPhoneLineResponse'
+        '404':
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - Bearer: []
+  /v1/phone-lines/{id}/customer-links:
+    get:
+      tags:
+        - PhoneLines
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PhoneLineCustomerLinkResponse'
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PhoneLineCustomerLinkResponse'
+            text/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PhoneLineCustomerLinkResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - Bearer: []
+    post:
+      tags:
+        - PhoneLines
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignPhoneLineCustomerInput'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/AssignPhoneLineCustomerInput'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/AssignPhoneLineCustomerInput'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PhoneLineCustomerLinkResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PhoneLineCustomerLinkResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/PhoneLineCustomerLinkResponse'
+        '400':
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '404':
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '409':
+          description: Conflict
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - Bearer: []
+  /v1/phone-lines/{id}/customer-links/transfer:
+    post:
+      tags:
+        - PhoneLines
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransferPhoneLineCustomerInput'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/TransferPhoneLineCustomerInput'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/TransferPhoneLineCustomerInput'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PhoneLineCustomerLinkResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PhoneLineCustomerLinkResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/PhoneLineCustomerLinkResponse'
+        '400':
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '404':
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '409':
+          description: Conflict
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - Bearer: []
+  /v1/phone-lines/{id}/customer-links/active:
+    delete:
+      tags:
+        - PhoneLines
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UnassignPhoneLineCustomerInput'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/UnassignPhoneLineCustomerInput'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/UnassignPhoneLineCustomerInput'
+        required: true
+      responses:
+        '202':
+          description: Accepted
+        '400':
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '404':
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '409':
+          description: Conflict
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - Bearer: []
+  /v1/customers:
+    get:
+      tags:
+        - Customers
+      parameters:
+        - name: page_index
+          in: query
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type: integer
+            format: int32
+        - name: page_size
+          in: query
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type: integer
+            format: int32
+        - name: provider_id
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PagedResponseOfListCustomerResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedResponseOfListCustomerResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/PagedResponseOfListCustomerResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - Bearer: []
+    post:
+      tags:
+        - Customers
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCustomerCommand'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/CreateCustomerCommand'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/CreateCustomerCommand'
+        required: true
+      responses:
+        '201':
+          description: Created
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/CreateCustomerResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateCustomerResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/CreateCustomerResponse'
+        '400':
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '409':
+          description: Conflict
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - Bearer: []
+  /v1/customers/{id}/phone-lines:
+    get:
+      tags:
+        - Customers
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: page_index
+          in: query
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type: integer
+            format: int32
+        - name: page_size
+          in: query
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type: integer
+            format: int32
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PagedResponseOfCustomerPhoneLineLinkResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedResponseOfCustomerPhoneLineLinkResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/PagedResponseOfCustomerPhoneLineLinkResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - Bearer: []
+  /v1/customers/{id}/provider-links:
+    get:
+      tags:
+        - Customers
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CustomerProviderLinkResponse'
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CustomerProviderLinkResponse'
+            text/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CustomerProviderLinkResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - Bearer: []
+  /v1/customers/{id}/attachments:
+    get:
+      tags:
+        - Customers
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CustomerAttachmentResponse'
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CustomerAttachmentResponse'
+            text/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CustomerAttachmentResponse'
+        '404':
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - Bearer: []
+    post:
+      tags:
+        - Customers
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterCustomerAttachmentInput'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/RegisterCustomerAttachmentInput'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/RegisterCustomerAttachmentInput'
+        required: true
+      responses:
+        '201':
+          description: Created
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/CustomerAttachmentResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomerAttachmentResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/CustomerAttachmentResponse'
+        '400':
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '404':
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - Bearer: []
+  /v1/customers/{id}/attachments/{attachmentId}:
+    delete:
+      tags:
+        - Customers
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: attachmentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '202':
+          description: Accepted
+        '400':
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '404':
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - Bearer: []
+  /v1/customers/{id}/processing-months/{processingMonthId}/billing-readiness:
+    get:
+      tags:
+        - Customers
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: processingMonthId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/GetCustomerProcessingMonthBillingReadinessResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetCustomerProcessingMonthBillingReadinessResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/GetCustomerProcessingMonthBillingReadinessResponse'
+        '404':
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - Bearer: []
+  /v1/customers/{id}/processing-months/{processingMonthId}/manual-release:
+    post:
+      tags:
+        - Customers
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: processingMonthId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ManuallyReleaseCustomerForProcessingMonthInput'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/ManuallyReleaseCustomerForProcessingMonthInput'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/ManuallyReleaseCustomerForProcessingMonthInput'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/GetCustomerProcessingMonthBillingReadinessResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetCustomerProcessingMonthBillingReadinessResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/GetCustomerProcessingMonthBillingReadinessResponse'
+        '400':
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '404':
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '409':
+          description: Conflict
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - Bearer: []
+  /v1/customers/{id}:
+    get:
+      tags:
+        - Customers
+      operationId: CustomersController.GetById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ListCustomerResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListCustomerResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ListCustomerResponse'
+        '404':
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - Bearer: []
+    patch:
+      tags:
+        - Customers
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCustomerInput'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCustomerInput'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/UpdateCustomerInput'
+        required: true
+      responses:
+        '202':
+          description: Accepted
+        '400':
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '404':
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '409':
+          description: Conflict
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - Bearer: []
+    delete:
+      tags:
+        - Customers
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '202':
+          description: Accepted
+        '400':
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '404':
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - Bearer: []
+  /v1/cost-centers:
+    get:
+      tags:
+        - CostCenters
+      parameters:
+        - name: page_index
+          in: query
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type: integer
+            format: int32
+        - name: page_size
+          in: query
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type: integer
+            format: int32
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PagedResponseOfListCostCenterResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedResponseOfListCostCenterResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/PagedResponseOfListCostCenterResponse'
+        '400':
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - Bearer: []
+  /v1/billing-cycles:
+    get:
+      tags:
+        - BillingCycles
+      parameters:
+        - name: page_index
+          in: query
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type: integer
+            format: int32
+        - name: page_size
+          in: query
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type: integer
+            format: int32
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PagedResponseOfListBillingCycleResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedResponseOfListBillingCycleResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/PagedResponseOfListBillingCycleResponse'
+        '400':
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - Bearer: []
+    post:
+      tags:
+        - BillingCycles
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBillingCycleInput'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/CreateBillingCycleInput'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/CreateBillingCycleInput'
+        required: true
+      responses:
+        '201':
+          description: Created
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/CreateBillingCycleResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateBillingCycleResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/CreateBillingCycleResponse'
+        '400':
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - Bearer: []
+  /v1/billing-cycles/{id}:
+    get:
+      tags:
+        - BillingCycles
+      operationId: BillingCyclesController.GetById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/GetBillingCycleResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetBillingCycleResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/GetBillingCycleResponse'
+        '404':
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - Bearer: []
+    patch:
+      tags:
+        - BillingCycles
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateBillingCycleInput'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/UpdateBillingCycleInput'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/UpdateBillingCycleInput'
+        required: true
+      responses:
+        '202':
+          description: Accepted
+        '400':
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '404':
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '409':
+          description: Conflict
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - Bearer: []
+components:
+  schemas:
+    ApiResponse:
+      type: object
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/Notification'
+    AssignPhoneLineCustomerInput:
+      required:
+        - customer_id
+        - start_date
+      type: object
+      properties:
+        customer_id:
+          type: string
+        start_date:
+          type:
+            - 'null'
+            - string
+          format: date
+    CloseProcessingMonthInContingencyInput:
+      required:
+        - justification
+      type: object
+      properties:
+        justification:
+          type: string
+    CreateBillingCycleInput:
+      required:
+        - provider_id
+        - code
+        - name
+        - start_date
+        - end_date
+      type: object
+      properties:
+        provider_id:
+          type: string
+        code:
+          type: string
+        name:
+          type: string
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+    CreateBillingCycleResponse:
+      required:
+        - id
+        - provider_id
+        - code
+        - name
+        - start_date
+        - end_date
+        - status
+        - closed_at
+        - closed_by
+      type: object
+      properties:
+        id:
+          type: string
+        provider_id:
+          type: string
+        code:
+          type: string
+        name:
+          type: string
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        status:
+          type: string
+        closed_at:
+          type:
+            - 'null'
+            - string
+          format: date-time
+        closed_by:
+          type:
+            - 'null'
+            - string
+    CreateCustomerAddressCommand:
+      required:
+        - street
+        - number
+        - neighborhood
+        - city
+        - state
+        - zip_code
+      type: object
+      properties:
+        street:
+          type: string
+        number:
+          type: string
+        neighborhood:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        zip_code:
+          type: string
+        complement:
+          type:
+            - 'null'
+            - string
+        country:
+          type: string
+          default: Brasil
+    CreateCustomerCommand:
+      required:
+        - provider_id
+        - type
+        - name
+        - document
+      type: object
+      properties:
+        provider_id:
+          type: string
+        type:
+          type: string
+        name:
+          type: string
+        legal_name:
+          type:
+            - 'null'
+            - string
+        document:
+          type: string
+        state_registration:
+          type:
+            - 'null'
+            - string
+        birth_or_opening_date:
+          type:
+            - 'null'
+            - string
+          format: date
+        responsible_salesperson_user_id:
+          type:
+            - 'null'
+            - string
+        addresses:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreateCustomerAddressCommand'
+    CreateCustomerResponse:
+      required:
+        - id
+        - active
+        - type
+        - name
+        - cpf_cnpj
+        - state_registration
+        - legal_name
+        - birth_or_opening_date
+        - responsible_salesperson_user_id
+      type: object
+      properties:
+        id:
+          type: string
+        active:
+          type: boolean
+        type:
+          type: string
+        name:
+          type: string
+        cpf_cnpj:
+          type: string
+        state_registration:
+          type:
+            - 'null'
+            - string
+        legal_name:
+          type:
+            - 'null'
+            - string
+        birth_or_opening_date:
+          type:
+            - 'null'
+            - string
+          format: date
+        responsible_salesperson_user_id:
+          type:
+            - 'null'
+            - string
+    CreatePresignedDownloadUrlInput:
+      required:
+        - bucket_name
+        - object_key
+      type: object
+      properties:
+        bucket_name:
+          type: string
+        object_key:
+          type: string
+        expires_in_seconds:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - 'null'
+            - integer
+          format: int32
+    CreatePresignedUploadUrlInput:
+      required:
+        - bucket_name
+        - object_key
+      type: object
+      properties:
+        bucket_name:
+          type: string
+        object_key:
+          type: string
+        content_type:
+          type:
+            - 'null'
+            - string
+        expires_in_seconds:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - 'null'
+            - integer
+          format: int32
+    CreateProcessingMonthInput:
+      required:
+        - provider_id
+        - year
+        - month
+        - display_name
+      type: object
+      properties:
+        provider_id:
+          type: string
+        year:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type: integer
+          format: int32
+        month:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type: integer
+          format: int32
+        display_name:
+          type: string
+    CreateProviderInput:
+      required:
+        - name
+        - slug
+      type: object
+      properties:
+        name:
+          type: string
+        slug:
+          type: string
+    CreateProviderResponse:
+      required:
+        - id
+        - name
+        - slug
+        - active
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        active:
+          type: boolean
+    CustomerAttachmentResponse:
+      required:
+        - id
+        - title
+        - original_file_name
+        - storage_bucket
+        - storage_object_key
+        - content_type
+        - size_bytes
+        - uploaded_at_utc
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type:
+            - 'null'
+            - string
+        original_file_name:
+          type: string
+        storage_bucket:
+          type: string
+        storage_object_key:
+          type: string
+        content_type:
+          type:
+            - 'null'
+            - string
+        size_bytes:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - 'null'
+            - integer
+          format: int64
+        uploaded_at_utc:
+          type: string
+          format: date-time
+    CustomerPhoneLineLinkResponse:
+      required:
+        - customer_id
+        - phone_line_id
+        - phone_line_number
+        - phone_line_status
+        - line_classification
+        - start_date
+        - end_date
+        - is_active
+      type: object
+      properties:
+        customer_id:
+          type: string
+        phone_line_id:
+          type: string
+        phone_line_number:
+          type: string
+        phone_line_status:
+          type: string
+        line_classification:
+          type: string
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type:
+            - 'null'
+            - string
+          format: date
+        is_active:
+          type: boolean
+    CustomerProviderLinkResponse:
+      required:
+        - customer_id
+        - provider_id
+        - provider_name
+        - start_date
+        - end_date
+        - is_active
+      type: object
+      properties:
+        customer_id:
+          type: string
+        provider_id:
+          type: string
+        provider_name:
+          type: string
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type:
+            - 'null'
+            - string
+          format: date
+        is_active:
+          type: boolean
+    DashboardStatsResponse:
+      required:
+        - billing_cycles_count
+        - customers_count
+        - providers_count
+        - provider_invoices_count
+        - phone_lines_count
+      type: object
+      properties:
+        billing_cycles_count:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type: integer
+          format: int32
+        customers_count:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type: integer
+          format: int32
+        providers_count:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type: integer
+          format: int32
+        provider_invoices_count:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type: integer
+          format: int32
+        phone_lines_count:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type: integer
+          format: int32
+    GetBillingCycleResponse:
+      required:
+        - id
+        - provider_id
+        - code
+        - name
+        - start_date
+        - end_date
+        - status
+        - closed_at
+        - closed_by
+      type: object
+      properties:
+        id:
+          type: string
+        provider_id:
+          type: string
+        code:
+          type: string
+        name:
+          type: string
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        status:
+          type: string
+        closed_at:
+          type:
+            - 'null'
+            - string
+          format: date-time
+        closed_by:
+          type:
+            - 'null'
+            - string
+    GetChildPhoneLineResponse:
+      required:
+        - id
+        - provider_plan_id
+        - provider_account_id
+        - cost_center_id
+        - last_invoice_id
+        - titular_line_id
+        - number
+        - line_classification
+        - status
+        - transition_sub_status
+        - transition_started_at
+        - activation_date
+        - cancellation_date
+        - plan
+        - services
+      type: object
+      properties:
+        id:
+          type: string
+        provider_plan_id:
+          type: string
+        provider_account_id:
+          type: string
+        cost_center_id:
+          type:
+            - 'null'
+            - string
+        last_invoice_id:
+          type:
+            - 'null'
+            - string
+        titular_line_id:
+          type:
+            - 'null'
+            - string
+        number:
+          type: string
+        line_classification:
+          type: string
+        status:
+          type: string
+        transition_sub_status:
+          type:
+            - 'null'
+            - string
+        transition_started_at:
+          type:
+            - 'null'
+            - string
+          format: date-time
+        activation_date:
+          type:
+            - 'null'
+            - string
+          format: date
+        cancellation_date:
+          type:
+            - 'null'
+            - string
+          format: date
+        plan:
+          $ref: '#/components/schemas/GetProviderPlanResponse'
+        services:
+          type: array
+          items:
+            $ref: '#/components/schemas/GetPhoneLineServiceResponse'
+    GetCustomerProcessingMonthBillingReadinessManualReleaseDto:
+      required:
+        - justification
+        - released_at
+        - released_by_user_id
+      type: object
+      properties:
+        justification:
+          type: string
+        released_at:
+          type: string
+          format: date-time
+        released_by_user_id:
+          type: string
+    GetCustomerProcessingMonthBillingReadinessResponse:
+      required:
+        - customer_id
+        - processing_month_id
+        - status_display_name
+        - is_released_for_billing
+        - is_automatically_complete
+        - is_manually_released
+        - automatic_evaluation_uses_cnpj_contracting_companies
+        - accounts_expected_for_automatic_rule
+        - accounts_with_invoice_in_processing_month
+        - manual_release
+      type: object
+      properties:
+        customer_id:
+          type: string
+        processing_month_id:
+          type: string
+        status_display_name:
+          type: string
+        is_released_for_billing:
+          type: boolean
+        is_automatically_complete:
+          type: boolean
+        is_manually_released:
+          type: boolean
+        automatic_evaluation_uses_cnpj_contracting_companies:
+          type: boolean
+        accounts_expected_for_automatic_rule:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type: integer
+          format: int32
+        accounts_with_invoice_in_processing_month:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type: integer
+          format: int32
+        manual_release:
+          oneOf:
+            - type: 'null'
+            - $ref:
+                "#/components/schemas/GetCustomerProcessingMonthBillingReadinessManualRel\
+                easeDto"
+    GetPhoneLineResponse:
+      required:
+        - id
+        - provider_plan_id
+        - provider_plan_name
+        - provider_account_id
+        - provider_account_number
+        - cost_center_id
+        - cost_center_name
+        - last_invoice_id
+        - last_invoice_number
+        - titular_line_id
+        - titular_line_number
+        - number
+        - line_classification
+        - status
+        - transition_sub_status
+        - transition_started_at
+        - activation_date
+        - cancellation_date
+        - base_cost
+        - cost_with_consumption
+        - children
+        - services
+      type: object
+      properties:
+        id:
+          type: string
+        provider_plan_id:
+          type: string
+        provider_plan_name:
+          type: string
+        provider_account_id:
+          type: string
+        provider_account_number:
+          type: string
+        cost_center_id:
+          type:
+            - 'null'
+            - string
+        cost_center_name:
+          type:
+            - 'null'
+            - string
+        last_invoice_id:
+          type:
+            - 'null'
+            - string
+        last_invoice_number:
+          type:
+            - 'null'
+            - string
+        titular_line_id:
+          type:
+            - 'null'
+            - string
+        titular_line_number:
+          type:
+            - 'null'
+            - string
+        number:
+          type: string
+        line_classification:
+          type: string
+        status:
+          type: string
+        transition_sub_status:
+          type:
+            - 'null'
+            - string
+        transition_started_at:
+          type:
+            - 'null'
+            - string
+          format: date-time
+        activation_date:
+          type:
+            - 'null'
+            - string
+          format: date
+        cancellation_date:
+          type:
+            - 'null'
+            - string
+          format: date
+        base_cost:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?$
+          type:
+            - 'null'
+            - number
+          format: decimal
+        cost_with_consumption:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?$
+          type:
+            - 'null'
+            - number
+          format: decimal
+        children:
+          type: array
+          items:
+            $ref: '#/components/schemas/GetChildPhoneLineResponse'
+        services:
+          type: array
+          items:
+            $ref: '#/components/schemas/GetPhoneLineServiceResponse'
+    GetPhoneLineServiceResponse:
+      required:
+        - id
+        - phone_line_id
+        - provider_plan_service_id
+        - name
+        - code
+        - recurring
+        - price
+        - active
+      type: object
+      properties:
+        id:
+          type: string
+        phone_line_id:
+          type: string
+        provider_plan_service_id:
+          type: string
+        name:
+          type: string
+        code:
+          type: string
+        recurring:
+          type: boolean
+        price:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?$
+          type:
+            - 'null'
+            - number
+          format: decimal
+        active:
+          type: boolean
+    GetProcessingMonthResponse:
+      required:
+        - id
+        - provider_id
+        - year
+        - month
+        - display_name
+        - status
+        - closed_at
+        - closed_by
+        - closed_in_contingency
+        - contingency_justification
+      type: object
+      properties:
+        id:
+          type: string
+        provider_id:
+          type: string
+        year:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type: integer
+          format: int32
+        month:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type: integer
+          format: int32
+        display_name:
+          type: string
+        status:
+          type: string
+        closed_at:
+          type:
+            - 'null'
+            - string
+          format: date-time
+        closed_by:
+          type:
+            - 'null'
+            - string
+        closed_in_contingency:
+          type: boolean
+        contingency_justification:
+          type:
+            - 'null'
+            - string
+    GetProviderInvoiceItemResponse:
+      required:
+        - id
+        - invoice_id
+        - parent_id
+        - description
+        - quantity
+        - total_price
+        - item_type
+        - quota_amount
+        - consumed_amount
+        - unit
+        - children
+      type: object
+      properties:
+        id:
+          type: string
+        invoice_id:
+          type: string
+        parent_id:
+          type:
+            - 'null'
+            - string
+        description:
+          type: string
+        quantity:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?$
+          type: number
+          format: decimal
+        total_price:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?$
+          type: number
+          format: decimal
+        item_type:
+          type: string
+        quota_amount:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?$
+          type:
+            - 'null'
+            - number
+          format: decimal
+        consumed_amount:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?$
+          type:
+            - 'null'
+            - number
+          format: decimal
+        unit:
+          type:
+            - 'null'
+            - string
+        children:
+          type: array
+          items:
+            $ref: '#/components/schemas/GetProviderInvoiceItemResponse'
+    GetProviderInvoiceQuotaSharingResponse:
+      required:
+        - id
+        - invoice_id
+        - phone_line_id
+        - description
+        - consumed_amount
+      type: object
+      properties:
+        id:
+          type: string
+        invoice_id:
+          type: string
+        phone_line_id:
+          type: string
+        description:
+          type: string
+        consumed_amount:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?$
+          type:
+            - 'null'
+            - number
+          format: decimal
+    GetProviderInvoiceResponse:
+      required:
+        - id
+        - number
+        - provider_account_id
+        - provider_account_number
+        - contracting_company_id
+        - contracting_company_name
+        - provider_id
+        - provider_name
+        - billing_cycle_id
+        - billing_cycle_name
+        - processing_month_id
+        - processing_month_name
+        - cost_center_id
+        - cost_center_name
+        - parent_invoice_id
+        - issue_date
+        - due_date
+        - total_amount
+        - status
+        - subtotal_services
+        - subtotal_usage
+        - subtotal_taxes
+        - subtotal_discounts
+        - subtotal_installments
+        - phone_lines
+        - provider_invoice_items
+        - provider_invoice_services
+        - provider_invoice_quota_sharing
+      type: object
+      properties:
+        id:
+          type: string
+        number:
+          type: string
+        provider_account_id:
+          type: string
+        provider_account_number:
+          type: string
+        contracting_company_id:
+          type: string
+        contracting_company_name:
+          type: string
+        provider_id:
+          type: string
+        provider_name:
+          type: string
+        billing_cycle_id:
+          type: string
+        billing_cycle_name:
+          type: string
+        processing_month_id:
+          type:
+            - 'null'
+            - string
+        processing_month_name:
+          type:
+            - 'null'
+            - string
+        cost_center_id:
+          type:
+            - 'null'
+            - string
+        cost_center_name:
+          type:
+            - 'null'
+            - string
+        parent_invoice_id:
+          type:
+            - 'null'
+            - string
+        issue_date:
+          type: string
+          format: date
+        due_date:
+          type: string
+          format: date
+        total_amount:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?$
+          type: number
+          format: decimal
+        status:
+          type: string
+        subtotal_services:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?$
+          type: number
+          format: decimal
+        subtotal_usage:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?$
+          type: number
+          format: decimal
+        subtotal_taxes:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?$
+          type: number
+          format: decimal
+        subtotal_discounts:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?$
+          type: number
+          format: decimal
+        subtotal_installments:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?$
+          type: number
+          format: decimal
+        phone_lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/GetProviderPhoneLineResponse'
+        provider_invoice_items:
+          type: array
+          items:
+            $ref: '#/components/schemas/GetProviderInvoiceItemResponse'
+        provider_invoice_services:
+          type: array
+          items:
+            $ref: '#/components/schemas/GetProviderInvoiceServiceResponse'
+        provider_invoice_quota_sharing:
+          type: array
+          items:
+            $ref: '#/components/schemas/GetProviderInvoiceQuotaSharingResponse'
+    GetProviderInvoiceServiceResponse:
+      required:
+        - id
+        - invoice_id
+        - plan_id
+        - plan_name
+        - description
+        - quantity
+        - total_price
+        - quota_amount
+        - consumed_amount
+        - unit
+      type: object
+      properties:
+        id:
+          type: string
+        invoice_id:
+          type: string
+        plan_id:
+          type: string
+        plan_name:
+          type: string
+        description:
+          type: string
+        quantity:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?$
+          type: number
+          format: decimal
+        total_price:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?$
+          type: number
+          format: decimal
+        quota_amount:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?$
+          type:
+            - 'null'
+            - number
+          format: decimal
+        consumed_amount:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?$
+          type:
+            - 'null'
+            - number
+          format: decimal
+        unit:
+          type:
+            - 'null'
+            - string
+    GetProviderPhoneLineResponse:
+      required:
+        - id
+        - provider_plan_id
+        - provider_plan_name
+        - provider_account_id
+        - provider_account_number
+        - cost_center_id
+        - cost_center_name
+        - last_invoice_id
+        - last_invoice_number
+        - titular_line_id
+        - titular_line_number
+        - number
+        - line_classification
+        - status
+        - transition_sub_status
+        - transition_started_at
+        - activation_date
+        - cancellation_date
+      type: object
+      properties:
+        id:
+          type: string
+        provider_plan_id:
+          type: string
+        provider_plan_name:
+          type: string
+        provider_account_id:
+          type: string
+        provider_account_number:
+          type: string
+        cost_center_id:
+          type:
+            - 'null'
+            - string
+        cost_center_name:
+          type:
+            - 'null'
+            - string
+        last_invoice_id:
+          type:
+            - 'null'
+            - string
+        last_invoice_number:
+          type:
+            - 'null'
+            - string
+        titular_line_id:
+          type:
+            - 'null'
+            - string
+        titular_line_number:
+          type:
+            - 'null'
+            - string
+        number:
+          type: string
+        line_classification:
+          type: string
+        status:
+          type: string
+        transition_sub_status:
+          type:
+            - 'null'
+            - string
+        transition_started_at:
+          type:
+            - 'null'
+            - string
+          format: date-time
+        activation_date:
+          type:
+            - 'null'
+            - string
+          format: date
+        cancellation_date:
+          type:
+            - 'null'
+            - string
+          format: date
+    GetProviderPlanResponse:
+      required:
+        - id
+        - name
+        - code
+        - services
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        code:
+          type: string
+        services:
+          type: array
+          items:
+            $ref: '#/components/schemas/GetProviderPlanServiceResponse'
+    GetProviderPlanServiceResponse:
+      required:
+        - id
+        - name
+        - active
+        - recurring
+        - price
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        active:
+          type: boolean
+        recurring:
+          type: boolean
+        price:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?$
+          type:
+            - 'null'
+            - number
+          format: decimal
+    GetProviderResponse:
+      required:
+        - id
+        - organization_id
+        - name
+        - slug
+        - active
+        - plans
+      type: object
+      properties:
+        id:
+          type: string
+        organization_id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        active:
+          type: boolean
+        plans:
+          type: array
+          items:
+            $ref: '#/components/schemas/GetProviderPlanResponse'
+    ListBillingCycleResponse:
+      required:
+        - id
+        - provider_id
+        - code
+        - name
+        - start_date
+        - end_date
+        - status
+        - closed_at
+        - closed_by
+      type: object
+      properties:
+        id:
+          type: string
+        provider_id:
+          type: string
+        code:
+          type: string
+        name:
+          type: string
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        status:
+          type: string
+        closed_at:
+          type:
+            - 'null'
+            - string
+          format: date-time
+        closed_by:
+          type:
+            - 'null'
+            - string
+    ListCostCenterResponse:
+      required:
+        - id
+        - name
+        - description
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+    ListCustomerResponse:
+      required:
+        - id
+        - active
+        - type
+        - name
+        - cpf_cnpj
+        - state_registration
+        - legal_name
+        - birth_or_opening_date
+        - responsible_salesperson_user_id
+      type: object
+      properties:
+        id:
+          type: string
+        active:
+          type: boolean
+        type:
+          type: string
+        name:
+          type: string
+        cpf_cnpj:
+          type: string
+        state_registration:
+          type:
+            - 'null'
+            - string
+        legal_name:
+          type:
+            - 'null'
+            - string
+        birth_or_opening_date:
+          type:
+            - 'null'
+            - string
+          format: date
+        responsible_salesperson_user_id:
+          type:
+            - 'null'
+            - string
+    ListPhoneLineResponse:
+      required:
+        - id
+        - provider_plan_id
+        - provider_plan_name
+        - provider_account_id
+        - provider_account_number
+        - cost_center_id
+        - cost_center_name
+        - last_invoice_id
+        - last_invoice_number
+        - titular_line_id
+        - titular_line_number
+        - number
+        - line_classification
+        - status
+        - transition_sub_status
+        - transition_started_at
+        - activation_date
+        - cancellation_date
+        - base_cost
+        - cost_with_consumption
+      type: object
+      properties:
+        id:
+          type: string
+        provider_plan_id:
+          type: string
+        provider_plan_name:
+          type: string
+        provider_account_id:
+          type: string
+        provider_account_number:
+          type: string
+        cost_center_id:
+          type:
+            - 'null'
+            - string
+        cost_center_name:
+          type:
+            - 'null'
+            - string
+        last_invoice_id:
+          type:
+            - 'null'
+            - string
+        last_invoice_number:
+          type:
+            - 'null'
+            - string
+        titular_line_id:
+          type:
+            - 'null'
+            - string
+        titular_line_number:
+          type:
+            - 'null'
+            - string
+        number:
+          type: string
+        line_classification:
+          type: string
+        status:
+          type: string
+        transition_sub_status:
+          type:
+            - 'null'
+            - string
+        transition_started_at:
+          type:
+            - 'null'
+            - string
+          format: date-time
+        activation_date:
+          type:
+            - 'null'
+            - string
+          format: date
+        cancellation_date:
+          type:
+            - 'null'
+            - string
+          format: date
+        base_cost:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?$
+          type:
+            - 'null'
+            - number
+          format: decimal
+        cost_with_consumption:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?$
+          type:
+            - 'null'
+            - number
+          format: decimal
+    ListProcessingMonthResponse:
+      required:
+        - id
+        - provider_id
+        - year
+        - month
+        - display_name
+        - status
+        - closed_at
+        - closed_by
+        - closed_in_contingency
+      type: object
+      properties:
+        id:
+          type: string
+        provider_id:
+          type: string
+        year:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type: integer
+          format: int32
+        month:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type: integer
+          format: int32
+        display_name:
+          type: string
+        status:
+          type: string
+        closed_at:
+          type:
+            - 'null'
+            - string
+          format: date-time
+        closed_by:
+          type:
+            - 'null'
+            - string
+        closed_in_contingency:
+          type: boolean
+    ListProviderInvoiceResponse:
+      required:
+        - id
+        - provider_account_id
+        - provider_account_number
+        - contracting_company_id
+        - contracting_company_name
+        - provider_id
+        - provider_name
+        - billing_cycle_id
+        - billing_cycle_name
+        - processing_month_id
+        - cost_center_id
+        - parent_invoice_id
+        - issue_date
+        - due_date
+        - total_amount
+        - status
+        - subtotal_services
+        - subtotal_usage
+        - subtotal_taxes
+        - subtotal_discounts
+        - subtotal_installments
+      type: object
+      properties:
+        id:
+          type: string
+        provider_account_id:
+          type: string
+        provider_account_number:
+          type: string
+        contracting_company_id:
+          type: string
+        contracting_company_name:
+          type: string
+        provider_id:
+          type: string
+        provider_name:
+          type: string
+        billing_cycle_id:
+          type: string
+        billing_cycle_name:
+          type: string
+        processing_month_id:
+          type:
+            - 'null'
+            - string
+        cost_center_id:
+          type:
+            - 'null'
+            - string
+        parent_invoice_id:
+          type:
+            - 'null'
+            - string
+        issue_date:
+          type: string
+          format: date
+        due_date:
+          type: string
+          format: date
+        total_amount:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?$
+          type: number
+          format: decimal
+        status:
+          type: string
+        subtotal_services:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?$
+          type: number
+          format: decimal
+        subtotal_usage:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?$
+          type: number
+          format: decimal
+        subtotal_taxes:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?$
+          type: number
+          format: decimal
+        subtotal_discounts:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?$
+          type: number
+          format: decimal
+        subtotal_installments:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?$
+          type: number
+          format: decimal
+    ListProvidersResponse:
+      required:
+        - id
+        - name
+        - slug
+        - active
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        active:
+          type: boolean
+    ManuallyReleaseCustomerForProcessingMonthInput:
+      required:
+        - justification
+      type: object
+      properties:
+        justification:
+          type: string
+    Notification:
+      required:
+        - code
+        - message
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        param:
+          type:
+            - 'null'
+            - string
+    PagedResponseOfCustomerPhoneLineLinkResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CustomerPhoneLineLinkResponse'
+        total_count:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type: integer
+          format: int64
+    PagedResponseOfListBillingCycleResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ListBillingCycleResponse'
+        total_count:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type: integer
+          format: int64
+    PagedResponseOfListCostCenterResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ListCostCenterResponse'
+        total_count:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type: integer
+          format: int64
+    PagedResponseOfListCustomerResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ListCustomerResponse'
+        total_count:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type: integer
+          format: int64
+    PagedResponseOfListPhoneLineResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ListPhoneLineResponse'
+        total_count:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type: integer
+          format: int64
+    PagedResponseOfListProcessingMonthResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ListProcessingMonthResponse'
+        total_count:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type: integer
+          format: int64
+    PagedResponseOfListProviderInvoiceResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ListProviderInvoiceResponse'
+        total_count:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type: integer
+          format: int64
+    PagedResponseOfListProvidersResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ListProvidersResponse'
+        total_count:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type: integer
+          format: int64
+    PhoneLineCustomerLinkResponse:
+      required:
+        - phone_line_id
+        - customer_id
+        - customer_name
+        - customer_document
+        - start_date
+        - end_date
+        - is_active
+      type: object
+      properties:
+        phone_line_id:
+          type: string
+        customer_id:
+          type: string
+        customer_name:
+          type: string
+        customer_document:
+          type:
+            - 'null'
+            - string
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type:
+            - 'null'
+            - string
+          format: date
+        is_active:
+          type: boolean
+    PresignedUrlModel:
+      required:
+        - url
+        - http_method
+        - expires_at_utc
+      type: object
+      properties:
+        url:
+          type: string
+        http_method:
+          type: string
+        expires_at_utc:
+          type: string
+          format: date-time
+    ProviderInvoiceImportRequestInput:
+      required:
+        - provider_id
+        - processing_month_id
+        - storage_bucket
+        - storage_object_key
+        - original_file_name
+      type: object
+      properties:
+        provider_id:
+          type: string
+        processing_month_id:
+          type: string
+        storage_bucket:
+          type: string
+        storage_object_key:
+          type: string
+        original_file_name:
+          type:
+            - 'null'
+            - string
+    RegisterCustomerAttachmentInput:
+      required:
+        - title
+        - original_file_name
+        - storage_bucket
+        - storage_object_key
+      type: object
+      properties:
+        title:
+          type:
+            - 'null'
+            - string
+        original_file_name:
+          type: string
+        storage_bucket:
+          type: string
+        storage_object_key:
+          type: string
+        content_type:
+          type:
+            - 'null'
+            - string
+        size_bytes:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - 'null'
+            - integer
+          format: int64
+    RequestProviderInvoiceImportResponse:
+      required:
+        - id
+        - processing_month_id
+        - status
+        - error
+        - completed_at
+      type: object
+      properties:
+        id:
+          type: string
+        processing_month_id:
+          type: string
+        status:
+          type: string
+        error:
+          type:
+            - 'null'
+            - string
+        completed_at:
+          type:
+            - 'null'
+            - string
+          format: date-time
+    TransferPhoneLineCustomerInput:
+      required:
+        - customer_id
+        - transfer_date
+      type: object
+      properties:
+        customer_id:
+          type: string
+        transfer_date:
+          type:
+            - 'null'
+            - string
+          format: date
+    UnassignPhoneLineCustomerInput:
+      required:
+        - end_date
+      type: object
+      properties:
+        end_date:
+          type:
+            - 'null'
+            - string
+          format: date
+    UpdateBillingCycleInput:
+      required:
+        - provider_id
+        - code
+        - name
+        - start_date
+        - end_date
+      type: object
+      properties:
+        provider_id:
+          type: string
+        code:
+          type: string
+        name:
+          type: string
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+    UpdateCustomerInput:
+      required:
+        - name
+      type: object
+      properties:
+        name:
+          type: string
+        legal_name:
+          type:
+            - 'null'
+            - string
+        state_registration:
+          type:
+            - 'null'
+            - string
+        birth_or_opening_date:
+          type:
+            - 'null'
+            - string
+          format: date
+        responsible_salesperson_user_id:
+          type:
+            - 'null'
+            - string
+    UpdateProviderInput:
+      required:
+        - name
+        - slug
+      type: object
+      properties:
+        name:
+          type: string
+        slug:
+          type: string
+  securitySchemes:
+    Bearer:
+      type: oauth2
+      flows:
+        password:
+          tokenUrl: http://host.docker.internal:8081/realms/luxus/protocol/openid-connect/token
+          scopes: {}
+tags:
+  - name: PreSignedUrls
+  - name: Stats
+  - name: ProviderInvoices
+  - name: Providers
+  - name: ProcessingMonths
+  - name: PhoneLines
+  - name: Customers
+  - name: CostCenters
+  - name: BillingCycles

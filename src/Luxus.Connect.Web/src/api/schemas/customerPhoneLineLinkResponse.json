@@ -1,0 +1,24 @@
+{
+  "required": [
+    "customer_id",
+    "phone_line_id",
+    "phone_line_number",
+    "phone_line_status",
+    "line_classification",
+    "start_date",
+    "end_date",
+    "is_active"
+  ],
+  "type": "object",
+  "properties": {
+    "customer_id": { "type": "string" },
+    "phone_line_id": { "type": "string" },
+    "phone_line_number": { "type": "string" },
+    "phone_line_status": { "type": "string" },
+    "line_classification": { "type": "string" },
+    "start_date": { "type": "string", "format": "date" },
+    "end_date": { "type": ["null", "string"], "format": "date" },
+    "is_active": { "type": "boolean" }
+  },
+  "x-readme-ref-name": "CustomerPhoneLineLinkResponse"
+}

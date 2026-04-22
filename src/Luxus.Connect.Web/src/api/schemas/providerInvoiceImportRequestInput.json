@@ -1,0 +1,18 @@
+{
+  "required": [
+    "provider_id",
+    "processing_month_id",
+    "storage_bucket",
+    "storage_object_key",
+    "original_file_name"
+  ],
+  "type": "object",
+  "properties": {
+    "provider_id": { "type": "string" },
+    "processing_month_id": { "type": "string" },
+    "storage_bucket": { "type": "string" },
+    "storage_object_key": { "type": "string" },
+    "original_file_name": { "type": ["null", "string"] }
+  },
+  "x-readme-ref-name": "ProviderInvoiceImportRequestInput"
+}

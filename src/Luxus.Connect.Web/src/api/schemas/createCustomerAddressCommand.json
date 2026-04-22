@@ -1,0 +1,15 @@
+{
+  "required": ["street", "number", "neighborhood", "city", "state", "zip_code"],
+  "type": "object",
+  "properties": {
+    "street": { "type": "string" },
+    "number": { "type": "string" },
+    "neighborhood": { "type": "string" },
+    "city": { "type": "string" },
+    "state": { "type": "string" },
+    "zip_code": { "type": "string" },
+    "complement": { "type": ["null", "string"] },
+    "country": { "type": "string", "default": "Brasil" }
+  },
+  "x-readme-ref-name": "CreateCustomerAddressCommand"
+}

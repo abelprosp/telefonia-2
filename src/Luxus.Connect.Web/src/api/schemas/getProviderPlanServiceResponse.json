@@ -1,0 +1,16 @@
+{
+  "required": ["id", "name", "active", "recurring", "price"],
+  "type": "object",
+  "properties": {
+    "id": { "type": "string" },
+    "name": { "type": "string" },
+    "active": { "type": "boolean" },
+    "recurring": { "type": "boolean" },
+    "price": {
+      "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+      "type": ["null", "number"],
+      "format": "decimal"
+    }
+  },
+  "x-readme-ref-name": "GetProviderPlanServiceResponse"
+}

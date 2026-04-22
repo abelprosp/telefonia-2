@@ -1,0 +1,6 @@
+{
+  "required": ["justification"],
+  "type": "object",
+  "properties": { "justification": { "type": "string" } },
+  "x-readme-ref-name": "ManuallyReleaseCustomerForProcessingMonthInput"
+}

@@ -1,0 +1,25 @@
+{
+  "type": "object",
+  "properties": {
+    "items": {
+      "type": "array",
+      "items": {
+        "required": ["id", "name", "slug", "active"],
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "slug": { "type": "string" },
+          "active": { "type": "boolean" }
+        },
+        "x-readme-ref-name": "ListProvidersResponse"
+      }
+    },
+    "total_count": {
+      "pattern": "^-?(?:0|[1-9]\\d*)$",
+      "type": "integer",
+      "format": "int64"
+    }
+  },
+  "x-readme-ref-name": "PagedResponseOfListProvidersResponse"
+}

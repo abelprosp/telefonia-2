@@ -1,0 +1,52 @@
+{
+  "required": [
+    "customer_id",
+    "processing_month_id",
+    "status_display_name",
+    "is_released_for_billing",
+    "is_automatically_complete",
+    "is_manually_released",
+    "automatic_evaluation_uses_cnpj_contracting_companies",
+    "accounts_expected_for_automatic_rule",
+    "accounts_with_invoice_in_processing_month",
+    "manual_release"
+  ],
+  "type": "object",
+  "properties": {
+    "customer_id": { "type": "string" },
+    "processing_month_id": { "type": "string" },
+    "status_display_name": { "type": "string" },
+    "is_released_for_billing": { "type": "boolean" },
+    "is_automatically_complete": { "type": "boolean" },
+    "is_manually_released": { "type": "boolean" },
+    "automatic_evaluation_uses_cnpj_contracting_companies": {
+      "type": "boolean"
+    },
+    "accounts_expected_for_automatic_rule": {
+      "pattern": "^-?(?:0|[1-9]\\d*)$",
+      "type": "integer",
+      "format": "int32"
+    },
+    "accounts_with_invoice_in_processing_month": {
+      "pattern": "^-?(?:0|[1-9]\\d*)$",
+      "type": "integer",
+      "format": "int32"
+    },
+    "manual_release": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "required": ["justification", "released_at", "released_by_user_id"],
+          "type": "object",
+          "properties": {
+            "justification": { "type": "string" },
+            "released_at": { "type": "string", "format": "date-time" },
+            "released_by_user_id": { "type": "string" }
+          },
+          "x-readme-ref-name": "GetCustomerProcessingMonthBillingReadinessManualReleaseDto"
+        }
+      ]
+    }
+  },
+  "x-readme-ref-name": "GetCustomerProcessingMonthBillingReadinessResponse"
+}

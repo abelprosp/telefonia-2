@@ -1,0 +1,15 @@
+{
+  "required": ["bucket_name", "object_key"],
+  "type": "object",
+  "properties": {
+    "bucket_name": { "type": "string" },
+    "object_key": { "type": "string" },
+    "content_type": { "type": ["null", "string"] },
+    "expires_in_seconds": {
+      "pattern": "^-?(?:0|[1-9]\\d*)$",
+      "type": ["null", "integer"],
+      "format": "int32"
+    }
+  },
+  "x-readme-ref-name": "CreatePresignedUploadUrlInput"
+}

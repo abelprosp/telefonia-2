@@ -1,0 +1,28 @@
+{
+  "required": [
+    "id",
+    "phone_line_id",
+    "provider_plan_service_id",
+    "name",
+    "code",
+    "recurring",
+    "price",
+    "active"
+  ],
+  "type": "object",
+  "properties": {
+    "id": { "type": "string" },
+    "phone_line_id": { "type": "string" },
+    "provider_plan_service_id": { "type": "string" },
+    "name": { "type": "string" },
+    "code": { "type": "string" },
+    "recurring": { "type": "boolean" },
+    "price": {
+      "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+      "type": ["null", "number"],
+      "format": "decimal"
+    },
+    "active": { "type": "boolean" }
+  },
+  "x-readme-ref-name": "GetPhoneLineServiceResponse"
+}

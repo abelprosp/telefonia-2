@@ -1,0 +1,19 @@
+{
+  "required": ["provider_id", "year", "month", "display_name"],
+  "type": "object",
+  "properties": {
+    "provider_id": { "type": "string" },
+    "year": {
+      "pattern": "^-?(?:0|[1-9]\\d*)$",
+      "type": "integer",
+      "format": "int32"
+    },
+    "month": {
+      "pattern": "^-?(?:0|[1-9]\\d*)$",
+      "type": "integer",
+      "format": "int32"
+    },
+    "display_name": { "type": "string" }
+  },
+  "x-readme-ref-name": "CreateProcessingMonthInput"
+}

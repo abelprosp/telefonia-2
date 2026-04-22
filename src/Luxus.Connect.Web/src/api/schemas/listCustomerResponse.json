@@ -1,0 +1,26 @@
+{
+  "required": [
+    "id",
+    "active",
+    "type",
+    "name",
+    "cpf_cnpj",
+    "state_registration",
+    "legal_name",
+    "birth_or_opening_date",
+    "responsible_salesperson_user_id"
+  ],
+  "type": "object",
+  "properties": {
+    "id": { "type": "string" },
+    "active": { "type": "boolean" },
+    "type": { "type": "string" },
+    "name": { "type": "string" },
+    "cpf_cnpj": { "type": "string" },
+    "state_registration": { "type": ["null", "string"] },
+    "legal_name": { "type": ["null", "string"] },
+    "birth_or_opening_date": { "type": ["null", "string"], "format": "date" },
+    "responsible_salesperson_user_id": { "type": ["null", "string"] }
+  },
+  "x-readme-ref-name": "ListCustomerResponse"
+}

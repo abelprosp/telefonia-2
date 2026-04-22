@@ -1,0 +1,82 @@
+# Produção / VPS: use com docker-compose.yml (ex.: ./docker-up.sh prod).
+# Domínio: luxus.bitpulse.com.br — frontend em 80/443 com TLS; Keycloak em /auth; API em /api (nginx → Kestrel sem prefixo).
+#
+# Antes do primeiro up: coloque fullchain.pem e privkey.pem em docker/ssl/luxus.bitpulse.com.br/
+# Migrações: ./ef-database-update.sh com Postgres acessível.
+
+services:
+  rabbitmq:
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 1s
+      retries: 20
+
+  postgres:
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: on-failure
+
+  keycloak:
+    depends_on:
+      postgres:
+        condition: service_healthy
+        restart: true
+    environment:
+      - KC_HTTP_RELATIVE_PATH=/auth
+      - KC_PROXY_HEADERS=xforwarded
+      - KC_HOSTNAME=luxus.bitpulse.com.br
+      - KC_HOSTNAME_STRICT=false
+    ports: []
+    restart: on-failure
+
+  connect-api:
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:80
+      - ASPNETCORE_ConnectionStrings__DefaultConnection=Host=postgres;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};Database=luxus_connect_dev;
+      - ASPNETCORE_ConnectionStrings__Seq=http://seq:5341
+      - ASPNETCORE_ConnectionStrings__RabbitMq=amqp://${RMQ_USER}:${RMQ_PWD}@rabbitmq:5672
+      - ASPNETCORE_Keycloak__Realm=luxus
+      - ASPNETCORE_Keycloak__AuthServerUrl=https://luxus.bitpulse.com.br/auth
+      - ASPNETCORE_Keycloak__SslRequired=none
+      - ASPNETCORE_Keycloak__Resource=connect-cli
+      - ASPNETCORE_Keycloak__VerifyTokenAudience=true
+      - ASPNETCORE_Keycloak__Scopes=email profile connect-cli-scope organization
+      - ASPNETCORE_Keycloak__ConfidentialPort=0
+      - ASPNETCORE_ObjectStorage__ServiceUrl=${OBJECT_STORAGE_SERVICE_URL}
+      - ASPNETCORE_ObjectStorage__AccessKeyId=${OBJECT_STORAGE_ACCESS_KEY_ID}
+      - ASPNETCORE_ObjectStorage__SecretAccessKey=${OBJECT_STORAGE_SECRET_ACCESS_KEY}
+      - ASPNETCORE_Cors__Origins=https://luxus.bitpulse.com.br
+    ports: []
+    depends_on:
+      postgres:
+        condition: service_healthy
+        restart: true
+      rabbitmq:
+        condition: service_healthy
+        restart: true
+      keycloak:
+        condition: service_started
+        restart: true
+    restart: on-failure
+
+  connect-web:
+    build:
+      context: ./src/Luxus.Connect.Web
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: https://luxus.bitpulse.com.br/api
+        VITE_AUTH_URL: https://luxus.bitpulse.com.br/auth
+        VITE_CLIENT_ID: connect-cli
+        VITE_CLIENT_SECRET: ${KC_CLIENT_SECRET}
+        VITE_STORAGE_BUCKET_NAME: luxus-connect
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./docker/nginx/connect-web.vps.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./docker/ssl/luxus.bitpulse.com.br:/etc/nginx/ssl:ro
+    restart: on-failure

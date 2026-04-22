@@ -1,0 +1,40 @@
+{
+  "required": ["provider_id", "type", "name", "document"],
+  "type": "object",
+  "properties": {
+    "provider_id": { "type": "string" },
+    "type": { "type": "string" },
+    "name": { "type": "string" },
+    "legal_name": { "type": ["null", "string"] },
+    "document": { "type": "string" },
+    "state_registration": { "type": ["null", "string"] },
+    "birth_or_opening_date": { "type": ["null", "string"], "format": "date" },
+    "responsible_salesperson_user_id": { "type": ["null", "string"] },
+    "addresses": {
+      "type": "array",
+      "items": {
+        "required": [
+          "street",
+          "number",
+          "neighborhood",
+          "city",
+          "state",
+          "zip_code"
+        ],
+        "type": "object",
+        "properties": {
+          "street": { "type": "string" },
+          "number": { "type": "string" },
+          "neighborhood": { "type": "string" },
+          "city": { "type": "string" },
+          "state": { "type": "string" },
+          "zip_code": { "type": "string" },
+          "complement": { "type": ["null", "string"] },
+          "country": { "type": "string", "default": "Brasil" }
+        },
+        "x-readme-ref-name": "CreateCustomerAddressCommand"
+      }
+    }
+  },
+  "x-readme-ref-name": "CreateCustomerCommand"
+}

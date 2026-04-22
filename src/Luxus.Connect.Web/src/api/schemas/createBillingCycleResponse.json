@@ -1,0 +1,26 @@
+{
+  "required": [
+    "id",
+    "provider_id",
+    "code",
+    "name",
+    "start_date",
+    "end_date",
+    "status",
+    "closed_at",
+    "closed_by"
+  ],
+  "type": "object",
+  "properties": {
+    "id": { "type": "string" },
+    "provider_id": { "type": "string" },
+    "code": { "type": "string" },
+    "name": { "type": "string" },
+    "start_date": { "type": "string", "format": "date" },
+    "end_date": { "type": "string", "format": "date" },
+    "status": { "type": "string" },
+    "closed_at": { "type": ["null", "string"], "format": "date-time" },
+    "closed_by": { "type": ["null", "string"] }
+  },
+  "x-readme-ref-name": "CreateBillingCycleResponse"
+}

@@ -1,0 +1,61 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": ".NET Core Launch (api)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "debug",
+      "program": "${workspaceFolder}/src/Luxus.Connect.Api/bin/Debug/net10.0/Luxus.Connect.Api.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/src/Luxus.Connect.Api",
+      "stopAtEntry": false,
+      "serverReadyAction": {
+        "action": "openExternally",
+        "pattern": "\\bNow listening on:\\s+(https?://\\S+)"
+      },
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_URLS": "https://localhost:7193;http://localhost:5193",
+        "ASPNETCORE_HTTPS_PORT": "4432",
+        "ASPNETCORE_Keycloak__Realm": "luxus.connect",
+        "ASPNETCORE_Keycloak__AuthServerUrl": "http://172.22.32.1:8081",
+        "ASPNETCORE_Keycloak__SslRequired": "none",
+        "ASPNETCORE_Keycloak__Resource": "luxus.connect-ui",
+        "ASPNETCORE_Keycloak__VerifyTokenAudience": "true",
+        "ASPNETCORE_Keycloak__Scopes": "email profile luxus.connect-ui-client-scope",
+        "ASPNETCORE_Keycloak__ConfidentialPort": "0"
+      },
+      "sourceFileMap": {}
+    },
+    {
+      "name": ".NET Core Launch (worker)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "debug",
+      "program": "${workspaceFolder}/src/Luxus.Connect.Worker/bin/Debug/net10.0/Luxus.Connect.Worker.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/src/Luxus.Connect.Worker",
+      "stopAtEntry": false,
+      "serverReadyAction": {
+        "action": "openExternally",
+        "pattern": "\\bNow listening on:\\s+(https?://\\S+)"
+      },
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_URLS": "https://localhost:7194;http://localhost:5194",
+        "ASPNETCORE_HTTPS_PORT": "4433"
+      },
+      "sourceFileMap": {}
+    },
+    {
+      "name": "Docker .NET Launch",
+      "type": "docker",
+      "request": "launch",
+      "preLaunchTask": "docker-run: debug",
+      "netCore": {
+        "appProject": "${workspaceFolder}/src/Luxus.Connect.Api/Luxus.Connect.Api.csproj"
+      }
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "required": ["provider_id", "code", "name", "start_date", "end_date"],
+  "type": "object",
+  "properties": {
+    "provider_id": { "type": "string" },
+    "code": { "type": "string" },
+    "name": { "type": "string" },
+    "start_date": { "type": "string", "format": "date" },
+    "end_date": { "type": "string", "format": "date" }
+  },
+  "x-readme-ref-name": "UpdateBillingCycleInput"
+}

@@ -1,0 +1,12 @@
+{
+  "required": ["id", "processing_month_id", "status", "error", "completed_at"],
+  "type": "object",
+  "properties": {
+    "id": { "type": "string" },
+    "processing_month_id": { "type": "string" },
+    "status": { "type": "string" },
+    "error": { "type": ["null", "string"] },
+    "completed_at": { "type": ["null", "string"], "format": "date-time" }
+  },
+  "x-readme-ref-name": "RequestProviderInvoiceImportResponse"
+}

@@ -1,0 +1,12 @@
+{
+  "required": ["name"],
+  "type": "object",
+  "properties": {
+    "name": { "type": "string" },
+    "legal_name": { "type": ["null", "string"] },
+    "state_registration": { "type": ["null", "string"] },
+    "birth_or_opening_date": { "type": ["null", "string"], "format": "date" },
+    "responsible_salesperson_user_id": { "type": ["null", "string"] }
+  },
+  "x-readme-ref-name": "UpdateCustomerInput"
+}

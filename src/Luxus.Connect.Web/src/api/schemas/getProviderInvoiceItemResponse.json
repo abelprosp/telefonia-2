@@ -1,0 +1,49 @@
+{
+  "required": [
+    "id",
+    "invoice_id",
+    "parent_id",
+    "description",
+    "quantity",
+    "total_price",
+    "item_type",
+    "quota_amount",
+    "consumed_amount",
+    "unit",
+    "children"
+  ],
+  "type": "object",
+  "properties": {
+    "id": { "type": "string" },
+    "invoice_id": { "type": "string" },
+    "parent_id": { "type": ["null", "string"] },
+    "description": { "type": "string" },
+    "quantity": {
+      "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+      "type": "number",
+      "format": "decimal"
+    },
+    "total_price": {
+      "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+      "type": "number",
+      "format": "decimal"
+    },
+    "item_type": { "type": "string" },
+    "quota_amount": {
+      "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+      "type": ["null", "number"],
+      "format": "decimal"
+    },
+    "consumed_amount": {
+      "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+      "type": ["null", "number"],
+      "format": "decimal"
+    },
+    "unit": { "type": ["null", "string"] },
+    "children": {
+      "type": "array",
+      "items": { "$ref": "#/components/schemas/GetProviderInvoiceItemResponse" }
+    }
+  },
+  "x-readme-ref-name": "GetProviderInvoiceItemResponse"
+}

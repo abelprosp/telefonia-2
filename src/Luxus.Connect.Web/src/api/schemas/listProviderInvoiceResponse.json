@@ -1,0 +1,74 @@
+{
+  "required": [
+    "id",
+    "provider_account_id",
+    "provider_account_number",
+    "contracting_company_id",
+    "contracting_company_name",
+    "provider_id",
+    "provider_name",
+    "billing_cycle_id",
+    "billing_cycle_name",
+    "processing_month_id",
+    "cost_center_id",
+    "parent_invoice_id",
+    "issue_date",
+    "due_date",
+    "total_amount",
+    "status",
+    "subtotal_services",
+    "subtotal_usage",
+    "subtotal_taxes",
+    "subtotal_discounts",
+    "subtotal_installments"
+  ],
+  "type": "object",
+  "properties": {
+    "id": { "type": "string" },
+    "provider_account_id": { "type": "string" },
+    "provider_account_number": { "type": "string" },
+    "contracting_company_id": { "type": "string" },
+    "contracting_company_name": { "type": "string" },
+    "provider_id": { "type": "string" },
+    "provider_name": { "type": "string" },
+    "billing_cycle_id": { "type": "string" },
+    "billing_cycle_name": { "type": "string" },
+    "processing_month_id": { "type": ["null", "string"] },
+    "cost_center_id": { "type": ["null", "string"] },
+    "parent_invoice_id": { "type": ["null", "string"] },
+    "issue_date": { "type": "string", "format": "date" },
+    "due_date": { "type": "string", "format": "date" },
+    "total_amount": {
+      "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+      "type": "number",
+      "format": "decimal"
+    },
+    "status": { "type": "string" },
+    "subtotal_services": {
+      "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+      "type": "number",
+      "format": "decimal"
+    },
+    "subtotal_usage": {
+      "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+      "type": "number",
+      "format": "decimal"
+    },
+    "subtotal_taxes": {
+      "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+      "type": "number",
+      "format": "decimal"
+    },
+    "subtotal_discounts": {
+      "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+      "type": "number",
+      "format": "decimal"
+    },
+    "subtotal_installments": {
+      "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+      "type": "number",
+      "format": "decimal"
+    }
+  },
+  "x-readme-ref-name": "ListProviderInvoiceResponse"
+}

@@ -1,0 +1,22 @@
+{
+  "required": [
+    "phone_line_id",
+    "customer_id",
+    "customer_name",
+    "customer_document",
+    "start_date",
+    "end_date",
+    "is_active"
+  ],
+  "type": "object",
+  "properties": {
+    "phone_line_id": { "type": "string" },
+    "customer_id": { "type": "string" },
+    "customer_name": { "type": "string" },
+    "customer_document": { "type": ["null", "string"] },
+    "start_date": { "type": "string", "format": "date" },
+    "end_date": { "type": ["null", "string"], "format": "date" },
+    "is_active": { "type": "boolean" }
+  },
+  "x-readme-ref-name": "PhoneLineCustomerLinkResponse"
+}

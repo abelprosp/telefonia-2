@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Luxus.Connect.Infra.Http\Luxus.Connect.Infra.Http.csproj" />
+    <ProjectReference Include="..\Luxus.Connect.Application\Luxus.Connect.Application.csproj" />
+    <ProjectReference Include="..\Luxus.Connect.Infra.Data.Query\Luxus.Connect.Infra.Data.Query.csproj" />
+    <ProjectReference Include="..\Luxus.Connect.Infra.Data\Luxus.Connect.Infra.Data.csproj" />
+    <ProjectReference Include="..\Luxus.Connect.Infra.Crosscutting\Luxus.Connect.Infra.Crosscutting.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Keycloak.AuthServices.Authentication" Version="2.8.1" />
+    <PackageReference Include="Keycloak.AuthServices.Authorization" Version="2.8.1" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.5" />
+    <PackageReference Include="Goal.Infra.Http.Abstractions" Version="10.0.12" />
+    <PackageReference Include="MassTransit.RabbitMQ" Version="8.5.5" />
+    <PackageReference Include="ConduitR" Version="1.0.3" />
+    <PackageReference Include="ConduitR.Abstractions" Version="1.0.3" />
+    <PackageReference Include="ConduitR.DependencyInjection" Version="1.0.3" />
+  </ItemGroup>
+
+</Project>

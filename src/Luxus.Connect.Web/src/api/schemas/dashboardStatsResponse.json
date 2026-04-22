@@ -1,0 +1,38 @@
+{
+  "required": [
+    "billing_cycles_count",
+    "customers_count",
+    "providers_count",
+    "provider_invoices_count",
+    "phone_lines_count"
+  ],
+  "type": "object",
+  "properties": {
+    "billing_cycles_count": {
+      "pattern": "^-?(?:0|[1-9]\\d*)$",
+      "type": "integer",
+      "format": "int32"
+    },
+    "customers_count": {
+      "pattern": "^-?(?:0|[1-9]\\d*)$",
+      "type": "integer",
+      "format": "int32"
+    },
+    "providers_count": {
+      "pattern": "^-?(?:0|[1-9]\\d*)$",
+      "type": "integer",
+      "format": "int32"
+    },
+    "provider_invoices_count": {
+      "pattern": "^-?(?:0|[1-9]\\d*)$",
+      "type": "integer",
+      "format": "int32"
+    },
+    "phone_lines_count": {
+      "pattern": "^-?(?:0|[1-9]\\d*)$",
+      "type": "integer",
+      "format": "int32"
+    }
+  },
+  "x-readme-ref-name": "DashboardStatsResponse"
+}

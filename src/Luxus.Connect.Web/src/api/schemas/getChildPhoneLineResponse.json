@@ -1,0 +1,99 @@
+{
+  "required": [
+    "id",
+    "provider_plan_id",
+    "provider_account_id",
+    "cost_center_id",
+    "last_invoice_id",
+    "titular_line_id",
+    "number",
+    "line_classification",
+    "status",
+    "transition_sub_status",
+    "transition_started_at",
+    "activation_date",
+    "cancellation_date",
+    "plan",
+    "services"
+  ],
+  "type": "object",
+  "properties": {
+    "id": { "type": "string" },
+    "provider_plan_id": { "type": "string" },
+    "provider_account_id": { "type": "string" },
+    "cost_center_id": { "type": ["null", "string"] },
+    "last_invoice_id": { "type": ["null", "string"] },
+    "titular_line_id": { "type": ["null", "string"] },
+    "number": { "type": "string" },
+    "line_classification": { "type": "string" },
+    "status": { "type": "string" },
+    "transition_sub_status": { "type": ["null", "string"] },
+    "transition_started_at": {
+      "type": ["null", "string"],
+      "format": "date-time"
+    },
+    "activation_date": { "type": ["null", "string"], "format": "date" },
+    "cancellation_date": { "type": ["null", "string"], "format": "date" },
+    "plan": {
+      "required": ["id", "name", "code", "services"],
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "code": { "type": "string" },
+        "services": {
+          "type": "array",
+          "items": {
+            "required": ["id", "name", "active", "recurring", "price"],
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" },
+              "active": { "type": "boolean" },
+              "recurring": { "type": "boolean" },
+              "price": {
+                "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+                "type": ["null", "number"],
+                "format": "decimal"
+              }
+            },
+            "x-readme-ref-name": "GetProviderPlanServiceResponse"
+          }
+        }
+      },
+      "x-readme-ref-name": "GetProviderPlanResponse"
+    },
+    "services": {
+      "type": "array",
+      "items": {
+        "required": [
+          "id",
+          "phone_line_id",
+          "provider_plan_service_id",
+          "name",
+          "code",
+          "recurring",
+          "price",
+          "active"
+        ],
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "phone_line_id": { "type": "string" },
+          "provider_plan_service_id": { "type": "string" },
+          "name": { "type": "string" },
+          "code": { "type": "string" },
+          "recurring": { "type": "boolean" },
+          "price": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": ["null", "number"],
+            "format": "decimal"
+          },
+          "active": { "type": "boolean" }
+        },
+        "x-readme-ref-name": "GetPhoneLineServiceResponse"
+      }
+    }
+  },
+  "x-readme-ref-name": "GetChildPhoneLineResponse"
+}

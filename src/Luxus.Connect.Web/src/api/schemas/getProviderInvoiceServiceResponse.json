@@ -1,0 +1,44 @@
+{
+  "required": [
+    "id",
+    "invoice_id",
+    "plan_id",
+    "plan_name",
+    "description",
+    "quantity",
+    "total_price",
+    "quota_amount",
+    "consumed_amount",
+    "unit"
+  ],
+  "type": "object",
+  "properties": {
+    "id": { "type": "string" },
+    "invoice_id": { "type": "string" },
+    "plan_id": { "type": "string" },
+    "plan_name": { "type": "string" },
+    "description": { "type": "string" },
+    "quantity": {
+      "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+      "type": "number",
+      "format": "decimal"
+    },
+    "total_price": {
+      "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+      "type": "number",
+      "format": "decimal"
+    },
+    "quota_amount": {
+      "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+      "type": ["null", "number"],
+      "format": "decimal"
+    },
+    "consumed_amount": {
+      "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+      "type": ["null", "number"],
+      "format": "decimal"
+    },
+    "unit": { "type": ["null", "string"] }
+  },
+  "x-readme-ref-name": "GetProviderInvoiceServiceResponse"
+}

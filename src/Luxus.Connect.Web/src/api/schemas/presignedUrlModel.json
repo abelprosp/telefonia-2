@@ -1,0 +1,10 @@
+{
+  "required": ["url", "http_method", "expires_at_utc"],
+  "type": "object",
+  "properties": {
+    "url": { "type": "string" },
+    "http_method": { "type": "string" },
+    "expires_at_utc": { "type": "string", "format": "date-time" }
+  },
+  "x-readme-ref-name": "PresignedUrlModel"
+}

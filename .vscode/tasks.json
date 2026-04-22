@@ -1,0 +1,103 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "build",
+        "${workspaceFolder}/Luxus.Connect.slnx",
+        "/property:GenerateFullPaths=true",
+        "/consoleloggerparameters:NoSummary"
+      ],
+      "problemMatcher": "$msCompile",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+    {
+      "label": "debug",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "build",
+        "${workspaceFolder}/Luxus.Connect.slnx",
+        "/property:GenerateFullPaths=true",
+        "/consoleloggerparameters:NoSummary"
+      ],
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "publish-api",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "publish",
+        "${workspaceFolder}/src/Core/Luxus.Connect.Api/Luxus.Connect.Api.csproj",
+        "/property:GenerateFullPaths=true",
+        "/consoleloggerparameters:NoSummary"
+      ],
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "watch-api",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "watch",
+        "run",
+        "--project",
+        "${workspaceFolder}/src/Core/Luxus.Connect.Api/Luxus.Connect.Api.csproj"
+      ],
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "publish-worker",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "publish",
+        "${workspaceFolder}/src/Core/Luxus.Connect.Worker/Luxus.Connect.Worker.csproj",
+        "/property:GenerateFullPaths=true",
+        "/consoleloggerparameters:NoSummary"
+      ],
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "watch-worker",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "watch",
+        "run",
+        "--project",
+        "${workspaceFolder}/src/Core/Luxus.Connect.Worker/Luxus.Connect.Worker.csproj"
+      ],
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "docker-down",
+      "command": "docker-compose",
+      "type": "process",
+      "args": ["-f", "docker-compose.yml", "down"],
+      "problemMatcher": []
+    },
+    {
+      "label": "docker-up",
+      "command": "docker-compose",
+      "type": "process",
+      "args": [
+        "-f",
+        "docker-compose.yml",
+        "up",
+        "-d",
+        "--build",
+        "--force-recreate",
+        "--remove-orphans"
+      ],
+      "problemMatcher": []
+    }
+  ]
+}

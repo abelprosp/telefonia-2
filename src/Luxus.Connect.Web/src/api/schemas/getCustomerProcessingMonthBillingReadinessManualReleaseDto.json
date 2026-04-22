@@ -1,0 +1,10 @@
+{
+  "required": ["justification", "released_at", "released_by_user_id"],
+  "type": "object",
+  "properties": {
+    "justification": { "type": "string" },
+    "released_at": { "type": "string", "format": "date-time" },
+    "released_by_user_id": { "type": "string" }
+  },
+  "x-readme-ref-name": "GetCustomerProcessingMonthBillingReadinessManualReleaseDto"
+}

@@ -1,0 +1,6 @@
+{
+  "required": ["name", "slug"],
+  "type": "object",
+  "properties": { "name": { "type": "string" }, "slug": { "type": "string" } },
+  "x-readme-ref-name": "CreateProviderInput"
+}

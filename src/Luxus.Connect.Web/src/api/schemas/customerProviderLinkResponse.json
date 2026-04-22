@@ -1,0 +1,20 @@
+{
+  "required": [
+    "customer_id",
+    "provider_id",
+    "provider_name",
+    "start_date",
+    "end_date",
+    "is_active"
+  ],
+  "type": "object",
+  "properties": {
+    "customer_id": { "type": "string" },
+    "provider_id": { "type": "string" },
+    "provider_name": { "type": "string" },
+    "start_date": { "type": "string", "format": "date" },
+    "end_date": { "type": ["null", "string"], "format": "date" },
+    "is_active": { "type": "boolean" }
+  },
+  "x-readme-ref-name": "CustomerProviderLinkResponse"
+}

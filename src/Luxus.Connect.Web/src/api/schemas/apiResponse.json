@@ -1,0 +1,19 @@
+{
+  "type": "object",
+  "properties": {
+    "messages": {
+      "type": "array",
+      "items": {
+        "required": ["code", "message"],
+        "type": "object",
+        "properties": {
+          "code": { "type": "string" },
+          "message": { "type": "string" },
+          "param": { "type": ["null", "string"] }
+        },
+        "x-readme-ref-name": "Notification"
+      }
+    }
+  },
+  "x-readme-ref-name": "ApiResponse"
+}

@@ -1,0 +1,117 @@
+name: luxus-connect
+
+services:
+  postgres:
+    image: postgres:latest
+    container_name: postgres.connect.luxus
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres-vol:/var/lib/postgresql
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER}']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    hostname: 'mabbit'
+    image: rabbitmq:management
+    container_name: rabbitmq.connect.luxus
+    ports:
+      - 5672:5672
+      - 15672:15672
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RMQ_USER}
+      - RABBITMQ_DEFAULT_PASS=${RMQ_PWD}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq/
+      - rabbitmq-mnesia:/var/lib/rabbitmq/mnesia/
+
+  seq:
+    image: datalust/seq:latest
+    container_name: seq.connect.luxus
+    ports:
+      - 81:80
+      - 5341:5341
+    environment:
+      - ACCEPT_EULA=Y
+      - SEQ_FIRSTRUN_ADMINPASSWORDHASH=${SEQ_PWD_HASH}
+    volumes:
+      - seq-data:/var/lib/seq/data/
+
+  keycloak:
+    image: 'quay.io/keycloak/keycloak:latest'
+    container_name: keycloak.connect.luxus
+    hostname: keycloak.connect.luxus
+    user: root
+    ports:
+      - '8081:8080'
+      - '8443:8443'
+    environment:
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=${KC_ADMIN_PWD}
+      - KC_DB=postgres
+      - KC_DB_USERNAME=${KC_DB_USERNAME}
+      - KC_DB_PASSWORD=${KC_DB_PASSWORD}
+      - KC_DB_URL=jdbc:postgresql://postgres:5432/luxus_kc_dev
+    volumes:
+      - keycloak-data:/opt/keycloak/data
+      - ./resources/theme/:/opt/keycloak/themes/
+    entrypoint: /opt/keycloak/bin/kc.sh --verbose start-dev --spi-theme-static-max-age=-1 --spi-theme-cache-themes=false --spi-theme-cache-templates=false
+
+  connect-api:
+    image: ${REGISTRY:-luxus/connect/api}:${PLATFORM:-linux}-${TAG:-latest}
+    container_name: api.connect.luxus
+    restart: always
+    build:
+      context: .
+      dockerfile: src/Luxus.Connect.Api/Dockerfile
+    ports:
+      - '8002:80'
+      - '4432:443'
+
+  connect-web:
+    image: ${WEB_REGISTRY:-luxus/connect/web}:${PLATFORM:-linux}-${TAG:-latest}
+    container_name: web.connect.luxus
+    restart: always
+    build:
+      context: ./src/Luxus.Connect.Web
+      dockerfile: Dockerfile
+
+  connect-web-dev:
+    profiles:
+      - dev
+    image: node:22-alpine
+    container_name: web-dev.connect.luxus
+    working_dir: /app
+    environment:
+      - VITE_USE_POLLING=true
+      - VITE_API_URL=http://host.docker.internal:8002
+      - VITE_AUTH_URL=http://host.docker.internal:8081
+      - VITE_CLIENT_ID=connect-cli
+      - VITE_STORAGE_BUCKET_NAME=luxus-connect
+    volumes:
+      - ./src/Luxus.Connect.Web:/app
+      - web_dev_node_modules:/app/node_modules
+    command: sh -c "npm ci && npm run dev -- --host 0.0.0.0 --port 5173"
+    ports:
+      - '5173:5173'
+
+volumes:
+  postgres-vol:
+    name: connect.luxus.postgres-vol
+  seq-data:
+    name: connect.luxus.seq-vol
+  keycloak-data:
+    name: connect.luxus.keycloak-vol
+  rabbitmq-data:
+    name: connect.luxus.rabbitmq-data-vol
+  rabbitmq-mnesia:
+    name: connect.luxus.rabbitmq-mnesia-vol
+  web_dev_node_modules:
+    name: connect.luxus.web-dev-node-modules

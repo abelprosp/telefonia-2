@@ -1,0 +1,9 @@
+{
+  "required": ["customer_id", "transfer_date"],
+  "type": "object",
+  "properties": {
+    "customer_id": { "type": "string" },
+    "transfer_date": { "type": ["null", "string"], "format": "date" }
+  },
+  "x-readme-ref-name": "TransferPhoneLineCustomerInput"
+}

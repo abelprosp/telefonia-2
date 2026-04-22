@@ -1,0 +1,22 @@
+{
+  "required": [
+    "id",
+    "invoice_id",
+    "phone_line_id",
+    "description",
+    "consumed_amount"
+  ],
+  "type": "object",
+  "properties": {
+    "id": { "type": "string" },
+    "invoice_id": { "type": "string" },
+    "phone_line_id": { "type": "string" },
+    "description": { "type": "string" },
+    "consumed_amount": {
+      "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+      "type": ["null", "number"],
+      "format": "decimal"
+    }
+  },
+  "x-readme-ref-name": "GetProviderInvoiceQuotaSharingResponse"
+}

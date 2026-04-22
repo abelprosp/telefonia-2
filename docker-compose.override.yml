@@ -1,0 +1,34 @@
+services:
+  connect-web-dev:
+    profiles: []
+
+  connect-web:
+    ports:
+      - '3000:80'
+
+  connect-api:
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_ConnectionStrings__DefaultConnection=Host=postgres;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};Database=luxus_connect_dev;
+      - ASPNETCORE_ConnectionStrings__Seq=http://host.docker.internal:5341
+      - ASPNETCORE_ConnectionStrings__RabbitMq=amqp://${RMQ_USER}:${RMQ_PWD}@rabbitmq:5672
+      - ASPNETCORE_URLS=https://+;http://+
+      - ASPNETCORE_HTTPS_PORT=4432
+      - ASPNETCORE_Keycloak__Realm=luxus
+      - ASPNETCORE_Keycloak__AuthServerUrl=http://host.docker.internal:8081
+      - ASPNETCORE_Keycloak__SslRequired=none
+      - ASPNETCORE_Keycloak__Resource=connect-cli
+      - ASPNETCORE_Keycloak__VerifyTokenAudience=true
+      - ASPNETCORE_Keycloak__Scopes=email profile connect-cli-scope organization
+      - ASPNETCORE_Keycloak__ConfidentialPort=0
+      - ASPNETCORE_ObjectStorage__ServiceUrl=${OBJECT_STORAGE_SERVICE_URL}
+      - ASPNETCORE_ObjectStorage__AccessKeyId=${OBJECT_STORAGE_ACCESS_KEY_ID}
+      - ASPNETCORE_ObjectStorage__SecretAccessKey=${OBJECT_STORAGE_SECRET_ACCESS_KEY}
+      - ASPNETCORE_Cors__Origins=https://localhost:4432;http://localhost:8002;http://localhost:4200;http://localhost:3000;http://localhost:5173
+      - ASPNETCORE_Serilog__MinimumLevel__Default=Information
+      - ASPNETCORE_Serilog__MinimumLevel__Override__Microsoft.EntityFrameworkCore=Information
+    volumes:
+      - ${APPDATA}/Microsoft/UserSecrets:/home/app/.microsoft/usersecrets:ro
+      - ${APPDATA}/Microsoft/UserSecrets:/root/.microsoft/usersecrets:ro
+      - ${APPDATA}/ASP.NET/Https:/home/app/.aspnet/https:ro
+      - ${APPDATA}/ASP.NET/Https:/root/.aspnet/https:ro

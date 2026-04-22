@@ -1,0 +1,59 @@
+{
+  "required": [
+    "id",
+    "provider_plan_id",
+    "provider_plan_name",
+    "provider_account_id",
+    "provider_account_number",
+    "cost_center_id",
+    "cost_center_name",
+    "last_invoice_id",
+    "last_invoice_number",
+    "titular_line_id",
+    "titular_line_number",
+    "number",
+    "line_classification",
+    "status",
+    "transition_sub_status",
+    "transition_started_at",
+    "activation_date",
+    "cancellation_date",
+    "base_cost",
+    "cost_with_consumption"
+  ],
+  "type": "object",
+  "properties": {
+    "id": { "type": "string" },
+    "provider_plan_id": { "type": "string" },
+    "provider_plan_name": { "type": "string" },
+    "provider_account_id": { "type": "string" },
+    "provider_account_number": { "type": "string" },
+    "cost_center_id": { "type": ["null", "string"] },
+    "cost_center_name": { "type": ["null", "string"] },
+    "last_invoice_id": { "type": ["null", "string"] },
+    "last_invoice_number": { "type": ["null", "string"] },
+    "titular_line_id": { "type": ["null", "string"] },
+    "titular_line_number": { "type": ["null", "string"] },
+    "number": { "type": "string" },
+    "line_classification": { "type": "string" },
+    "status": { "type": "string" },
+    "transition_sub_status": { "type": ["null", "string"] },
+    "transition_started_at": {
+      "type": ["null", "string"],
+      "format": "date-time"
+    },
+    "activation_date": { "type": ["null", "string"], "format": "date" },
+    "cancellation_date": { "type": ["null", "string"], "format": "date" },
+    "base_cost": {
+      "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+      "type": ["null", "number"],
+      "format": "decimal"
+    },
+    "cost_with_consumption": {
+      "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+      "type": ["null", "number"],
+      "format": "decimal"
+    }
+  },
+  "x-readme-ref-name": "ListPhoneLineResponse"
+}
