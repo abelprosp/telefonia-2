@@ -30,19 +30,11 @@ Copia `docker/env.deploy.example` para `.env` na raiz e preenche. Variáveis usa
 
 ---
 
-## `nuget.config` (feed privado Azure DevOps)
+## Pacotes NuGet privados (`Goal.*` / Azure Artifacts)
 
-O ficheiro **`nuget.config` na raiz do repositório** está no **`.gitignore`**: não acompanha `git clone`. Para builds na VPS (Dockerfile da API faz `COPY nuget.config`):
+O **`docker compose build` da API** monta um segredo BuildKit a partir de **`${NUGET_CONFIG_FILE:-docker/build-secrets/nuget.config}`** (substitui por um ficheiro só na VPS com URL + `packageSourceCredentials` do Azure Artifacts, sem committar segredos ao Git). Alternativa sem ficheiro: **`NUGET_FEED_URL`** + **`NUGET_PAT`** no **`.env`**.
 
-1. Copia o ficheiro da tua máquina local, por exemplo:
-
-   ```bash
-   scp nuget.config usuario@servidor:/caminho/do/luxus-connect/nuget.config
-   ```
-
-2. Confirma na VPS: `ls -la nuget.config` na raiz do clone.
-
-3. Restringe permissões se quiseres: `chmod 600 nuget.config`.
+Para `dotnet restore` à parte (CI ou máquinas de desenvolvimento), **`nuget.config`** na raiz continua válido onde o projeto o utilizar (**`.gitignore`**).
 
 ---
 

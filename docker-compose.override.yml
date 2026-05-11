@@ -7,6 +7,9 @@ services:
       - '3000:80'
 
   connect-api:
+    depends_on:
+      postgres:
+        condition: service_healthy
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_ConnectionStrings__DefaultConnection=Host=postgres;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};Database=luxus_connect_dev;

@@ -1,5 +1,9 @@
 name: luxus-connect
 
+secrets:
+  nuget_config:
+    file: ${NUGET_CONFIG_FILE:-./docker/build-secrets/nuget.config}
+
 services:
   postgres:
     image: postgres:latest
@@ -71,6 +75,12 @@ services:
     build:
       context: .
       dockerfile: src/Luxus.Connect.Api/Dockerfile
+      args:
+        NUGET_FEED_URL: ${NUGET_FEED_URL:-}
+        NUGET_PAT: ${NUGET_PAT:-}
+      secrets:
+        - source: nuget_config
+          target: nuget_config
     ports:
       - '8002:80'
       - '4432:443'
