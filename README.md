@@ -106,9 +106,10 @@ OBJECT_STORAGE_SECRET_ACCESS_KEY=
 
 **Seq:** gerar hash em [Seq password hashing](https://blog.datalust.co/setting-an-initial-password-when-deploying-seq-to-docker/).
 
-### 3. `nuget.config` (feed privado)
+### 3. Pacotes privados (Azure Artifacts / `Goal.*`)
 
-Se o projeto depender de pacotes privados, mantenha `nuget.config` na raiz (no `.gitignore` em alguns ambientes — copie para a máquina/VPS antes do `docker build`). Exemplo no README histórico: credenciais Azure DevOps.
+- **Docker (`docker compose ... --build`)**: o build injeta **`docker/build-secrets/nuget.config`** como segredo BuildKit — pode ser (1) substituído pelo `nuget.config` completo da equipa, ou (2) usar **`docker/build-secrets/nuget.credentials.config`** (no `.gitignore`) + **`NUGET_CONFIG_FILE`** no `.env`, ou (3) **`NUGET_FEED_URL`** + **`NUGET_PAT`** no `.env`.
+- **SDK local (Visual Studio / `dotnet restore`)**: mantenha `nuget.config` na raiz (geralmente no `.gitignore` — copie da equipa). Detalhes de deploy: [`docs/DEPLOY_VPS.md`](docs/DEPLOY_VPS.md).
 
 ### 4. Certificados HTTPS (Windows, API local)
 
@@ -220,3 +221,5 @@ Se alterar o domínio, atualize em conjunto: `docker-compose.prod.yml`, `connect
 ## Contato
 
 - Anderson Ritter de Souza — [@ritter.ander](https://www.instagram.com/ritter.ander) — anderdsouza@gmail.com
+#   t e l e f o n i a 2  
+ 
