@@ -1,4 +1,4 @@
-import { format, parse, parseISO } from 'date-fns';
+import { format, isValid, parse, parseISO } from 'date-fns';
 
 declare global {
   interface String {
@@ -11,12 +11,23 @@ declare global {
   }
 }
 
-String.prototype.toDate = function (format?: string): Date | undefined {
-  if (!format) {
-    return parseISO(String(this));
+String.prototype.toDate = function (formatStr?: string): Date | undefined {
+  const value = String(this).trim();
+  if (!value) {
+    return undefined;
   }
 
-  return parse(String(this), format, new Date());
+  let date: Date;
+  if (!formatStr) {
+    date = parseISO(value);
+  } else {
+    date = parse(value, formatStr, new Date());
+    if (!isValid(date)) {
+      date = parseISO(value);
+    }
+  }
+
+  return isValid(date) ? date : undefined;
 };
 
 String.prototype.toCurrency = function (

@@ -1,11 +1,12 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
 import { getRouteApi } from '@tanstack/react-router';
-import { PackageX } from 'lucide-react';
+import { PackageX, Plus } from 'lucide-react';
 
 import { useGetV1PhoneLines } from '@/api';
 import { DataTable, DataTablePagination } from '@/components/data-table';
 import { ListPageHeader, ListPageSkeleton } from '@/components/list-page';
+import { Button } from '@/components/ui/button';
 import {
   Empty,
   EmptyDescription,
@@ -17,6 +18,7 @@ import { getErrorMessage, isApiHttpError } from '@/lib/api-error';
 import { parseTotalCount } from '@/lib/query-utils';
 
 import { createStockLinesColumns } from './columns';
+import { StockLineCreateSheet } from './stock-line-create-sheet';
 
 const routeApi = getRouteApi('/__app/stock/');
 
@@ -34,13 +36,14 @@ const STOCK_LINES_SKELETON_COLUMNS = [
 export function StockLinesList() {
   const { page, pageSize } = routeApi.useSearch();
   const navigate = routeApi.useNavigate();
+  const [createOpen, setCreateOpen] = useState(false);
 
   const pageIndex = page - 1;
 
   const listQuery = useGetV1PhoneLines({
     page_index: pageIndex,
     page_size: pageSize,
-    status: 'IN_STOCK'
+    status: 'in_stock'
   });
 
   const total = parseTotalCount(listQuery.data?.total_count);
@@ -97,7 +100,19 @@ export function StockLinesList() {
     <div className="flex flex-col gap-6">
       <ListPageHeader
         title="Estoque de linhas"
-        description="Linhas com situação em estoque (sem vínculo ativo em fatura no período ou conforme regras da operadora)"
+        description="Linhas disponíveis sem vínculo com cliente. Também entram automaticamente ao importar faturas."
+        action={
+          <Button onClick={() => setCreateOpen(true)}>
+            <Plus />
+            Cadastrar linha
+          </Button>
+        }
+      />
+
+      <StockLineCreateSheet
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onSuccess={() => void listQuery.refetch()}
       />
 
       <DataTable

@@ -31,6 +31,7 @@ const router = createRouter({
 const oidcConfig = {
   authority: `${env.VITE_AUTH_URL}/realms/luxus`,
   client_id: env.VITE_CLIENT_ID,
+  scope: 'openid organization',
   redirect_uri: window.location.origin,
   onSigninCallback: () => {
     window.history.replaceState({}, document.title, window.location.pathname);
@@ -40,7 +41,7 @@ const oidcConfig = {
 
 createRoot(document.getElementById('root')!).render(
   <AuthProvider {...oidcConfig}>
-    <AppProvider defaultTheme="dark" storageKey="luxus-connect">
+    <AppProvider defaultTheme="light" storageKey="luxus-connect">
       <RouterProvider router={router} />
     </AppProvider>
   </AuthProvider>

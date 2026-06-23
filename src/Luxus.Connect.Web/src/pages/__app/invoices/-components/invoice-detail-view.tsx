@@ -19,7 +19,10 @@ import {
   formatInvoiceStatus,
   formatPhoneNumber
 } from '@/lib/format';
+import { useAuthRoles } from '@/lib/auth-roles';
 import { cn } from '@/lib/utils';
+
+import { InvoiceFinancialActions } from './invoice-financial-actions';
 
 type InvoicesListSearch = {
   page: number;
@@ -93,6 +96,7 @@ export function InvoiceDetailView({
   invoice,
   listSearch
 }: InvoiceDetailViewProps) {
+  const { canAccessFinance } = useAuthRoles();
   const backLink = {
     to: '/invoices' as const,
     search: {
@@ -142,9 +146,7 @@ export function InvoiceDetailView({
               <FieldLabel>Emissão</FieldLabel>
               <ReadOnlyField
                 value={
-                  invoice.issue_date
-                    ?.toDate('yyyy-MM-dd')
-                    ?.format('dd/MM/yyyy') ?? '-'
+                  invoice.issue_date?.toDate()?.format('dd/MM/yyyy') ?? '-'
                 }
               />
             </Field>
@@ -152,9 +154,7 @@ export function InvoiceDetailView({
               <FieldLabel>Vencimento</FieldLabel>
               <ReadOnlyField
                 value={
-                  invoice.due_date
-                    ?.toDate('yyyy-MM-dd')
-                    ?.format('dd/MM/yyyy') ?? '-'
+                  invoice.due_date?.toDate()?.format('dd/MM/yyyy') ?? '-'
                 }
               />
             </Field>
@@ -165,6 +165,23 @@ export function InvoiceDetailView({
           </div>
         </FieldGroup>
       </DetailSection>
+
+      {canAccessFinance ? (
+        <>
+          <Separator />
+          <DetailSection
+            title="Financeiro"
+            description="Vincule esta fatura da operadora a uma conta a pagar para o refaturamento."
+          >
+            <InvoiceFinancialActions
+              invoiceId={invoice.id}
+              totalAmount={invoice.total_amount}
+              accountPayableId={invoice.account_payable_id}
+              accountPayableStatus={invoice.account_payable_status}
+            />
+          </DetailSection>
+        </>
+      ) : null}
 
       <Separator />
 

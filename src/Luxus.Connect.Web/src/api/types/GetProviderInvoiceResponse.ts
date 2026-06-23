@@ -105,6 +105,8 @@ export type GetProviderInvoiceResponse = {
    * @type number, decimal
    */
   subtotal_installments: number;
+  account_payable_id?: string | null;
+  account_payable_status?: string | null;
   /**
    * @type array
    */

@@ -135,7 +135,7 @@ export function CustomerCreateSheet({
         type: values.type,
         name: values.name.trim(),
         legal_name: values.legal_name?.trim() || null,
-        document: values.document.trim(),
+        document: values.document.replace(/\D/g, ''),
         state_registration: values.state_registration?.trim() || null,
         birth_or_opening_date: values.birth_or_opening_date?.trim() || null,
         responsible_salesperson_user_id:

@@ -1,9 +1,5 @@
 name: luxus-connect
 
-secrets:
-  nuget_config:
-    file: ${NUGET_CONFIG_FILE:-./docker/build-secrets/nuget.config}
-
 services:
   postgres:
     image: postgres:latest
@@ -66,24 +62,18 @@ services:
     volumes:
       - keycloak-data:/opt/keycloak/data
       - ./resources/theme/:/opt/keycloak/themes/
-    entrypoint: /opt/keycloak/bin/kc.sh --verbose start-dev --spi-theme-static-max-age=-1 --spi-theme-cache-themes=false --spi-theme-cache-templates=false
+      - ./docker/keycloak/luxus-realm.json:/opt/keycloak/data/import/luxus-realm.json:ro
+    entrypoint: /opt/keycloak/bin/kc.sh --verbose start-dev --import-realm --spi-theme-static-max-age=-1 --spi-theme-cache-themes=false --spi-theme-cache-templates=false
 
   connect-api:
     image: ${REGISTRY:-luxus/connect/api}:${PLATFORM:-linux}-${TAG:-latest}
     container_name: api.connect.luxus
     restart: always
     build:
-      context: .
-      dockerfile: src/Luxus.Connect.Api/Dockerfile
-      args:
-        NUGET_FEED_URL: ${NUGET_FEED_URL:-}
-        NUGET_PAT: ${NUGET_PAT:-}
-      secrets:
-        - source: nuget_config
-          target: nuget_config
+      context: ./api
+      dockerfile: Dockerfile
     ports:
       - '8002:80'
-      - '4432:443'
 
   connect-web:
     image: ${WEB_REGISTRY:-luxus/connect/web}:${PLATFORM:-linux}-${TAG:-latest}
@@ -101,10 +91,6 @@ services:
     working_dir: /app
     environment:
       - VITE_USE_POLLING=true
-      - VITE_API_URL=http://host.docker.internal:8002
-      - VITE_AUTH_URL=http://host.docker.internal:8081
-      - VITE_CLIENT_ID=connect-cli
-      - VITE_STORAGE_BUCKET_NAME=luxus-connect
     volumes:
       - ./src/Luxus.Connect.Web:/app
       - web_dev_node_modules:/app/node_modules

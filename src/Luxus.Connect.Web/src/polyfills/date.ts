@@ -9,6 +9,7 @@ import {
   isBefore,
   isEqual,
   isToday,
+  isValid,
   isWeekend,
   startOfDay
 } from 'date-fns';
@@ -35,6 +36,10 @@ declare global {
 }
 
 Date.prototype.format = function (formatStr?: string): string {
+  if (!isValid(this)) {
+    return '—';
+  }
+
   if (formatStr) {
     return format(this, formatStr);
   }

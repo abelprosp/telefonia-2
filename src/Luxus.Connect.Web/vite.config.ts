@@ -7,6 +7,9 @@ import { defineConfig } from 'vite';
 
 // https://vite.dev/config/
 export default defineConfig({
+  optimizeDeps: {
+    include: ['jwt-decode', 'react-oidc-context', 'oidc-client-ts']
+  },
   server: {
     host: true,
     port: 5173,

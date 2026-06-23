@@ -259,6 +259,12 @@ export function InvoiceImportSheet({
   };
 
   const providers = providersQuery.data?.items ?? [];
+  const selectedProviderId = form.watch('providerId');
+  const openProcessingMonths = (processingMonthsQuery.data?.items ?? []).filter(
+    (m: ListProcessingMonthResponse) =>
+      m.status === 'open' &&
+      (!selectedProviderId || m.provider_id === selectedProviderId)
+  );
 
   return (
     <Sheet
@@ -302,7 +308,7 @@ export function InvoiceImportSheet({
                   >
                     <SelectTrigger className="border-input bg-background w-full max-w-none rounded-xl border">
                       <SelectValue placeholder="Selecione">
-                        {(processingMonthsQuery.data?.items ?? []).find(
+                        {openProcessingMonths.find(
                           (m: ListProcessingMonthResponse) =>
                             m.id === field.value
                         )?.display_name ?? 'Selecione'}
@@ -310,7 +316,7 @@ export function InvoiceImportSheet({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
-                        {(processingMonthsQuery.data?.items ?? []).map(
+                        {openProcessingMonths.map(
                           (m: ListProcessingMonthResponse) => (
                             <SelectItem key={m.id} value={m.id}>
                               {m.display_name}

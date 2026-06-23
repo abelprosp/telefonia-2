@@ -8,8 +8,7 @@ import {
   Phone,
   Plus,
   Receipt,
-  Users,
-  type LucideIcon
+  Users
 } from 'lucide-react';
 
 import {
@@ -17,12 +16,6 @@ import {
   useGetV1PhoneLines,
   useGetV1StatsDashboard
 } from '@/api';
-import {
-  StatsHero,
-  StatsMetricCard,
-  StatsMetricGrid,
-  StatsPanel
-} from '@/components/stats-layout';
 import { Button } from '@/components/ui/button';
 import {
   Empty,
@@ -54,6 +47,11 @@ import {
 } from '@/lib/format';
 import { parseTotalCount } from '@/lib/query-utils';
 
+import { DashboardMetricCard } from './dashboard-metric-card';
+
+const formatCount = (value: number) =>
+  new Intl.NumberFormat('pt-BR').format(value);
+
 export const DashboardView = () => {
   const statsQuery = useGetV1StatsDashboard();
   const customersQuery = useGetV1Customers({
@@ -73,18 +71,14 @@ export const DashboardView = () => {
   if (summaryPending) {
     return (
       <div className="flex flex-col gap-6">
-        <StatsHero
-          align="left"
-          title="Visão geral"
-          subtitle="Indicadores consolidados da API Luxus.Connect."
-        />
-        <StatsMetricGrid className="mt-8 grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-5">
+        <Skeleton className="h-10 w-72 rounded-xl" />
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           {Array.from({ length: 5 }).map((_, i) => (
-            <Skeleton key={i} className="h-44 rounded-xl" />
+            <Skeleton key={i} className="h-32 rounded-2xl" />
           ))}
-        </StatsMetricGrid>
-        <Skeleton className="h-48 rounded-xl" />
-        <Skeleton className="h-48 rounded-xl" />
+        </div>
+        <Skeleton className="h-80 rounded-2xl" />
+        <Skeleton className="h-80 rounded-2xl" />
       </div>
     );
   }
@@ -95,7 +89,7 @@ export const DashboardView = () => {
   if (summaryError) {
     const err = summaryError;
     return (
-      <div className="border-destructive/40 bg-destructive/10 text-destructive rounded-lg border px-4 py-3 text-sm">
+      <div className="border-destructive/40 bg-destructive/10 text-destructive rounded-2xl border px-4 py-3 text-sm">
         {isApiHttpError(err) ? err.message : getErrorMessage(err)}
       </div>
     );
@@ -109,53 +103,38 @@ export const DashboardView = () => {
     return null;
   }
 
-  const metrics: {
-    variant: 'blue' | 'green' | 'red' | 'amber' | 'purple';
-    icon: LucideIcon;
-    value: number;
-    title: string;
-    description?: string;
-    to: string;
-    search?: Record<string, unknown>;
-    featured?: boolean;
-  }[] = [
+  const metrics = [
     {
-      variant: 'blue',
-      icon: Users,
-      value: parseTotalCount(stats.customers_count),
       title: 'Clientes',
+      value: formatCount(parseTotalCount(stats.customers_count)),
+      icon: Users,
       to: '/customers'
     },
     {
-      variant: 'green',
-      icon: Building2,
-      value: parseTotalCount(stats.providers_count),
       title: 'Operadoras',
+      value: formatCount(parseTotalCount(stats.providers_count)),
+      icon: Building2,
       to: '/providers',
       search: { page: 1, pageSize: 10 }
     },
     {
-      variant: 'red',
-      icon: Phone,
-      value: parseTotalCount(stats.phone_lines_count),
       title: 'Linhas telefônicas',
+      value: formatCount(parseTotalCount(stats.phone_lines_count)),
+      icon: Phone,
       to: '/phone-lines',
-      search: { page: 1, pageSize: 10 },
-      featured: true
+      search: { page: 1, pageSize: 10 }
     },
     {
-      variant: 'amber',
+      title: 'Faturas emitidas',
+      value: formatCount(parseTotalCount(stats.provider_invoices_count)),
       icon: FileText,
-      value: parseTotalCount(stats.provider_invoices_count),
-      title: 'Faturas emitidas pelas operadoras',
       to: '/invoices',
       search: { page: 1, pageSize: 10 }
     },
     {
-      variant: 'purple',
-      icon: Calendar,
-      value: parseTotalCount(stats.billing_cycles_count),
       title: 'Ciclos de faturamento',
+      value: formatCount(parseTotalCount(stats.billing_cycles_count)),
+      icon: Calendar,
       to: '/billing-cycles',
       search: { page: 1, pageSize: 10 }
     }
@@ -163,63 +142,54 @@ export const DashboardView = () => {
 
   return (
     <div className="flex flex-col gap-6">
-      <StatsHero align="left" title="Dashboard" />
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+          Visão geral
+        </h1>
+        <p className="text-muted-foreground mt-1 text-sm">
+          Indicadores consolidados da operação de telefonia
+        </p>
+      </div>
 
-      <StatsPanel title="Visão geral" description="Indicadores consolidados">
-        <StatsMetricGrid className="grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3">
-          {metrics.map((m) => (
-            <StatsMetricCard
-              key={m.title}
-              variant={m.variant}
-              icon={m.icon}
-              value={m.value}
-              title={m.title}
-              description={m.description}
-              to={m.to}
-              search={m.search}
-              featured={m.featured}
-            />
-          ))}
-        </StatsMetricGrid>
-      </StatsPanel>
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        {metrics.map((metric) => (
+          <DashboardMetricCard key={metric.title} {...metric} />
+        ))}
+      </div>
 
-      <StatsPanel
-        title="Clientes recentes"
-        description="Últimos 10 clientes cadastrados"
-      >
-        <RecentCustomersTable rows={customers.items ?? []} />
-      </StatsPanel>
-
-      <StatsPanel
-        title="Linhas recentes"
-        description="Últimas 10 linhas telefônicas cadastradas"
-      >
-        <RecentPhoneLinesTable rows={phoneLines.items ?? []} />
-      </StatsPanel>
+      <RecentCustomersPanel rows={customers.items ?? []} />
+      <RecentPhoneLinesPanel rows={phoneLines.items ?? []} />
     </div>
   );
 };
 
-const RecentCustomersTable = ({
+const RecentCustomersPanel = ({
   rows
 }: {
   rows: { id: string; name: string; cpf_cnpj: string; active: boolean }[];
 }) => {
   return (
-    <div className="w-full overflow-hidden rounded-md border">
+    <div className="dashboard-card overflow-hidden">
+      <div className="border-b px-5 py-4">
+        <h3 className="text-lg font-semibold">Clientes recentes</h3>
+        <p className="text-muted-foreground text-sm">
+          Últimos cadastros na plataforma
+        </p>
+      </div>
+
       <Table>
         <TableHeader>
-          <TableRow>
-            <TableHead>Nome</TableHead>
+          <TableRow className="hover:bg-transparent">
+            <TableHead>Cliente</TableHead>
             <TableHead>Documento</TableHead>
-            <TableHead className="w-28">Situação</TableHead>
-            <TableHead className="w-24 text-right"> </TableHead>
+            <TableHead>Situação</TableHead>
+            <TableHead className="w-24 text-right" />
           </TableRow>
         </TableHeader>
         <TableBody>
           {rows.length === 0 ? (
-            <TableRow className="rounded-b-lg">
-              <TableCell className="font-medium" colSpan={4}>
+            <TableRow>
+              <TableCell colSpan={4}>
                 <Empty>
                   <EmptyHeader>
                     <EmptyMedia variant="icon">
@@ -227,8 +197,8 @@ const RecentCustomersTable = ({
                     </EmptyMedia>
                     <EmptyTitle>Nenhum cliente encontrado</EmptyTitle>
                     <EmptyDescription>
-                      Você ainda não cadastrou nenhum cliente. Comece
-                      cadastrando seu primeiro cliente ou importe uma fatura.
+                      Comece cadastrando seu primeiro cliente ou importe uma
+                      fatura.
                     </EmptyDescription>
                   </EmptyHeader>
                   <EmptyContent>
@@ -246,7 +216,7 @@ const RecentCustomersTable = ({
             </TableRow>
           ) : (
             rows.map((row) => (
-              <TableRow className="odd:bg-muted/50" key={row.id}>
+              <TableRow key={row.id}>
                 <TableCell className="font-medium">{row.name}</TableCell>
                 <TableCell className="text-muted-foreground">
                   {formatCpfCnpj(row.cpf_cnpj)}
@@ -255,15 +225,15 @@ const RecentCustomersTable = ({
                   <span
                     className={
                       row.active
-                        ? 'text-emerald-600 dark:text-emerald-400'
-                        : 'text-muted-foreground'
+                        ? 'inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700'
+                        : 'text-muted-foreground inline-flex rounded-full bg-muted px-2.5 py-1 text-xs font-medium'
                     }
                   >
                     {row.active ? 'Ativo' : 'Inativo'}
                   </span>
                 </TableCell>
                 <TableCell>
-                  <div className="flex justify-end gap-2">
+                  <div className="flex justify-end">
                     <Tooltip>
                       <TooltipTrigger
                         render={
@@ -281,7 +251,6 @@ const RecentCustomersTable = ({
                                   pageSize: 10,
                                   providerId: undefined
                                 }}
-                                className="text-primary hover:underline"
                               >
                                 <FilePenLine />
                               </Link>
@@ -302,69 +271,57 @@ const RecentCustomersTable = ({
   );
 };
 
-const RecentPhoneLinesTable = ({
+const RecentPhoneLinesPanel = ({
   rows
 }: {
   rows: { id: string; number: string | null; status?: string | null }[];
 }) => {
   return (
-    <div className="w-full overflow-hidden rounded-md border">
+    <div className="dashboard-card overflow-hidden">
+      <div className="border-b px-5 py-4">
+        <h3 className="text-lg font-semibold">Linhas recentes</h3>
+        <p className="text-muted-foreground text-sm">
+          Últimas linhas telefônicas cadastradas
+        </p>
+      </div>
+
       <Table>
         <TableHeader>
-          <TableRow>
+          <TableRow className="hover:bg-transparent">
             <TableHead>Número</TableHead>
             <TableHead>Status</TableHead>
-            <TableHead className="w-24 text-right"> </TableHead>
+            <TableHead className="w-24 text-right" />
           </TableRow>
         </TableHeader>
         <TableBody>
           {rows.length === 0 ? (
-            <TableRow className="rounded-b-lg">
-              <TableCell className="font-medium" colSpan={4}>
+            <TableRow>
+              <TableCell colSpan={3}>
                 <Empty>
                   <EmptyHeader>
                     <EmptyMedia variant="icon">
-                      <Receipt />
+                      <Phone />
                     </EmptyMedia>
                     <EmptyTitle>Nenhuma linha encontrada</EmptyTitle>
                     <EmptyDescription>
-                      Você ainda não cadastrou nenhuma linha telefônica. Comece
-                      cadastrando sua primeira linha telefônica ou importe uma
-                      fatura.
+                      Cadastre uma linha telefônica ou importe uma fatura para
+                      começar.
                     </EmptyDescription>
                   </EmptyHeader>
-                  <EmptyContent>
-                    <div className="flex flex-wrap gap-2 *:mx-auto">
-                      <Button>
-                        <Plus /> Cadastrar linha
-                      </Button>
-                      <Button variant="outline">
-                        <Import /> Importar fatura
-                      </Button>
-                    </div>
-                  </EmptyContent>
                 </Empty>
               </TableCell>
             </TableRow>
           ) : (
             rows.map((line) => (
-              <TableRow key={line.id} className="odd:bg-muted/50">
-                <TableCell className="text-sm font-medium">
+              <TableRow key={line.id}>
+                <TableCell className="font-medium">
                   {formatPhoneNumber(line.number!) ?? '—'}
                 </TableCell>
                 <TableCell className="text-muted-foreground">
-                  <span
-                    className={
-                      line.status === 'ACTIVE'
-                        ? 'text-emerald-600 dark:text-emerald-400'
-                        : 'text-muted-foreground'
-                    }
-                  >
-                    {formatPhoneLineStatus(line.status) ?? '—'}
-                  </span>
+                  {formatPhoneLineStatus(line.status) ?? '—'}
                 </TableCell>
                 <TableCell>
-                  <div className="flex justify-end gap-2">
+                  <div className="flex justify-end">
                     <Tooltip>
                       <TooltipTrigger
                         render={
@@ -378,7 +335,6 @@ const RecentPhoneLinesTable = ({
                                 to="/phone-lines/$phoneLineId"
                                 params={{ phoneLineId: line.id }}
                                 search={{ page: 1, pageSize: 10 }}
-                                className="text-primary hover:underline"
                               >
                                 <FilePenLine />
                               </Link>

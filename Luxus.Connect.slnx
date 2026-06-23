@@ -8,33 +8,16 @@
     <File Path="api.http" />
     <File Path="CHANGELOG.md" />
     <File Path="CONTRIBUTING.md" />
-    <File Path="nuget.config" />
     <File Path="README.md" />
   </Folder>
 
+  <Folder Name="/api/" />
   <Folder Name="/src/" />
-  <Folder Name="/src/0. Web/">
+  <Folder Name="/src/Web/">
     <Project Path="src/Luxus.Connect.Web/Luxus.Connect.Web.esproj">
       <Build />
       <Deploy />
     </Project>
-  </Folder>
-  <Folder Name="/src/1. Api/">
-    <Project Path="src/Luxus.Connect.Api/Luxus.Connect.Api.csproj" Id="ad52d5ca-3e51-4304-ba0b-d4e241cb1dc3" />
-  </Folder>
-  <Folder Name="/src/2. Application/">
-    <Project Path="src/Luxus.Connect.Application/Luxus.Connect.Application.csproj" />
-    <Project Path="src/Luxus.Connect.Contracts/Luxus.Connect.Contracts.csproj" Id="ed588cad-b74e-4904-a1fe-39d439ca7077" />
-  </Folder>
-  <Folder Name="/src/3. Domain/">
-    <Project Path="src/Luxus.Connect.Domain/Luxus.Connect.Domain.csproj" Id="7d683825-4b9d-4dae-b27f-a4851868ae99" />
-  </Folder>
-  <Folder Name="/src/4. Infrastructure/">
-    <Project Path="src/Luxus.Connect.Infra.Crosscutting/Luxus.Connect.Infra.Crosscutting.csproj" />
-    <Project Path="src/Luxus.Connect.Infra.Data.Query/Luxus.Connect.Infra.Data.Query.csproj" Id="09ea782f-8674-4825-9be4-928e68323ea0" />
-    <Project Path="src/Luxus.Connect.Infra.Data/Luxus.Connect.Infra.Data.csproj" Id="f87daebd-6cf6-443e-8517-8f756a0b9121" />
-    <Project Path="src/Luxus.Connect.Infra.Http/Luxus.Connect.Infra.Http.csproj" Id="fc6c575c-d235-4f41-bfd3-0b621304d5e4" />
-    <Project Path="src/Luxus.Connect.Infra.IoC/Luxus.Connect.Infra.IoC.csproj" Id="9026f8ad-82b8-47e6-aa85-a2c1b78fb9f3" />
   </Folder>
   <Project Path="docker-compose.dcproj">
     <Build />

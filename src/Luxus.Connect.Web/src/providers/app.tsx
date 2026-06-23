@@ -45,6 +45,9 @@ export const AppProvider = ({
 }: AppProviderProps) => {
   const { signinRedirect, user } = useAuth();
 
+  // Regista o token antes dos filhos dispararem queries (useEffect corre depois dos filhos).
+  registerAuthTokenGetter(() => user?.access_token ?? null);
+
   const [theme, setTheme] = useState<Theme>(
     () => getItem(`${storageKey}.theme`, defaultTheme)!
   );

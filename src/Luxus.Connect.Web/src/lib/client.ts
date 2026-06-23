@@ -123,7 +123,7 @@ api.interceptors.response.use(
     const response = error.response;
 
     if (response) {
-      const hadToken = !getAccessTokenFromAuth();
+      const hadToken = Boolean(getAccessTokenFromAuth());
 
       if (response.status === 401 && hadToken) {
         onUnauthorized?.();

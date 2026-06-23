@@ -11,6 +11,7 @@ import {
   TooltipTrigger
 } from '@/components/ui/tooltip';
 import { formatInvoiceStatus } from '@/lib/format';
+import { formatFinancialStatus } from '@/lib/financial-api';
 
 type InvoicesListSearch = {
   page: number;
@@ -58,7 +59,7 @@ export function createInvoicesColumns(opts: {
         <DataTableColumnHeader column={column} title="Emissão" />
       ),
       cell: ({ row }) =>
-        row.original.issue_date?.toDate('yyyy-MM-dd')?.format('dd/MM/yyyy')
+        row.original.issue_date?.toDate()?.format('dd/MM/yyyy') ?? '—'
     },
     {
       accessorKey: 'due_date',
@@ -66,7 +67,7 @@ export function createInvoicesColumns(opts: {
         <DataTableColumnHeader column={column} title="Vencimento" />
       ),
       cell: ({ row }) =>
-        row.original.due_date?.toDate('yyyy-MM-dd')?.format('dd/MM/yyyy')
+        row.original.due_date?.toDate()?.format('dd/MM/yyyy') ?? '—'
     },
     {
       id: 'processing_month',
@@ -98,6 +99,24 @@ export function createInvoicesColumns(opts: {
         <DataTableColumnHeader column={column} title="Situação" />
       ),
       cell: ({ row }) => formatInvoiceStatus(row.original.status)
+    },
+    {
+      id: 'financial',
+      header: () => <span>Financeiro</span>,
+      cell: ({ row }) => {
+        const inv = row.original as ListProviderInvoiceResponse & {
+          account_payable_id?: string | null;
+          account_payable_status?: string | null;
+        };
+        if (inv.account_payable_id) {
+          return (
+            <span className="text-sm">
+              {formatFinancialStatus(inv.account_payable_status ?? 'open')}
+            </span>
+          );
+        }
+        return <span className="text-muted-foreground text-sm">Sem conta</span>;
+      }
     },
     {
       id: 'actions',

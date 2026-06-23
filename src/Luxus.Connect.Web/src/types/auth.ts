@@ -37,6 +37,8 @@ export type TokenPayload = JwtPayload & {
   email: string;
   family_name: string;
   given_name: string;
+  roles?: string[];
+  realm_access?: { roles: string[] };
   organization: Record<string, { name: string[] }>;
   resource_access: Record<string, { roles: string[] }>;
 };

@@ -25,56 +25,49 @@ Utilizadores e organizações vivem no **Keycloak** (SSO). O PostgreSQL da aplic
 
 ## Arquitetura
 
-O backend segue **Clean Architecture** com **DDD**, **CQRS** e integração assíncrona onde faz sentido.
+O backend é uma **API REST em Go** (binário único, ~15 MB) com o mesmo contrato HTTP que o frontend já consome. O schema PostgreSQL existente é reutilizado.
 
-| Camada             | Projetos (principais)                                  | Função                                                       |
-| ------------------ | ------------------------------------------------------ | ------------------------------------------------------------ |
-| **API**            | `Luxus.Connect.Api`                                    | Controllers, OpenAPI, consumidores RabbitMQ                  |
-| **Application**    | `Luxus.Connect.Application`, `Luxus.Connect.Contracts` | Comandos, validações, orquestração, contratos                |
-| **Domain**         | `Luxus.Connect.Domain`                                 | Agregados, entidades, interfaces de repositório              |
-| **Infraestrutura** | `Luxus.Connect.Infra.*`                                | EF Core (PostgreSQL), queries de leitura, HTTP, IoC, storage |
-
-### Frontend (SPA)
-
-- **Em produção:** [`src/Luxus.Connect.Web`](src/Luxus.Connect.Web) — Vite, React, TypeScript, TanStack Router, React Query, Tailwind, shadcn/ui. Detalhes: [`src/Luxus.Connect.Web/README.md`](src/Luxus.Connect.Web/README.md).
-- **Referência legada:** [`src/old`](src/old) — Next.js anterior; **não** é destino de novas funcionalidades, apenas consulta de UX/fluxos.
+| Camada | Localização | Função |
+| ------ | ----------- | ------ |
+| **API** | [`api/`](api/) | HTTP (chi), auth JWT Keycloak, handlers REST, consumer RabbitMQ |
+| **Store** | `api/internal/store` | PostgreSQL via pgx (queries e comandos) |
+| **Serviços** | `api/internal/services` | Regras de negócio (clientes, linhas, faturas, etc.) |
+| **Importação** | `api/internal/importservice` + `api/internal/vivo` | Parser VIVO + pipeline assíncrono |
+| **Frontend** | [`src/Luxus.Connect.Web`](src/Luxus.Connect.Web) | Vite, React, TypeScript, TanStack Router/Query |
 
 ### Fluxo de dados (resumo)
 
-- **Escrita:** Controller → MediatR → _CommandHandler_ → EF Core (PostgreSQL) → publicação de eventos (MassTransit / RabbitMQ) quando aplicável.
-- **Leitura:** Controller → repositórios de query em `Luxus.Connect.Infra.Data.Query` (EF Core / projeções) → modelos em Contracts.
+- **Escrita:** Handler → Service → PostgreSQL; eventos de importação via RabbitMQ.
+- **Leitura:** Handler → Store (SQL) → DTOs JSON snake_case.
+- **Importação de faturas:** upload S3/R2 → `POST /v1/provider-invoices` → fila `luxus-connect-events` → parser VIVO.
 
-**Padrões:** repositório, unit of work, mediator (MediatR), validação com FluentValidation, autenticação/autorização com pacotes **Keycloak.AuthServices**.
-
-**Solução .NET:** ficheiro na raiz [`Luxus.Connect.slnx`](Luxus.Connect.slnx).
+**Solução:** [`Luxus.Connect.slnx`](Luxus.Connect.slnx) (frontend + Docker). Backend Go em [`api/go.mod`](api/go.mod).
 
 ## Stack tecnológica
 
-| Área                | Tecnologias                                                                                                               |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| **Backend**         | ASP.NET Core 10, C#, EF Core, PostgreSQL, MediatR, FluentValidation, MassTransit + RabbitMQ                               |
-| **Auth**            | Keycloak (OIDC), `Keycloak.AuthServices.Authentication` / `Authorization`                                                 |
-| **Frontend**        | Vite, React, TypeScript, TanStack Router, TanStack Query, Tailwind, shadcn/ui, Zod (`VITE_*` em build)                    |
-| **Object storage**  | API compatível com S3 (URLs pré-assinadas, importação de faturas)                                                         |
-| **Observabilidade** | Serilog → Seq                                                                                                             |
-| **Containerização** | Docker, Docker Compose; em produção na VPS: **nginx** no serviço `connect-web` (TLS, reverse proxy para `/auth` e `/api`) |
+| Área | Tecnologias |
+| ---- | ----------- |
+| **Backend** | Go 1.22, chi, pgx, RabbitMQ (amqp), AWS SDK v2 (S3/R2) |
+| **Auth** | Keycloak (OIDC), validação JWT + JWKS |
+| **Frontend** | Vite, React, TypeScript, TanStack Router, TanStack Query, Tailwind, shadcn/ui |
+| **Object storage** | API compatível com S3 (URLs pré-assinadas, importação de faturas) |
+| **Containerização** | Docker, Docker Compose; produção: nginx no `connect-web` (TLS, `/auth`, `/api`) |
 
 ## Início rápido (desenvolvimento)
 
 ### Pré-requisitos
 
-- [.NET 10 SDK](https://dotnet.microsoft.com/download)
+- [Go 1.22+](https://go.dev/dl/)
 - [Docker + Docker Compose](https://www.docker.com/products/docker-desktop/) (plugin v2)
 - [Git](https://git-scm.com/downloads)
-- [Node.js 22](https://nodejs.org/) (para o frontend local; o Docker do web usa a mesma major)
+- [Node.js 22](https://nodejs.org/) (para o frontend local)
 - PowerShell (Windows) ou Bash para scripts
 
-### 1. Clonar e restaurar
+### 1. Clonar
 
 ```bash
 git clone <url-do-repositório>
 cd <pasta-do-clone>
-dotnet restore
 ```
 
 ### 2. Ficheiro `.env` na raiz
@@ -104,23 +97,9 @@ OBJECT_STORAGE_ACCESS_KEY_ID=
 OBJECT_STORAGE_SECRET_ACCESS_KEY=
 ```
 
-**Seq:** gerar hash em [Seq password hashing](https://blog.datalust.co/setting-an-initial-password-when-deploying-seq-to-docker/).
+**Seq:** gerar hash em [Seq password hashing](https://blog.datalust.co/setting-an-initial-password-when-deploying-seq-to-docker/) (opcional; o serviço Seq permanece no Compose para logs legados).
 
-### 3. Pacotes privados (Azure Artifacts / `Goal.*`)
-
-- **Docker (`docker compose ... --build`)**: o build injeta **`docker/build-secrets/nuget.config`** como segredo BuildKit — pode ser (1) substituído pelo `nuget.config` completo da equipa, ou (2) usar **`docker/build-secrets/nuget.credentials.config`** (no `.gitignore`) + **`NUGET_CONFIG_FILE`** no `.env`, ou (3) **`NUGET_FEED_URL`** + **`NUGET_PAT`** no `.env`.
-- **SDK local (Visual Studio / `dotnet restore`)**: mantenha `nuget.config` na raiz (geralmente no `.gitignore` — copie da equipa). Detalhes de deploy: [`docs/DEPLOY_VPS.md`](docs/DEPLOY_VPS.md).
-
-### 4. Certificados HTTPS (Windows, API local)
-
-```powershell
-mkdir $Env:USERPROFILE/.aspnet/https -Force
-dotnet dev-certs https -ep $Env:USERPROFILE/.aspnet/https/Development.pfx -p c1bc6816-f70f-42e3-a71f-4ab75a294755
-dotnet dev-certs https --trust
-dotnet dev-certs https --check
-```
-
-### 5. Subir dependências com Docker
+### 3. Subir dependências com Docker
 
 ```bash
 chmod +x docker-up.sh
@@ -130,15 +109,20 @@ chmod +x docker-up.sh
 - Em desenvolvimento, o script define `COMPOSE_PROFILES=dev` e usa `docker-compose.yml` + `docker-compose.override.yml` (inclui `connect-web-dev` com Vite em `http://localhost:5173` quando o serviço está ativo).
 - Se existir `docker-compose.<nome>.yml`, pode passar `./docker-up.sh <nome>` para acrescentar esse ficheiro (ex.: `docker-compose.vscode.yml`).
 
-### 6. Migrações PostgreSQL
+### 4. Schema PostgreSQL
 
-Com o Postgres acessível:
+O schema deve existir antes da API subir (bases criadas pelo `docker/postgres/init.sql` no primeiro boot). Migrações históricas EF estão em [`db/migrations/ef/`](db/migrations/ef/) — ver [`db/migrations/README.md`](db/migrations/README.md).
+
+### API local (sem Docker)
 
 ```bash
-./ef-database-update.sh
+cd api
+export DATABASE_URL="Host=localhost;Username=postgres;Password=postgres;Database=luxus_connect_dev"
+export KEYCLOAK_REALM=luxus
+export KEYCLOAK_AUTH_SERVER_URL=http://localhost:8081
+export KEYCLOAK_RESOURCE=connect-cli
+go run ./cmd/api
 ```
-
-Scripts adicionais: `./ef-migrations-add.sh`, `./ef-migrations-remove.sh`, `./ef-migrations-script.sh` (ver comentários nos scripts).
 
 ### Parar serviços
 
@@ -150,7 +134,7 @@ Scripts adicionais: `./ef-migrations-add.sh`, `./ef-migrations-remove.sh`, `./ef
 
 | Serviço             | Portas (host)             | Função                                                    |
 | ------------------- | ------------------------- | --------------------------------------------------------- |
-| **connect-api**     | 4432 (HTTPS), 8002 (HTTP) | API principal                                             |
+| **connect-api**     | 8002 (HTTP)               | API Go                                                    |
 | **connect-web**     | 3000 → 80 (override)      | SPA estática ou base nginx                                |
 | **connect-web-dev** | 5173 (perfil `dev`)       | Vite HMR                                                  |
 | **postgres**        | 5432                      | Dados transacionais (`luxus_connect_dev`, `luxus_kc_dev`) |
@@ -162,14 +146,14 @@ Scripts adicionais: `./ef-migrations-add.sh`, `./ef-migrations-remove.sh`, `./ef
 
 | Recurso             | URL                                                                   |
 | ------------------- | --------------------------------------------------------------------- |
-| API (container)     | `https://localhost:4432`                                              |
-| OpenAPI             | `https://localhost:4432/api-docs`                                     |
+| API (container)     | `http://localhost:8002`                                               |
+| Health              | `http://localhost:8002/health`                                        |
 | Seq                 | `http://localhost:81`                                                 |
 | RabbitMQ Management | `http://localhost:15672` (credenciais do `.env`)                      |
 | Keycloak Admin      | `http://localhost:8081` — utilizador `admin`, password `KC_ADMIN_PWD` |
 | Vite (perfil dev)   | `http://localhost:5173`                                               |
 
-**Importação de faturas (async):** upload para storage S3-compatível (URL pré-assinada), depois `POST /v1/invoice-imports` com `storage_bucket` e `storage_object_key`; estado em `GET /v1/invoice-imports/{id}`.
+**Importação de faturas (async):** upload para storage S3-compatível (URL pré-assinada), depois `POST /v1/provider-invoices` com `storage_bucket` e `storage_object_key`; estado em `GET /v1/provider-invoices/{id}`.
 
 ## Configuração Keycloak
 
@@ -177,17 +161,11 @@ Os valores **realm**, **client** e **URL do servidor** têm de estar alinhados e
 
 ### API via Docker Compose (`docker-compose.override.yml`)
 
-Variáveis injetadas no contentor `connect-api` (exemplo):
+Variáveis injetadas no contentor `connect-api`:
 
-- `ASPNETCORE_Keycloak__Realm=luxus`
-- `ASPNETCORE_Keycloak__AuthServerUrl=http://host.docker.internal:8081`
-- `ASPNETCORE_Keycloak__Resource=connect-cli`
-- `ASPNETCORE_Keycloak__Scopes=email profile connect-cli-scope organization`
-- `ASPNETCORE_Keycloak__SslRequired=none`
-
-### API via perfil VS Code (`src/Luxus.Connect.Api/Properties/launchSettings.json`)
-
-O perfil **VSCode** usa outro conjunto (ex.: realm `luxus.connect`, client `luxus.connect-ui`, scopes `luxus.connect-ui-client-scope`). Ajuste o realm no Keycloak **ou** alinhe estas variáveis ao que importou no ambiente.
+- `KEYCLOAK_REALM=luxus`
+- `KEYCLOAK_AUTH_SERVER_URL=http://host.docker.internal:8081`
+- `KEYCLOAK_RESOURCE=connect-cli`
 
 ### Frontend (`src/Luxus.Connect.Web`)
 
@@ -195,21 +173,20 @@ Variáveis obrigatórias: `VITE_API_URL`, `VITE_AUTH_URL`, `VITE_CLIENT_ID`, `VI
 
 ### Produção (VPS)
 
-Keycloak fica atrás do nginx em **`/auth`**; a API em **`/api`**. Variáveis típicas estão em [`docker-compose.prod.yml`](docker-compose.prod.yml) (ex.: `ASPNETCORE_Keycloak__AuthServerUrl=https://<domínio>/auth`). O client **`connect-cli`** deve ter **secret** igual a `KC_CLIENT_SECRET` no `.env`; **Redirect URIs** e **Web origins** devem incluir a origem HTTPS do front. O access token deve expor o claim **`organization`** (mapper no client), tal como descrito em [`docs/DEPLOY_VPS.md`](docs/DEPLOY_VPS.md).
+Keycloak fica atrás do nginx em **`/auth`**; a API em **`/api`**. Variáveis em [`docker-compose.prod.yml`](docker-compose.prod.yml) (ex.: `KEYCLOAK_AUTH_SERVER_URL=https://<domínio>/auth`).
 
 **Temas Keycloak:** volume `./resources/theme/` → `/opt/keycloak/themes/` (ver imagem no `docker-compose.yml`).
 
 ## Deploy em VPS
 
-Guia passo a passo (TLS Let’s Encrypt, `.env`, `nuget.config`, migrações, Keycloak, nginx): **[`docs/DEPLOY_VPS.md`](docs/DEPLOY_VPS.md)**.
+Guia passo a passo (TLS Let’s Encrypt, `.env`, Keycloak, nginx): **[`docs/DEPLOY_VPS.md`](docs/DEPLOY_VPS.md)**.
 
 Resumo:
 
 1. Copiar [`docker/env.deploy.example`](docker/env.deploy.example) para `.env` e preencher (incl. `KC_CLIENT_SECRET` e object storage).
-2. Colocar `fullchain.pem` e `privkey.pem` em `docker/ssl/<FQDN>/` (coerente com `docker-compose.prod.yml` e [`docker/nginx/connect-web.vps.conf`](docker/nginx/connect-web.vps.conf)).
-3. Garantir `nuget.config` na raiz se o build da API precisar do feed privado.
-4. Na raiz: `./docker-up.sh prod` (usa apenas `docker-compose.yml` + `docker-compose.prod.yml`, **sem** perfil `dev`).
-5. Executar `./ef-database-update.sh` com Postgres acessível.
+2. Colocar `fullchain.pem` e `privkey.pem` em `docker/ssl/<FQDN>/`.
+3. Na raiz: `./docker-up.sh prod` (usa `docker-compose.yml` + `docker-compose.prod.yml`).
+4. Garantir schema PostgreSQL aplicado (ver `db/migrations/`).
 
 Se alterar o domínio, atualize em conjunto: `docker-compose.prod.yml`, `connect-web.vps.conf`, pasta `docker/ssl/...` e rebuild do `connect-web` (args `VITE_*` são embutidos no build).
 
@@ -221,5 +198,3 @@ Se alterar o domínio, atualize em conjunto: `docker-compose.prod.yml`, `connect
 ## Contato
 
 - Anderson Ritter de Souza — [@ritter.ander](https://www.instagram.com/ritter.ander) — anderdsouza@gmail.com
-#   t e l e f o n i a 2  
- 
