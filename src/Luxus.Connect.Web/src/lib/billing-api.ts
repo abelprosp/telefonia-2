@@ -478,7 +478,7 @@ export function useSyncSicrediPayment() {
 export function useSyncSicrediPayments() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (daysBack = 7) => {
+    mutationFn: async (daysBack: number = 7) => {
       const { data } = await client<{ checked: number; paid: number }>({
         url: '/v1/collections/sync-sicredi-payments',
         method: 'POST',

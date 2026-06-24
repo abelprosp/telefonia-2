@@ -179,6 +179,7 @@ export function StockLineCreateSheet({ open, onOpenChange, onSuccess }: StockLin
                     <Link
                       to="/providers/$providerId"
                       params={{ providerId }}
+                      search={{ page: 1, pageSize: 10 }}
                       className="text-primary font-medium hover:underline"
                     >
                       Cadastre um plano
