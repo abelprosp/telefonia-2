@@ -203,6 +203,15 @@ func (s *Service) SyncSicrediPaymentForDocument(ctx context.Context, documentID 
 
 func (s *Service) applySicrediPayment(ctx context.Context, doc store.UnpaidSicrediBillingDocument, paid sicredi.LiquidadoItem) error {
 	orgID := doc.OrganizationID
+
+	alreadyPaid, err := s.Store.IsBillingDocumentSicrediPaid(ctx, orgID, doc.ID)
+	if err != nil {
+		return err
+	}
+	if alreadyPaid {
+		return nil
+	}
+
 	paidAt := paid.DataPagamento
 	if paidAt.IsZero() {
 		paidAt = time.Now().UTC()
@@ -214,10 +223,16 @@ func (s *Service) applySicrediPayment(ctx context.Context, doc store.UnpaidSicre
 
 	if doc.AccountsReceivableID != nil && strings.TrimSpace(*doc.AccountsReceivableID) != "" {
 		receivableID := strings.TrimSpace(*doc.AccountsReceivableID)
-		ref := "Sicredi " + paid.NossoNumero
-		notes := "Liquidação Sicredi (" + paid.TipoLiquidacao + ")"
-		if err := s.Store.RegisterReceivablePaymentAuto(ctx, uuid.New().String(), orgID, receivableID, amount, paidAt, ref, notes, time.Now().UTC()); err != nil {
+		ref := "Sicredi " + strings.TrimSpace(paid.NossoNumero)
+		exists, err := s.Store.ReceivablePaymentExistsByReference(ctx, orgID, receivableID, ref)
+		if err != nil {
 			return err
+		}
+		if !exists {
+			notes := "Liquidação Sicredi (" + paid.TipoLiquidacao + ")"
+			if err := s.Store.RegisterReceivablePaymentAuto(ctx, uuid.New().String(), orgID, receivableID, amount, paidAt, ref, notes, time.Now().UTC()); err != nil {
+				return err
+			}
 		}
 	}
 

@@ -39,6 +39,7 @@ type Config struct {
 	SicrediCodigoBeneficiario string
 	SicrediWebhookToken       string
 	SicrediPublicAPIURL       string
+	SicrediAutoRegisterWebhook bool
 }
 
 func Load() Config {
@@ -106,6 +107,7 @@ func Load() Config {
 		SicrediCodigoBeneficiario: strings.TrimSpace(os.Getenv("SICREDI_CODIGO_BENEFICIARIO")),
 		SicrediWebhookToken:       strings.TrimSpace(os.Getenv("SICREDI_WEBHOOK_TOKEN")),
 		SicrediPublicAPIURL:       sicrediPublicURL,
+		SicrediAutoRegisterWebhook: strings.EqualFold(os.Getenv("SICREDI_AUTO_REGISTER_WEBHOOK"), "true"),
 	}
 }
 

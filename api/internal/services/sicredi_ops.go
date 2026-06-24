@@ -172,11 +172,13 @@ func (s *Service) GetSicrediStatus(ctx context.Context) (*models.SicrediIntegrat
 	if s.Sicredi != nil {
 		cfg := s.Sicredi.Config()
 		resp.Sandbox = cfg.Sandbox
+		resp.Production = cfg.Production
 		resp.Cooperativa = cfg.Cooperativa
 		resp.Posto = cfg.Posto
 		resp.CodigoBeneficiario = cfg.CodigoBeneficiario
 		resp.PublicAPIURL = cfg.PublicAPIURL
-		resp.WebhookConfigured = cfg.WebhookToken != "" && cfg.PublicAPIURL != "" &&
+		resp.WebhookTokenSet = strings.TrimSpace(cfg.WebhookToken) != ""
+		resp.WebhookConfigured = resp.WebhookTokenSet && cfg.PublicAPIURL != "" &&
 			!strings.Contains(cfg.PublicAPIURL, "localhost") && !strings.Contains(cfg.PublicAPIURL, "127.0.0.1")
 		if cfg.PublicAPIURL != "" {
 			resp.WebhookURL = strings.TrimRight(cfg.PublicAPIURL, "/") + "/v1/webhooks/sicredi"
@@ -192,6 +194,7 @@ func (s *Service) GetSicrediStatus(ctx context.Context) (*models.SicrediIntegrat
 				}
 			}
 		}
+		resp.ReadyForProduction = resp.Connected && resp.WebhookConfigured && resp.WebhookRegistered && !cfg.Sandbox
 	}
 	return resp, nil
 }
@@ -201,6 +204,9 @@ func (s *Service) HandleSicrediWebhook(ctx context.Context, r *http.Request) err
 		return httputil.BusinessError(notifications.SicrediNotConfigured)
 	}
 	cfg := s.Sicredi.Config()
+	if cfg.Production && strings.TrimSpace(cfg.WebhookToken) == "" {
+		return httputil.BusinessError(notifications.N("SICREDI_WEBHOOK_TOKEN_REQUIRED", "Configure SICREDI_WEBHOOK_TOKEN em produção para aceitar webhooks."))
+	}
 	if token := strings.TrimSpace(cfg.WebhookToken); token != "" {
 		auth := strings.TrimSpace(r.Header.Get("Authorization"))
 		if auth != "Bearer "+token && auth != token {
@@ -223,14 +229,22 @@ func (s *Service) HandleSicrediWebhook(ctx context.Context, r *http.Request) err
 	seuNumero := firstWebhookString(payload, "seuNumero", "seu_numero")
 	idEmpresa := firstWebhookString(payload, "idTituloEmpresa", "id_titulo_empresa", "idEmpresa")
 
+	var orgID *string
+	if doc, _ := s.findWebhookBillingDocument(ctx, nossoNumero, idEmpresa); doc != nil {
+		orgID = &doc.OrganizationID
+	}
+
 	eventID := uuid.New().String()
 	now := time.Now().UTC()
 	row := store.SicrediWebhookEventRow{
-		ID:              eventID,
-		EventType:       eventType,
-		Payload:         json.RawMessage(raw),
-		Processed:       false,
-		CreatedAt:       now,
+		ID:        eventID,
+		EventType: eventType,
+		Payload:   json.RawMessage(raw),
+		Processed: false,
+		CreatedAt: now,
+	}
+	if orgID != nil {
+		row.OrganizationID = orgID
 	}
 	if nossoNumero != "" {
 		row.NossoNumero = &nossoNumero
@@ -242,8 +256,12 @@ func (s *Service) HandleSicrediWebhook(ctx context.Context, r *http.Request) err
 		row.IdTituloEmpresa = &idEmpresa
 	}
 
-	if err := s.Store.InsertSicrediWebhookEvent(ctx, row); err != nil {
+	inserted, err := s.Store.InsertSicrediWebhookEvent(ctx, row)
+	if err != nil {
 		return httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+	if !inserted {
+		return nil
 	}
 
 	processErr := s.processSicrediWebhookEvent(ctx, eventType, nossoNumero, idEmpresa, payload)

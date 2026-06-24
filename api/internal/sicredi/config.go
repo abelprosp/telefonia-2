@@ -9,6 +9,7 @@ import (
 type Config struct {
 	Enabled            bool
 	Sandbox            bool
+	Production         bool
 	APIKey             string
 	Username           string
 	Password           string
@@ -27,6 +28,7 @@ func ConfigFrom(cfg config.Config) Config {
 	return Config{
 		Enabled:            cfg.SicrediEnabled,
 		Sandbox:            cfg.SicrediSandbox,
+		Production:         cfg.IsProduction(),
 		APIKey:             strings.TrimSpace(cfg.SicrediAPIKey),
 		Username:           username,
 		Password:           cfg.SicrediPassword,

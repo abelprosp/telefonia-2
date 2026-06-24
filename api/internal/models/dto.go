@@ -910,6 +910,7 @@ type IssueSicrediBoletoResponse struct {
 type SicrediIntegrationStatusResponse struct {
 	Enabled            bool   `json:"enabled"`
 	Sandbox            bool   `json:"sandbox"`
+	Production         bool   `json:"production"`
 	Connected          bool   `json:"connected"`
 	ConnectionError    string `json:"connection_error,omitempty"`
 	Cooperativa        string `json:"cooperativa,omitempty"`
@@ -919,6 +920,20 @@ type SicrediIntegrationStatusResponse struct {
 	WebhookRegistered  bool   `json:"webhook_registered"`
 	WebhookURL         string `json:"webhook_url,omitempty"`
 	PublicAPIURL       string `json:"public_api_url,omitempty"`
+	WebhookTokenSet    bool   `json:"webhook_token_set"`
+	ReadyForProduction bool   `json:"ready_for_production"`
+}
+
+type SicrediSetupStep struct {
+	Name    string `json:"name"`
+	OK      bool   `json:"ok"`
+	Message string `json:"message,omitempty"`
+}
+
+type SicrediProductionSetupResponse struct {
+	Success bool             `json:"success"`
+	Message string           `json:"message"`
+	Steps   []SicrediSetupStep `json:"steps"`
 }
 
 type SicrediTestConnectionResponse struct {
@@ -1070,20 +1085,26 @@ type GenerateCustomerBillingDocumentInput struct {
 }
 
 type GenerateCustomerBillingDocumentResponse struct {
-	ID           string  `json:"id"`
-	ReceivableID string  `json:"receivable_id"`
-	Amount       float64 `json:"amount"`
-	Message      string  `json:"message"`
+	ID                  string  `json:"id"`
+	ReceivableID        string  `json:"receivable_id"`
+	Amount              float64 `json:"amount"`
+	Message             string  `json:"message"`
+	SicrediBoletoStatus *string `json:"sicredi_boleto_status,omitempty"`
+	SicrediBoletoError  *string `json:"sicredi_boleto_error,omitempty"`
+	SicrediNossoNumero  *string `json:"sicredi_nosso_numero,omitempty"`
 }
 
 type BulkBillingGenerateItemResult struct {
-	CustomerID   string  `json:"customer_id"`
-	CustomerName string  `json:"customer_name"`
-	Status       string  `json:"status"`
-	Message      string  `json:"message,omitempty"`
-	DocumentID   *string `json:"document_id,omitempty"`
-	ReceivableID *string `json:"receivable_id,omitempty"`
-	Amount       float64 `json:"amount,omitempty"`
+	CustomerID          string  `json:"customer_id"`
+	CustomerName        string  `json:"customer_name"`
+	Status              string  `json:"status"`
+	Message             string  `json:"message,omitempty"`
+	DocumentID          *string `json:"document_id,omitempty"`
+	ReceivableID        *string `json:"receivable_id,omitempty"`
+	Amount              float64 `json:"amount,omitempty"`
+	SicrediBoletoStatus *string `json:"sicredi_boleto_status,omitempty"`
+	SicrediBoletoError  *string `json:"sicredi_boleto_error,omitempty"`
+	SicrediNossoNumero  *string `json:"sicredi_nosso_numero,omitempty"`
 }
 
 type BulkGenerateBillingDocumentsResponse struct {

@@ -36,7 +36,28 @@ func (s *Service) IssueSicrediBoleto(ctx context.Context, documentID string) (*m
 	return result, nil
 }
 
-func (s *Service) tryAttachSicrediBoleto(ctx context.Context, orgID, documentID string) {
+func (s *Service) tryAttachSicrediBoleto(ctx context.Context, orgID, documentID string) (issued bool, errMsg string) {
+	if s.Sicredi == nil || !s.Sicredi.Enabled() {
+		return false, ""
+	}
+	doc, err := s.GetCustomerBillingDocument(ctx, documentID)
+	if err != nil || doc == nil {
+		return false, ""
+	}
+	if doc.SicrediNossoNumero != nil && strings.TrimSpace(*doc.SicrediNossoNumero) != "" {
+		return true, ""
+	}
+	_, err = s.issueSicrediBoletoForDocument(ctx, orgID, doc)
+	if err != nil {
+		if ae, ok := err.(*httputil.AppError); ok {
+			return false, ae.Error()
+		}
+		return false, err.Error()
+	}
+	return true, ""
+}
+
+func (s *Service) applySicrediFeedback(ctx context.Context, documentID string, message *string, status **string, nosso **string, boletoErr **string) {
 	if s.Sicredi == nil || !s.Sicredi.Enabled() {
 		return
 	}
@@ -44,10 +65,29 @@ func (s *Service) tryAttachSicrediBoleto(ctx context.Context, orgID, documentID 
 	if err != nil || doc == nil {
 		return
 	}
-	if doc.SicrediNossoNumero != nil && strings.TrimSpace(*doc.SicrediNossoNumero) != "" {
+	if status != nil {
+		*status = doc.SicrediBoletoStatus
+	}
+	if nosso != nil {
+		*nosso = doc.SicrediNossoNumero
+	}
+	if boletoErr != nil {
+		*boletoErr = doc.SicrediBoletoError
+	}
+	if message == nil {
 		return
 	}
-	_, _ = s.issueSicrediBoletoForDocument(ctx, orgID, doc)
+	if doc.SicrediNossoNumero != nil && strings.TrimSpace(*doc.SicrediNossoNumero) != "" {
+		*message = "Fatura e boleto Sicredi gerados com sucesso."
+		return
+	}
+	if doc.SicrediBoletoStatus != nil && *doc.SicrediBoletoStatus == "failed" {
+		msg := "Fatura criada; boleto Sicredi falhou."
+		if doc.SicrediBoletoError != nil && strings.TrimSpace(*doc.SicrediBoletoError) != "" {
+			msg += " " + strings.TrimSpace(*doc.SicrediBoletoError)
+		}
+		*message = msg
+	}
 }
 
 func (s *Service) issueSicrediBoletoForDocument(ctx context.Context, orgID string, doc *models.GetCustomerBillingDocumentResponse) (*models.IssueSicrediBoletoResponse, error) {

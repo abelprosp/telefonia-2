@@ -296,6 +296,17 @@ func (s *Store) RegisterReceivablePaymentAuto(ctx context.Context, paymentID, or
 	return s.RegisterReceivablePayment(ctx, paymentID, orgID, accountID, "sicredi-sync", amount, paymentDate, &ref, &n, now)
 }
 
+func (s *Store) ReceivablePaymentExistsByReference(ctx context.Context, orgID, accountID, reference string) (bool, error) {
+	var exists bool
+	err := s.q(ctx).QueryRow(ctx, `
+		SELECT EXISTS(
+			SELECT 1 FROM "FinancialPayments"
+			WHERE "OrganizationId" = $1 AND "AccountType" = 'receivable'
+				AND "AccountId" = $2 AND "Reference" = $3
+		)`, orgID, accountID, reference).Scan(&exists)
+	return exists, err
+}
+
 func (s *Store) GetPartnerCommissionPercent(ctx context.Context, orgID string) (float64, error) {
 	var pct float64
 	err := s.q(ctx).QueryRow(ctx, `

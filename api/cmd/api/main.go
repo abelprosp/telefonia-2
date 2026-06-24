@@ -73,6 +73,19 @@ func main() {
 	}
 	if svc.Sicredi != nil && svc.Sicredi.Enabled() {
 		logger.Info("sicredi boleto integration enabled", "sandbox", cfg.SicrediSandbox)
+		if cfg.SicrediAutoRegisterWebhook {
+			go func() {
+				time.Sleep(3 * time.Second)
+				resp, err := svc.SetupSicrediProduction(context.Background(), nil)
+				if err != nil {
+					logger.Warn("sicredi production setup failed", "error", err)
+				} else if resp != nil && resp.Success {
+					logger.Info("sicredi production setup complete", "message", resp.Message)
+				} else if resp != nil {
+					logger.Warn("sicredi production setup incomplete", "message", resp.Message)
+				}
+			}()
+		}
 		go func() {
 			ticker := time.NewTicker(15 * time.Minute)
 			defer ticker.Stop()

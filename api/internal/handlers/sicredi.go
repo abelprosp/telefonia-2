@@ -38,6 +38,21 @@ func (h *Handler) registerSicrediWebhook(w http.ResponseWriter, r *http.Request)
 	httputil.WriteJSON(w, http.StatusOK, item)
 }
 
+func (h *Handler) setupSicrediProduction(w http.ResponseWriter, r *http.Request) {
+	var input models.RegisterSicrediWebhookInput
+	_ = decodeJSON(r, &input)
+	item, err := h.Svc.SetupSicrediProduction(r.Context(), &input)
+	if err != nil {
+		httputil.HandleServiceError(w, err)
+		return
+	}
+	status := http.StatusOK
+	if !item.Success {
+		status = http.StatusConflict
+	}
+	httputil.WriteJSON(w, status, item)
+}
+
 func (h *Handler) testSicrediConnection(w http.ResponseWriter, r *http.Request) {
 	item, err := h.Svc.TestSicrediConnection(r.Context())
 	if err != nil {

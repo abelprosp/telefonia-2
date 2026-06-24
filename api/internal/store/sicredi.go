@@ -23,16 +23,21 @@ type SicrediWebhookEventRow struct {
 	ProcessedAt     *time.Time
 }
 
-func (s *Store) InsertSicrediWebhookEvent(ctx context.Context, row SicrediWebhookEventRow) error {
-	_, err := s.q(ctx).Exec(ctx, `
+func (s *Store) InsertSicrediWebhookEvent(ctx context.Context, row SicrediWebhookEventRow) (bool, error) {
+	tag, err := s.q(ctx).Exec(ctx, `
 		INSERT INTO "SicrediWebhookEvents" (
 			"Id", "OrganizationId", "NossoNumero", "SeuNumero", "IdTituloEmpresa",
 			"EventType", "Payload", "Processed", "ProcessError", "CreatedAt", "ProcessedAt"
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		ON CONFLICT ("NossoNumero", "EventType") WHERE "NossoNumero" IS NOT NULL AND "EventType" <> ''
+		DO NOTHING`,
 		row.ID, row.OrganizationID, row.NossoNumero, row.SeuNumero, row.IdTituloEmpresa,
 		row.EventType, row.Payload, row.Processed, row.ProcessError, row.CreatedAt, row.ProcessedAt,
 	)
-	return err
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() > 0, nil
 }
 
 func (s *Store) MarkSicrediWebhookEventProcessed(ctx context.Context, id string, processError *string, processedAt time.Time) error {

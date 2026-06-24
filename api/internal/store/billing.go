@@ -862,3 +862,15 @@ func (s *Store) MarkSicrediBoletoPaid(ctx context.Context, orgID, documentID str
 	}
 	return nil
 }
+
+func (s *Store) IsBillingDocumentSicrediPaid(ctx context.Context, orgID, documentID string) (bool, error) {
+	var paid bool
+	err := s.q(ctx).QueryRow(ctx, `
+		SELECT "SicrediPaidAt" IS NOT NULL
+		FROM "CustomerBillingDocuments"
+		WHERE "OrganizationId" = $1 AND "Id" = $2`, orgID, documentID).Scan(&paid)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	return paid, err
+}

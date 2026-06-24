@@ -139,15 +139,14 @@ func (s *Service) GenerateCustomerBillingDocument(ctx context.Context, customerI
 		return nil, genErr
 	}
 	msg := "Fatura criada com sucesso."
-	if s.Sicredi != nil && s.Sicredi.Enabled() {
-		msg = "Fatura criada com boleto Sicredi (código de barras + PIX), quando disponível."
-	}
-	return &models.GenerateCustomerBillingDocumentResponse{
+	resp := &models.GenerateCustomerBillingDocumentResponse{
 		ID:           docID,
 		ReceivableID: receivableID,
 		Amount:       amount,
 		Message:      msg,
-	}, nil
+	}
+	s.applySicrediFeedback(ctx, docID, &resp.Message, &resp.SicrediBoletoStatus, &resp.SicrediNossoNumero, &resp.SicrediBoletoError)
+	return resp, nil
 }
 
 func (s *Service) generateBillingDocumentsForCandidates(
@@ -192,6 +191,7 @@ func (s *Service) generateBillingDocumentsForCandidates(
 		result.Status = "created"
 		result.DocumentID = &docID
 		result.ReceivableID = &receivableID
+		s.applySicrediFeedback(ctx, docID, &result.Message, &result.SicrediBoletoStatus, &result.SicrediNossoNumero, &result.SicrediBoletoError)
 		resp.Created++
 		resp.Items = append(resp.Items, result)
 	}

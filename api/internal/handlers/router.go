@@ -476,6 +476,8 @@ func (h *Handler) RegisterRoutes(
 
 				r.Post("/sicredi/register-webhook", h.registerSicrediWebhook)
 
+				r.Post("/sicredi/setup-production", h.setupSicrediProduction)
+
 			})
 
 		})

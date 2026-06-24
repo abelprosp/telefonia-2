@@ -17,6 +17,7 @@ import {
   formatSicrediBoletoStatus,
   useCustomerBillingDocuments,
   useRegisterSicrediWebhook,
+  useSetupSicrediProduction,
   useSicrediStatus,
   useSyncSicrediPayments,
   useTestSicrediConnection
@@ -46,6 +47,7 @@ function CustomerInvoicesPage() {
   const sicrediStatusQuery = useSicrediStatus();
   const testConnectionMutation = useTestSicrediConnection();
   const registerWebhookMutation = useRegisterSicrediWebhook();
+  const setupProductionMutation = useSetupSicrediProduction();
   const [publicApiUrl, setPublicApiUrl] = useState('');
 
   const columns: ColumnDef<CustomerBillingDocument>[] = [
@@ -160,6 +162,12 @@ function CustomerInvoicesPage() {
                 <Badge variant={sicrediStatusQuery.data.webhook_registered ? 'default' : 'outline'}>
                   {sicrediStatusQuery.data.webhook_registered ? 'Webhook ativo' : 'Webhook pendente'}
                 </Badge>
+                {sicrediStatusQuery.data.ready_for_production && (
+                  <Badge variant="default">Pronto para produção</Badge>
+                )}
+                {!sicrediStatusQuery.data.webhook_token_set && !sicrediStatusQuery.data.sandbox && (
+                  <Badge variant="destructive">Token webhook ausente</Badge>
+                )}
               </div>
               {sicrediStatusQuery.data.connection_error && (
                 <p className="text-destructive mt-2 text-xs">{sicrediStatusQuery.data.connection_error}</p>
@@ -186,6 +194,27 @@ function CustomerInvoicesPage() {
               >
                 <Plug className="mr-2 size-4" />
                 {testConnectionMutation.isPending ? 'Testando…' : 'Testar conexão'}
+              </Button>
+              <Button
+                size="sm"
+                disabled={setupProductionMutation.isPending || !sicrediStatusQuery.data.connected}
+                onClick={() => {
+                  const url = (publicApiUrl || sicrediStatusQuery.data.public_api_url || '').trim();
+                  setupProductionMutation.mutate(url || undefined, {
+                    onSuccess: (data) => {
+                      if (data.success) {
+                        toast.success(data.message);
+                      } else {
+                        const failed = data.steps.filter((s) => !s.ok).map((s) => s.message).join(' · ');
+                        toast.error(failed || data.message);
+                      }
+                    },
+                    onError: (e) =>
+                      toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+                  });
+                }}
+              >
+                {setupProductionMutation.isPending ? 'Configurando…' : 'Configurar produção'}
               </Button>
             </div>
           </div>

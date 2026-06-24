@@ -559,6 +559,7 @@ export function useAlterSicrediBoletoDueDate() {
 export type SicrediIntegrationStatus = {
   enabled: boolean;
   sandbox: boolean;
+  production: boolean;
   connected: boolean;
   connection_error?: string;
   cooperativa?: string;
@@ -568,6 +569,20 @@ export type SicrediIntegrationStatus = {
   webhook_registered: boolean;
   webhook_url?: string;
   public_api_url?: string;
+  webhook_token_set: boolean;
+  ready_for_production: boolean;
+};
+
+export type SicrediSetupStep = {
+  name: string;
+  ok: boolean;
+  message?: string;
+};
+
+export type SicrediProductionSetupResponse = {
+  success: boolean;
+  message: string;
+  steps: SicrediSetupStep[];
 };
 
 export function useSicrediStatus() {
@@ -605,6 +620,23 @@ export function useRegisterSicrediWebhook() {
     mutationFn: async (publicApiUrl?: string) => {
       const { data } = await client<{ success: boolean; message: string }>({
         url: '/v1/collections/sicredi/register-webhook',
+        method: 'POST',
+        data: publicApiUrl ? { public_api_url: publicApiUrl } : undefined
+      });
+      return data;
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['sicredi', 'status'] });
+    }
+  });
+}
+
+export function useSetupSicrediProduction() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (publicApiUrl?: string) => {
+      const { data } = await client<SicrediProductionSetupResponse>({
+        url: '/v1/collections/sicredi/setup-production',
         method: 'POST',
         data: publicApiUrl ? { public_api_url: publicApiUrl } : undefined
       });
