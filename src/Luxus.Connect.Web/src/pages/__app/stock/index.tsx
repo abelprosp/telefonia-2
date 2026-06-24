@@ -16,10 +16,10 @@ const RouteComponent = () => {
     >
       <div className="flex flex-col gap-4">
         <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" size="sm" render={<Link to="/stock" />}>
+          <Button variant="secondary" size="sm" render={<Link to="/stock" search={{ page: 1, pageSize: 10 }} />}>
             Estoque de linhas
           </Button>
-          <Button variant="outline" size="sm" render={<Link to="/stock/devices" />}>
+          <Button variant="outline" size="sm" render={<Link to="/stock/devices" search={{ page: 1, pageSize: 10 }} />}>
             Estoque de aparelhos
           </Button>
         </div>
