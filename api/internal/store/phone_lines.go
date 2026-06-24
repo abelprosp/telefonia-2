@@ -127,10 +127,10 @@ func (s *Store) GetPhoneLine(ctx context.Context, orgID, id string) (*models.Get
 
 func (s *Store) ListPhoneLineCustomerLinks(ctx context.Context, orgID, phoneLineID string) ([]models.PhoneLineCustomerLinkResponse, error) {
 	rows, err := s.q(ctx).Query(ctx, `
-		SELECT l."PhoneLineId", l."CustomerId", c."Name",
+		SELECT l."Id", l."PhoneLineId", l."CustomerId", c."Name",
 			(SELECT cd."Number" FROM "CustomerDocuments" cd
 			 WHERE cd."CustomerId" = c."Id" AND cd."DocumentType" IN ('cpf','cnpj') LIMIT 1),
-			l."StartDate", l."EndDate"
+			l."StartDate", l."EndDate", l."MonthlyAmount"
 		FROM "PhoneLineCustomerLinks" l
 		JOIN "Customers" c ON c."Id" = l."CustomerId"
 		JOIN "PhoneLines" pl ON pl."Id" = l."PhoneLineId"
@@ -147,8 +147,8 @@ func (s *Store) ListPhoneLineCustomerLinks(ctx context.Context, orgID, phoneLine
 	for rows.Next() {
 		var item models.PhoneLineCustomerLinkResponse
 		var endDate *time.Time
-		if err := rows.Scan(&item.PhoneLineID, &item.CustomerID, &item.CustomerName,
-			&item.CustomerDocument, &item.StartDate, &endDate); err != nil {
+		if err := rows.Scan(&item.ID, &item.PhoneLineID, &item.CustomerID, &item.CustomerName,
+			&item.CustomerDocument, &item.StartDate, &endDate, &item.MonthlyAmount); err != nil {
 			return nil, err
 		}
 		item.EndDate = endDate
@@ -171,16 +171,30 @@ func (s *Store) GetActivePhoneLineCustomerLink(ctx context.Context, phoneLineID 
 	return linkID, customerID, err
 }
 
-func (s *Store) AssignPhoneLineCustomer(ctx context.Context, phoneLineID, customerID string, start time.Time) error {
+func (s *Store) AssignPhoneLineCustomer(ctx context.Context, phoneLineID, customerID string, start time.Time, monthlyAmount *float64) error {
 	if _, err := s.q(ctx).Exec(ctx, `
 		UPDATE "PhoneLineCustomerLinks" SET "EndDate" = $2
 		WHERE "PhoneLineId" = $1 AND "EndDate" IS NULL`, phoneLineID, start); err != nil {
 		return err
 	}
 	_, err := s.q(ctx).Exec(ctx, `
-		INSERT INTO "PhoneLineCustomerLinks" ("Id", "PhoneLineId", "CustomerId", "StartDate")
-		VALUES ($1, $2, $3, $4)`, newUUID(), phoneLineID, customerID, start)
+		INSERT INTO "PhoneLineCustomerLinks" ("Id", "PhoneLineId", "CustomerId", "StartDate", "MonthlyAmount")
+		VALUES ($1, $2, $3, $4, $5)`, newUUID(), phoneLineID, customerID, start, monthlyAmount)
 	return err
+}
+
+func (s *Store) UpdateActivePhoneLineCustomerLinkAmount(ctx context.Context, phoneLineID string, monthlyAmount *float64) error {
+	tag, err := s.q(ctx).Exec(ctx, `
+		UPDATE "PhoneLineCustomerLinks"
+		SET "MonthlyAmount" = $2
+		WHERE "PhoneLineId" = $1 AND "EndDate" IS NULL`, phoneLineID, monthlyAmount)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+	return nil
 }
 
 func (s *Store) UnassignPhoneLineCustomer(ctx context.Context, phoneLineID string, end time.Time) error {

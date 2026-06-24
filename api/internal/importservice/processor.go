@@ -107,6 +107,10 @@ func (p *Processor) process(ctx context.Context, req *store.ImportRequestRow) er
 		return err
 	}
 
+	if err := p.processInvoiceServices(ctx, req.ProviderID, invoiceID, parsed, header); err != nil {
+		return err
+	}
+
 	if err := p.processLines(ctx, req.ProviderID, account.ID, invoiceID, parsed, importCustomer, numbersInFile, header); err != nil {
 		return err
 	}
@@ -244,6 +248,66 @@ func (p *Processor) resolveCustomer(ctx context.Context, orgID, providerID strin
 	return "", nil
 }
 
+func (p *Processor) processInvoiceServices(ctx context.Context, providerID, invoiceID string, parsed []any, header *vivo.Line010DHeader) error {
+	for _, rec := range parsed {
+		var planCode, name string
+		var qty int
+		var total, franchise, used float64
+		switch svc := rec.(type) {
+		case *vivo.Line050HService:
+			planCode, name, qty, franchise, used, total = svc.PlanCode, svc.ServiceName, svc.Quantity, svc.Franchise, svc.Used, svc.Total
+		case *vivo.Line050GService:
+			planCode, name, qty, franchise, used, total = svc.PlanCode, svc.ServiceName, svc.Quantity, svc.Franchise, svc.Used, svc.Total
+		default:
+			continue
+		}
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+		plan, err := p.resolvePlan(ctx, providerID, planCode)
+		if err != nil || plan == nil {
+			continue
+		}
+		qtyF := float64(qty)
+		if qtyF <= 0 {
+			qtyF = 1
+		}
+		if err := p.Store.CreateInvoiceService(ctx, store.InvoiceServiceInsert{
+			ID:             uuid.New().String(),
+			InvoiceID:      invoiceID,
+			PlanID:         plan.ID,
+			Description:    name,
+			Quantity:       qtyF,
+			TotalPrice:     total,
+			QuotaAmount:    &franchise,
+			ConsumedAmount: &used,
+		}); err != nil {
+			return err
+		}
+	}
+	if header.SubtotalUsageExceeded != 0 {
+		plan, err := p.resolvePlan(ctx, providerID, "CONSUMO")
+		if err != nil {
+			return err
+		}
+		if plan != nil {
+			usage := header.SubtotalUsageExceeded
+			if err := p.Store.CreateInvoiceService(ctx, store.InvoiceServiceInsert{
+				ID:          uuid.New().String(),
+				InvoiceID:   invoiceID,
+				PlanID:      plan.ID,
+				Description: "Consumo",
+				Quantity:    1,
+				TotalPrice:  usage,
+			}); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func (p *Processor) processLines(ctx context.Context, providerID, accountID, invoiceID string, parsed []any, customerID string, numbers map[string]struct{}, header *vivo.Line010DHeader) error {
 	seen := map[string]struct{}{}
 	for _, rec := range parsed {
@@ -283,7 +347,7 @@ func (p *Processor) processLines(ctx context.Context, providerID, accountID, inv
 		if customerID != "" {
 			_, activeCustomer, _ := p.Store.GetActivePhoneLineCustomerLink(ctx, pl.ID)
 			if activeCustomer == "" {
-				_ = p.Store.AssignPhoneLineCustomer(ctx, pl.ID, customerID, header.IssueDate)
+				_ = p.Store.AssignPhoneLineCustomer(ctx, pl.ID, customerID, header.IssueDate, nil)
 				_ = p.Store.AddCustomerProviderLink(ctx, customerID, providerID, header.IssueDate)
 				_ = p.Store.ReactivateCustomer(ctx, customerID)
 			}

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
@@ -44,6 +44,7 @@ import {
   TableRow
 } from '@/components/ui/table';
 import { getErrorMessage, isApiHttpError } from '@/lib/api-error';
+import { formatMoney } from '@/lib/financial-api';
 import {
   formatCpfCnpj,
   formatLineClassification,
@@ -51,6 +52,11 @@ import {
   formatPhoneNumber,
   formatTransitionSubStatus
 } from '@/lib/format';
+import {
+  formatMoneyInput,
+  parseMoneyInput,
+  useUpdatePhoneLineMonthlyAmount
+} from '@/lib/phone-line-api';
 import { cn } from '@/lib/utils';
 
 type PhoneLinesListSearch = {
@@ -122,17 +128,26 @@ export function PhoneLineDetailView({
   const [unassignOpen, setUnassignOpen] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [effectiveDate, setEffectiveDate] = useState('');
+  const [assignMonthlyAmount, setAssignMonthlyAmount] = useState('');
+  const [editMonthlyAmount, setEditMonthlyAmount] = useState('');
 
   const customerLinksQuery = useGetV1PhoneLinesIdCustomerLinks(line.id);
   const customersQuery = useGetV1Customers({
-    page_index: 1,
-    page_size: 500
+    page_index: 0,
+    page_size: 100
   });
 
   const activeLink = useMemo(
     () => customerLinksQuery.data?.find((l) => l.is_active) ?? null,
     [customerLinksQuery.data]
   );
+
+  const activeMonthlyAmount = (activeLink as { monthly_amount?: number | null } | null)
+    ?.monthly_amount;
+
+  useEffect(() => {
+    setEditMonthlyAmount(formatMoneyInput(activeMonthlyAmount));
+  }, [activeMonthlyAmount, activeLink?.customer_id]);
 
   const customersOptions = useMemo(
     () => (customersQuery.data?.items ?? []).filter((c) => c.active),
@@ -142,7 +157,10 @@ export function PhoneLineDetailView({
   const resetLinkActionForm = () => {
     setSelectedCustomerId('');
     setEffectiveDate('');
+    setAssignMonthlyAmount('');
   };
+
+  const updateMonthlyMutation = useUpdatePhoneLineMonthlyAmount();
 
   const invalidateLinks = async () => {
     await queryClient.invalidateQueries({
@@ -282,6 +300,60 @@ export function PhoneLineDetailView({
                 }
               />
             </Field>
+            <Field>
+              <FieldLabel>Custo operadora (base)</FieldLabel>
+              <ReadOnlyField
+                value={
+                  line.base_cost != null ? formatMoney(line.base_cost) : '—'
+                }
+              />
+            </Field>
+            <Field>
+              <FieldLabel>Custo c/ consumo</FieldLabel>
+              <ReadOnlyField
+                value={
+                  line.cost_with_consumption != null
+                    ? formatMoney(line.cost_with_consumption)
+                    : '—'
+                }
+              />
+            </Field>
+            <Field className="sm:col-span-2">
+              <FieldLabel>Valor mensal do cliente (R$)</FieldLabel>
+              <div className="flex flex-wrap gap-2">
+                <Input
+                  className="max-w-xs"
+                  inputMode="decimal"
+                  placeholder="0,00"
+                  value={editMonthlyAmount}
+                  disabled={!activeLink}
+                  onChange={(e) => setEditMonthlyAmount(e.target.value)}
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={!activeLink || updateMonthlyMutation.isPending}
+                  onClick={() => {
+                    updateMonthlyMutation.mutate(
+                      {
+                        phoneLineId: line.id,
+                        monthly_amount: parseMoneyInput(editMonthlyAmount)
+                      },
+                      {
+                        onSuccess: () => toast.success('Valor mensal atualizado.'),
+                        onError: (e) =>
+                          toast.error(
+                            isApiHttpError(e) ? e.message : getErrorMessage(e)
+                          )
+                      }
+                    );
+                  }}
+                >
+                  Salvar valor
+                </Button>
+              </div>
+            </Field>
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -326,6 +398,7 @@ export function PhoneLineDetailView({
                     <TableHead>Documento</TableHead>
                     <TableHead>Início</TableHead>
                     <TableHead>Fim</TableHead>
+                    <TableHead>Valor mensal</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -341,6 +414,14 @@ export function PhoneLineDetailView({
                       </TableCell>
                       <TableCell>
                         {link.end_date?.toDate()?.format('dd/MM/yyyy') ?? '—'}
+                      </TableCell>
+                      <TableCell>
+                        {(link as { monthly_amount?: number | null }).monthly_amount !=
+                        null
+                          ? formatMoney(
+                              (link as { monthly_amount?: number }).monthly_amount!
+                            )
+                          : '—'}
                       </TableCell>
                       <TableCell>
                         {link.is_active ? 'Ativo' : 'Encerrado'}
@@ -552,6 +633,15 @@ export function PhoneLineDetailView({
                 onChange={(e) => setEffectiveDate(e.target.value)}
               />
             </Field>
+            <Field>
+              <FieldLabel>Valor mensal cobrado (R$)</FieldLabel>
+              <Input
+                inputMode="decimal"
+                placeholder="0,00"
+                value={assignMonthlyAmount}
+                onChange={(e) => setAssignMonthlyAmount(e.target.value)}
+              />
+            </Field>
           </div>
           <SheetFooter className="gap-2">
             <SheetClose render={<Button variant="outline" />}>
@@ -564,8 +654,9 @@ export function PhoneLineDetailView({
                   id: line.id,
                   data: {
                     customer_id: selectedCustomerId,
-                    start_date: effectiveDate || null
-                  }
+                    start_date: effectiveDate || null,
+                    monthly_amount: parseMoneyInput(assignMonthlyAmount)
+                  } as { customer_id: string; start_date: string | null; monthly_amount?: number | null }
                 })
               }
             >

@@ -29,6 +29,16 @@ type Config struct {
 	SMTPPassword             string
 	SMTPFrom                 string
 	SMTPTLS                  bool
+	SicrediEnabled           bool
+	SicrediSandbox           bool
+	SicrediAPIKey            string
+	SicrediUsername          string
+	SicrediPassword          string
+	SicrediCooperativa       string
+	SicrediPosto             string
+	SicrediCodigoBeneficiario string
+	SicrediWebhookToken       string
+	SicrediPublicAPIURL       string
 }
 
 func Load() Config {
@@ -44,6 +54,18 @@ func Load() Config {
 	for _, o := range cors {
 		if t := strings.TrimSpace(o); t != "" {
 			origins = append(origins, t)
+		}
+	}
+	if len(origins) == 0 {
+		if rd := strings.TrimSpace(os.Getenv("RAILWAY_PUBLIC_DOMAIN")); rd != "" {
+			origins = append(origins, "https://"+rd)
+		}
+	}
+
+	sicrediPublicURL := strings.TrimRight(strings.TrimSpace(os.Getenv("SICREDI_PUBLIC_API_URL")), "/")
+	if sicrediPublicURL == "" {
+		if rd := strings.TrimSpace(os.Getenv("RAILWAY_PUBLIC_DOMAIN")); rd != "" {
+			sicrediPublicURL = "https://" + rd
 		}
 	}
 
@@ -74,6 +96,16 @@ func Load() Config {
 		SMTPPassword:             os.Getenv("SMTP_PASSWORD"),
 		SMTPFrom:                 strings.TrimSpace(os.Getenv("SMTP_FROM")),
 		SMTPTLS:                  strings.EqualFold(os.Getenv("SMTP_TLS"), "true"),
+		SicrediEnabled:           strings.EqualFold(os.Getenv("SICREDI_ENABLED"), "true"),
+		SicrediSandbox:           !strings.EqualFold(os.Getenv("SICREDI_SANDBOX"), "false"),
+		SicrediAPIKey:            strings.TrimSpace(os.Getenv("SICREDI_API_KEY")),
+		SicrediUsername:          strings.TrimSpace(os.Getenv("SICREDI_USERNAME")),
+		SicrediPassword:          os.Getenv("SICREDI_PASSWORD"),
+		SicrediCooperativa:       strings.TrimSpace(os.Getenv("SICREDI_COOPERATIVA")),
+		SicrediPosto:             strings.TrimSpace(os.Getenv("SICREDI_POSTO")),
+		SicrediCodigoBeneficiario: strings.TrimSpace(os.Getenv("SICREDI_CODIGO_BENEFICIARIO")),
+		SicrediWebhookToken:       strings.TrimSpace(os.Getenv("SICREDI_WEBHOOK_TOKEN")),
+		SicrediPublicAPIURL:       sicrediPublicURL,
 	}
 }
 
@@ -97,6 +129,7 @@ func NormalizeDatabaseURL(raw string) string {
 		return ""
 	}
 	if strings.HasPrefix(raw, "postgres://") || strings.HasPrefix(raw, "postgresql://") {
+		// Railway e outros PaaS usam sslmode=require; pgx aceita a URL como está.
 		return raw
 	}
 	if !strings.Contains(raw, "=") {

@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import type { ColumnDef } from '@tanstack/react-table';
-import { FilePenLine } from 'lucide-react';
+import { FilePenLine, Link2 } from 'lucide-react';
 
 import type { ListPhoneLineResponse } from '@/api';
 import { DataTableColumnHeader } from '@/components/data-table/data-table-column-header';
@@ -18,8 +18,9 @@ import {
 
 export function createStockLinesColumns(opts: {
   listSearch: { page: number; pageSize: number };
+  onLinkCustomer?: (line: ListPhoneLineResponse) => void;
 }): ColumnDef<ListPhoneLineResponse>[] {
-  const { listSearch } = opts;
+  const { listSearch, onLinkCustomer } = opts;
 
   return [
     {
@@ -59,6 +60,24 @@ export function createStockLinesColumns(opts: {
         const line = row.original;
         return (
           <div className="flex justify-end gap-2">
+            {onLinkCustomer ? (
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="text-primary hover:text-primary"
+                      onClick={() => onLinkCustomer(line)}
+                    >
+                      <Link2 />
+                    </Button>
+                  }
+                />
+                <TooltipContent>Vincular cliente</TooltipContent>
+              </Tooltip>
+            ) : null}
             <Tooltip>
               <TooltipTrigger
                 render={

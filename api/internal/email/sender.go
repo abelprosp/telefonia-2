@@ -5,11 +5,14 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"mime"
+	"mime/quotedprintable"
 	"net"
 	"net/smtp"
 	"strings"
 
 	"github.com/luxus-connect/telefonia/api/internal/config"
+	"github.com/luxus-connect/telefonia/api/internal/invoicelayout"
 )
 
 type Message struct {
@@ -102,13 +105,33 @@ func (s *Sender) sendTLS(_ context.Context, addr string, auth smtp.Auth, from, t
 }
 
 func buildMIMEBody(from, to, subject, html string) string {
+	wrapped := invoicelayout.EnsureHTMLDocument(html)
+
+	var encodedBody bytes.Buffer
+	qp := quotedprintable.NewWriter(&encodedBody)
+	_, _ = qp.Write([]byte(wrapped))
+	_ = qp.Close()
+
 	var buf bytes.Buffer
 	buf.WriteString("From: " + from + "\r\n")
 	buf.WriteString("To: " + to + "\r\n")
-	buf.WriteString("Subject: " + subject + "\r\n")
+	buf.WriteString("Subject: " + encodeSubject(subject) + "\r\n")
 	buf.WriteString("MIME-Version: 1.0\r\n")
 	buf.WriteString("Content-Type: text/html; charset=UTF-8\r\n")
+	buf.WriteString("Content-Transfer-Encoding: quoted-printable\r\n")
 	buf.WriteString("\r\n")
-	buf.WriteString(html)
+	buf.Write(encodedBody.Bytes())
 	return buf.String()
+}
+
+func encodeSubject(subject string) string {
+	if subject == "" {
+		return subject
+	}
+	for _, r := range subject {
+		if r > 127 {
+			return mime.QEncoding.Encode("utf-8", subject)
+		}
+	}
+	return subject
 }

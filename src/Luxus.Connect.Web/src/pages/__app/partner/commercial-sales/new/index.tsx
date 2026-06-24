@@ -16,6 +16,8 @@ import {
   SelectValue
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { SalePhoneLinePicker, buildPhoneLineSaleDescription } from '@/components/sale-phone-line-picker';
+import { SaleDevicePicker, buildDeviceSaleDescription } from '@/components/sale-device-picker';
 import { getErrorMessage, isApiHttpError } from '@/lib/api-error';
 import { usePartnerCustomers } from '@/lib/partner-api';
 import {
@@ -61,6 +63,16 @@ function PartnerNewSalePage() {
     setItems((prev) => prev.map((i) => (i.key === key ? { ...i, ...patch } : i)));
   };
 
+  const usedPhoneLineIds = (excludeKey: string) =>
+    items
+      .filter((i) => i.key !== excludeKey && i.line_item_type === 'phone_line' && i.phone_line_id)
+      .map((i) => i.phone_line_id as string);
+
+  const usedDeviceSkus = (excludeKey: string) =>
+    items
+      .filter((i) => i.key !== excludeKey && i.line_item_type === 'device' && i.device_sku)
+      .map((i) => i.device_sku as string);
+
   const handleFinish = async (confirm: boolean) => {
     if (!customerId) {
       toast.error('Selecione o cliente.');
@@ -69,6 +81,20 @@ function PartnerNewSalePage() {
     const validItems = items.filter((i) => i.description.trim());
     if (validItems.length === 0) {
       toast.error('Adicione ao menos um item.');
+      return;
+    }
+    const missingLine = validItems.find(
+      (i) => i.line_item_type === 'phone_line' && !i.phone_line_id
+    );
+    if (missingLine) {
+      toast.error('Selecione uma linha em estoque para cada item do tipo linha telefônica.');
+      return;
+    }
+    const missingDevice = validItems.find(
+      (i) => i.line_item_type === 'device' && !i.device_sku
+    );
+    if (missingDevice) {
+      toast.error('Selecione um aparelho em estoque para cada item do tipo aparelho.');
       return;
     }
     try {
@@ -157,9 +183,17 @@ function PartnerNewSalePage() {
                 <div key={item.key} className="space-y-2 rounded border p-3">
                   <Select
                     value={item.line_item_type}
-                    onValueChange={(v) =>
-                      updateItem(item.key, { line_item_type: v as DraftItem['line_item_type'] })
-                    }
+                    onValueChange={(v) => {
+                      const type = v as DraftItem['line_item_type'];
+                      updateItem(item.key, {
+                        line_item_type: type,
+                        phone_line_id: undefined,
+                        device_sku: undefined,
+                        description:
+                          type === 'phone_line' || type === 'device' ? '' : item.description,
+                        unit_price: type === 'device' ? 0 : item.unit_price
+                      });
+                    }}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -170,8 +204,53 @@ function PartnerNewSalePage() {
                       <SelectItem value="other">Outro</SelectItem>
                     </SelectContent>
                   </Select>
+                  {item.line_item_type === 'phone_line' && (
+                    <SalePhoneLinePicker
+                      value={item.phone_line_id}
+                      excludeLineIds={usedPhoneLineIds(item.key)}
+                      onChange={(line) => {
+                        if (!line) {
+                          updateItem(item.key, { phone_line_id: undefined, description: '' });
+                          return;
+                        }
+                        updateItem(item.key, {
+                          phone_line_id: line.id,
+                          description: buildPhoneLineSaleDescription(line),
+                          quantity: 1
+                        });
+                      }}
+                    />
+                  )}
+                  {item.line_item_type === 'device' && (
+                    <SaleDevicePicker
+                      value={item.device_sku}
+                      excludeSkus={usedDeviceSkus(item.key)}
+                      onChange={(device) => {
+                        if (!device) {
+                          updateItem(item.key, {
+                            device_sku: undefined,
+                            description: '',
+                            unit_price: 0
+                          });
+                          return;
+                        }
+                        updateItem(item.key, {
+                          device_sku: device.sku,
+                          description: buildDeviceSaleDescription(device),
+                          unit_price: device.sale_price ?? 0,
+                          quantity: 1
+                        });
+                      }}
+                    />
+                  )}
                   <Input
-                    placeholder="Descrição"
+                    placeholder={
+                      item.line_item_type === 'phone_line'
+                        ? 'Preenchida ao selecionar a linha'
+                        : item.line_item_type === 'device'
+                          ? 'Preenchida ao selecionar o aparelho'
+                          : 'Descrição'
+                    }
                     value={item.description}
                     onChange={(e) => updateItem(item.key, { description: e.target.value })}
                   />
@@ -214,6 +293,11 @@ function PartnerNewSalePage() {
                 {items.filter((i) => i.description.trim()).map((i) => (
                   <div key={i.key}>
                     {formatLineItemType(i.line_item_type)} — {i.description}
+                    {i.line_item_type === 'phone_line' && i.phone_line_id
+                      ? ' (linha do estoque)'
+                      : i.line_item_type === 'device' && i.device_sku
+                        ? ' (aparelho do estoque)'
+                        : ''}
                   </div>
                 ))}
               </CardDescription>

@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router';
-import { ChevronDown, ChevronLeft, ChevronRight, Users } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, Plus, Users } from 'lucide-react';
 
 import type { GetProviderPlanResponse, GetProviderResponse } from '@/api';
 import { Button } from '@/components/ui/button';
@@ -52,6 +52,7 @@ type ProviderDetailViewProps = {
   listSearch: ProvidersListSearch;
   openPlanId: string | null;
   onTogglePlan: (planId: string | null) => void;
+  onAddPlan?: () => void;
 };
 
 export function ProviderDetailView({
@@ -59,7 +60,8 @@ export function ProviderDetailView({
   providerId,
   listSearch,
   openPlanId,
-  onTogglePlan
+  onTogglePlan,
+  onAddPlan
 }: ProviderDetailViewProps) {
   const backLink = {
     to: '/providers' as const,
@@ -147,11 +149,18 @@ export function ProviderDetailView({
 
       <DetailSection
         title="Planos e serviços"
-        description="Planos ofertados e serviços cadastrados por plano. Expanda um plano para ver a tabela de serviços."
+        description="Cadastre planos para vincular às linhas do estoque. Expanda um plano para ver os serviços e o valor mensal."
       >
+        <div className="mb-4 flex flex-wrap justify-end">
+          <Button type="button" size="sm" onClick={onAddPlan}>
+            <Plus className="mr-2 size-4" />
+            Novo plano
+          </Button>
+        </div>
         {planItems.length === 0 ? (
           <p className="text-muted-foreground text-sm">
-            Nenhum plano cadastrado para esta operadora.
+            Nenhum plano cadastrado. Clique em &quot;Novo plano&quot; para cadastrar e usar no estoque de
+            linhas.
           </p>
         ) : (
           <div className="flex flex-col gap-2">

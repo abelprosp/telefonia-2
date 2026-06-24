@@ -290,6 +290,12 @@ func (s *Store) RegisterReceivablePayment(ctx context.Context, paymentID, orgID,
 	})
 }
 
+func (s *Store) RegisterReceivablePaymentAuto(ctx context.Context, paymentID, orgID, accountID string, amount float64, paymentDate time.Time, reference, notes string, now time.Time) error {
+	ref := reference
+	n := notes
+	return s.RegisterReceivablePayment(ctx, paymentID, orgID, accountID, "sicredi-sync", amount, paymentDate, &ref, &n, now)
+}
+
 func (s *Store) GetPartnerCommissionPercent(ctx context.Context, orgID string) (float64, error) {
 	var pct float64
 	err := s.q(ctx).QueryRow(ctx, `

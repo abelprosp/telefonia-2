@@ -9,6 +9,8 @@
     <a href="#início-rápido-desenvolvimento"><strong>Guia de instalação »</strong></a>
     ·
     <a href="docs/DEPLOY_VPS.md">Deploy em VPS</a>
+    ·
+    <a href="docs/RAILWAY.md">Deploy no Railway</a>
   </p>
 </p>
 

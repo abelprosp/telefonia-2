@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Link } from '@tanstack/react-router';
 import { Controller, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { withMask } from 'use-mask-input';
@@ -172,6 +173,19 @@ export function StockLineCreateSheet({ open, onOpenChange, onSuccess }: StockLin
                   </SelectContent>
                 </Select>
                 <FieldError>{fieldState.error?.message}</FieldError>
+                {providerId && plans.length === 0 && !providerDetailQuery.isPending && (
+                  <p className="text-muted-foreground text-xs">
+                    Nenhum plano nesta operadora.{' '}
+                    <Link
+                      to="/providers/$providerId"
+                      params={{ providerId }}
+                      className="text-primary font-medium hover:underline"
+                    >
+                      Cadastre um plano
+                    </Link>{' '}
+                    antes de incluir a linha no estoque.
+                  </p>
+                )}
               </Field>
             )}
           />

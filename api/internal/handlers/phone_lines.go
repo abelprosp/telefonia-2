@@ -92,6 +92,20 @@ func (h *Handler) unassignPhoneLineCustomer(w http.ResponseWriter, r *http.Reque
 	w.WriteHeader(http.StatusAccepted)
 }
 
+func (h *Handler) updateActivePhoneLineCustomerLink(w http.ResponseWriter, r *http.Request) {
+	var input models.UpdateActivePhoneLineCustomerLinkInput
+	if err := decodeJSON(r, &input); err != nil {
+		httputil.WriteFail(w, http.StatusBadRequest, notifications.N("REQUEST_VALIDATION", "Invalid request body"))
+		return
+	}
+	item, err := h.Svc.UpdateActivePhoneLineCustomerLink(r.Context(), chi.URLParam(r, "id"), input)
+	if err != nil {
+		httputil.HandleServiceError(w, err)
+		return
+	}
+	httputil.WriteJSON(w, http.StatusOK, item)
+}
+
 func (h *Handler) listBillingCycles(w http.ResponseWriter, r *http.Request) {
 	page := httputil.ParsePagination(r)
 	items, total, err := h.Svc.ListBillingCycles(r.Context(), page)

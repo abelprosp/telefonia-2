@@ -18,8 +18,8 @@ WORKDIR /app
 
 COPY --from=build /out/api /app/api
 
-ENV PORT=80
-EXPOSE 80
+ENV PORT=8080
+EXPOSE 8080
 
 USER nobody
 ENTRYPOINT ["/app/api"]

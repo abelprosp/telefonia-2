@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
-import { ChevronLeft, Loader2, Trash2 } from 'lucide-react';
+import { ChevronLeft, FileStack, Link2, Loader2, Smartphone, Trash2 } from 'lucide-react';
 import { useForm, type Resolver } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -46,14 +46,22 @@ import {
 } from '@/components/ui/table';
 import { getErrorMessage, isApiHttpError } from '@/lib/api-error';
 import {
+  useCustomerDevices,
+  useUnassignCustomerDevice
+} from '@/lib/customer-devices-api';
+import {
   formatCpfCnpj,
   formatCustomerType,
   formatPhoneLineStatus
 } from '@/lib/format';
+import { formatMoney } from '@/lib/financial-api';
 import { invalidateDashboardCaches } from '@/lib/query-utils';
 import { cn } from '@/lib/utils';
 
 import { CustomerAttachmentsView } from './customer-attachments-view';
+import { AssignCustomerDeviceSheet } from './assign-customer-device-sheet';
+import { GenerateCustomerInvoiceSheet } from './generate-customer-invoice-sheet';
+import { LinkCustomerLineSheet } from '@/components/link-customer-line-sheet';
 
 type ListSearch = {
   page: number;
@@ -135,6 +143,9 @@ export function CustomerDetailView({
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [linkLineOpen, setLinkLineOpen] = useState(false);
+  const [linkDeviceOpen, setLinkDeviceOpen] = useState(false);
+  const [generateInvoiceOpen, setGenerateInvoiceOpen] = useState(false);
 
   const isPj = customer.type.trim().toUpperCase() === 'PJ';
   const schema = useMemo(() => buildSchema(isPj), [isPj]);
@@ -202,9 +213,11 @@ export function CustomerDetailView({
     customer.id
   );
   const customerLinesQuery = useGetV1CustomersIdPhoneLines(customer.id, {
-    page_index: 1,
+    page_index: 0,
     page_size: 50
   });
+  const customerDevicesQuery = useCustomerDevices(customer.id);
+  const unassignDeviceMutation = useUnassignCustomerDevice(customer.id);
 
   const customerAttachmentsQuery = useGetV1CustomersIdAttachments(customer.id);
 
@@ -403,6 +416,19 @@ export function CustomerDetailView({
           title="Linhas vinculadas"
           description="Histórico dos vínculos linha-cliente deste cliente."
         >
+          {isActive ? (
+            <div className="mb-4 flex justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setLinkLineOpen(true)}
+              >
+                <Link2 className="mr-2 size-4" />
+                Vincular linha
+              </Button>
+            </div>
+          ) : null}
           {customerLinesQuery.isPending ? (
             <p className="text-muted-foreground text-sm">
               Carregando vínculos...
@@ -418,6 +444,16 @@ export function CustomerDetailView({
               <p className="text-muted-foreground">
                 Nenhuma linha vinculada a este cliente.
               </p>
+              {isActive ? (
+                <Button
+                  type="button"
+                  variant="link"
+                  className="mt-2"
+                  onClick={() => setLinkLineOpen(true)}
+                >
+                  Vincular uma linha em estoque
+                </Button>
+              ) : null}
             </div>
           ) : (
             <div className="space-y-3">
@@ -428,6 +464,8 @@ export function CustomerDetailView({
                       <TableHead>Linha</TableHead>
                       <TableHead>Status da linha</TableHead>
                       <TableHead>Classificação</TableHead>
+                      <TableHead>Valor mensal</TableHead>
+                      <TableHead>Custo operadora</TableHead>
                       <TableHead>Início</TableHead>
                       <TableHead>Fim</TableHead>
                       <TableHead>Vínculo</TableHead>
@@ -444,6 +482,27 @@ export function CustomerDetailView({
                           {formatPhoneLineStatus(item.phone_line_status)}
                         </TableCell>
                         <TableCell>{item.line_classification}</TableCell>
+                        <TableCell>
+                          {(item as { monthly_amount?: number | null }).monthly_amount !=
+                          null
+                            ? formatMoney(
+                                (item as { monthly_amount?: number }).monthly_amount!
+                              )
+                            : '—'}
+                        </TableCell>
+                        <TableCell>
+                          {(item as { cost_with_consumption?: number | null })
+                            .cost_with_consumption != null
+                            ? formatMoney(
+                                (item as { cost_with_consumption?: number })
+                                  .cost_with_consumption!
+                              )
+                            : (item as { base_cost?: number | null }).base_cost != null
+                              ? formatMoney(
+                                  (item as { base_cost?: number }).base_cost!
+                                )
+                              : '—'}
+                        </TableCell>
                         <TableCell>
                           {item.start_date.toDate()?.format('dd/MM/yyyy') ??
                             '—'}
@@ -484,6 +543,127 @@ export function CustomerDetailView({
         </DetailSection>
 
         <Separator />
+
+        <DetailSection
+          title="Aparelhos vinculados"
+          description="Aparelhos cobrados mensalmente na fatura do cliente."
+        >
+          {isActive ? (
+            <div className="mb-4 flex justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setLinkDeviceOpen(true)}
+              >
+                <Smartphone className="mr-2 size-4" />
+                Vincular aparelho
+              </Button>
+            </div>
+          ) : null}
+          {customerDevicesQuery.isPending ? (
+            <p className="text-muted-foreground text-sm">Carregando aparelhos...</p>
+          ) : customerDevicesQuery.isError ? (
+            <p className="text-destructive text-sm">
+              {isApiHttpError(customerDevicesQuery.error)
+                ? customerDevicesQuery.error.message
+                : getErrorMessage(customerDevicesQuery.error)}
+            </p>
+          ) : (customerDevicesQuery.data?.items?.length ?? 0) === 0 ? (
+            <div className="border-input rounded-md border border-dashed p-6 text-center text-sm">
+              <p className="text-muted-foreground">Nenhum aparelho vinculado.</p>
+              {isActive ? (
+                <Button
+                  type="button"
+                  variant="link"
+                  className="mt-2"
+                  onClick={() => setLinkDeviceOpen(true)}
+                >
+                  Vincular aparelho do estoque
+                </Button>
+              ) : null}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="overflow-x-auto rounded-lg border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Descrição</TableHead>
+                      <TableHead>Marca / modelo</TableHead>
+                      <TableHead>Valor mensal</TableHead>
+                      <TableHead>Início</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(customerDevicesQuery.data?.items ?? []).map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell>{item.description}</TableCell>
+                        <TableCell>
+                          {item.brand} {item.model}
+                        </TableCell>
+                        <TableCell>{formatMoney(item.monthly_amount)}</TableCell>
+                        <TableCell>
+                          {new Date(item.start_date).toLocaleDateString('pt-BR')}
+                        </TableCell>
+                        <TableCell>{item.is_active ? 'Ativo' : 'Encerrado'}</TableCell>
+                        <TableCell className="text-right">
+                          {item.is_active ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              disabled={unassignDeviceMutation.isPending}
+                              onClick={() =>
+                                unassignDeviceMutation.mutate(item.id, {
+                                  onSuccess: () => {
+                                    toast.success('Vínculo do aparelho encerrado.');
+                                    void customerDevicesQuery.refetch();
+                                  },
+                                  onError: (e) =>
+                                    toast.error(
+                                      isApiHttpError(e) ? e.message : getErrorMessage(e)
+                                    )
+                                })
+                              }
+                            >
+                              Encerrar
+                            </Button>
+                          ) : null}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
+        </DetailSection>
+
+        <Separator />
+
+        {isActive ? (
+          <>
+            <DetailSection
+              title="Faturamento"
+              description="Gere fatura avulsa com boleto Sicredi (código de barras + PIX), sem depender da fatura importada da operadora."
+            >
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4">
+                <p className="text-muted-foreground text-sm">
+                  A fatura incluirá linha digitável, código de barras e QR Code PIX quando o Sicredi
+                  estiver configurado.
+                </p>
+                <Button type="button" onClick={() => setGenerateInvoiceOpen(true)}>
+                  <FileStack className="mr-2 size-4" />
+                  Gerar fatura
+                </Button>
+              </div>
+            </DetailSection>
+            <Separator />
+          </>
+        ) : null}
 
         <DetailSection
           title="Endereços"
@@ -647,6 +827,34 @@ export function CustomerDetailView({
           </SheetFooter>
         </SheetContent>
       </Sheet>
+
+      <LinkCustomerLineSheet
+        mode="customer-to-line"
+        customerId={customer.id}
+        customerName={customer.name}
+        open={linkLineOpen}
+        onOpenChange={setLinkLineOpen}
+        onSuccess={() => {
+          void customerLinesQuery.refetch();
+        }}
+      />
+
+      <AssignCustomerDeviceSheet
+        customerId={customer.id}
+        customerName={customer.name}
+        open={linkDeviceOpen}
+        onOpenChange={setLinkDeviceOpen}
+        onSuccess={() => {
+          void customerDevicesQuery.refetch();
+        }}
+      />
+
+      <GenerateCustomerInvoiceSheet
+        customerId={customer.id}
+        customerName={customer.name}
+        open={generateInvoiceOpen}
+        onOpenChange={setGenerateInvoiceOpen}
+      />
     </div>
   );
 }

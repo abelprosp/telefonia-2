@@ -152,11 +152,18 @@ services:
 
       - CORS_ORIGINS=https://localhost:8002;http://localhost:8002;http://localhost:4200;http://localhost:3000;http://localhost:5173
 
-
+      # Sicredi API Cobrança (boleto híbrido + PIX) — https://developer.sicredi.com.br
+      - SICREDI_ENABLED=${SICREDI_ENABLED:-false}
+      - SICREDI_SANDBOX=${SICREDI_SANDBOX:-true}
+      - SICREDI_API_KEY=${SICREDI_API_KEY:-}
+      - SICREDI_USERNAME=${SICREDI_USERNAME:-}
+      - SICREDI_PASSWORD=${SICREDI_PASSWORD:-}
+      - SICREDI_COOPERATIVA=${SICREDI_COOPERATIVA:-}
+      - SICREDI_POSTO=${SICREDI_POSTO:-}
+      - SICREDI_CODIGO_BENEFICIARIO=${SICREDI_CODIGO_BENEFICIARIO:-}
+      - SICREDI_PUBLIC_API_URL=${SICREDI_PUBLIC_API_URL:-}
+      - SICREDI_WEBHOOK_TOKEN=${SICREDI_WEBHOOK_TOKEN:-}
 
 volumes:
-
   minio-data:
-
     name: connect.luxus.minio-data
-

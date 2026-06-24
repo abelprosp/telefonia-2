@@ -33,6 +33,7 @@ import { Route as _appPhoneLinesPhoneLineIdRouteImport } from './pages/__app/pho
 import { Route as _appInvoicesInvoiceIdRouteImport } from './pages/__app/invoices/$invoiceId'
 import { Route as _appCustomersCustomerIdRouteImport } from './pages/__app/customers/$customerId'
 import { Route as _appBillingCyclesCycleIdRouteImport } from './pages/__app/billing-cycles/$cycleId'
+import { Route as _appStockDevicesIndexRouteImport } from './pages/__app/stock/devices/index'
 import { Route as _appSalesNewIndexRouteImport } from './pages/__app/sales/new/index'
 import { Route as _appReportsTransitionPendingIndexRouteImport } from './pages/__app/reports/transition-pending/index'
 import { Route as _appPartnerRequestsIndexRouteImport } from './pages/__app/partner/requests/index'
@@ -43,10 +44,13 @@ import { Route as _appPartnerCommercialSalesIndexRouteImport } from './pages/__a
 import { Route as _appFinanceReceivablesIndexRouteImport } from './pages/__app/finance/receivables/index'
 import { Route as _appFinancePayablesIndexRouteImport } from './pages/__app/finance/payables/index'
 import { Route as _appFinancePartnerSalesIndexRouteImport } from './pages/__app/finance/partner-sales/index'
+import { Route as _appFinanceInvoiceLayoutTemplatesIndexRouteImport } from './pages/__app/finance/invoice-layout-templates/index'
 import { Route as _appFinanceInvoiceEmailTemplatesIndexRouteImport } from './pages/__app/finance/invoice-email-templates/index'
 import { Route as _appFinanceCustomerInvoicesIndexRouteImport } from './pages/__app/finance/customer-invoices/index'
 import { Route as _appFinanceCollectionsIndexRouteImport } from './pages/__app/finance/collections/index'
 import { Route as _appPartnerCommercialSalesSaleIdRouteImport } from './pages/__app/partner/commercial-sales/$saleId'
+import { Route as _appFinanceInvoiceLayoutTemplatesIdRouteImport } from './pages/__app/finance/invoice-layout-templates/$id'
+import { Route as _appFinanceCustomerInvoicesBulkGenerateRouteImport } from './pages/__app/finance/customer-invoices/bulk-generate'
 import { Route as _appFinanceCustomerInvoicesIdRouteImport } from './pages/__app/finance/customer-invoices/$id'
 import { Route as _appPartnerCommercialSalesNewIndexRouteImport } from './pages/__app/partner/commercial-sales/new/index'
 
@@ -174,6 +178,11 @@ const _appBillingCyclesCycleIdRoute =
     path: '/billing-cycles/$cycleId',
     getParentRoute: () => _appLayoutRoute,
   } as any)
+const _appStockDevicesIndexRoute = _appStockDevicesIndexRouteImport.update({
+  id: '/stock/devices/',
+  path: '/stock/devices/',
+  getParentRoute: () => _appLayoutRoute,
+} as any)
 const _appSalesNewIndexRoute = _appSalesNewIndexRouteImport.update({
   id: '/sales/new/',
   path: '/sales/new/',
@@ -233,6 +242,12 @@ const _appFinancePartnerSalesIndexRoute =
     path: '/finance/partner-sales/',
     getParentRoute: () => _appLayoutRoute,
   } as any)
+const _appFinanceInvoiceLayoutTemplatesIndexRoute =
+  _appFinanceInvoiceLayoutTemplatesIndexRouteImport.update({
+    id: '/finance/invoice-layout-templates/',
+    path: '/finance/invoice-layout-templates/',
+    getParentRoute: () => _appLayoutRoute,
+  } as any)
 const _appFinanceInvoiceEmailTemplatesIndexRoute =
   _appFinanceInvoiceEmailTemplatesIndexRouteImport.update({
     id: '/finance/invoice-email-templates/',
@@ -255,6 +270,18 @@ const _appPartnerCommercialSalesSaleIdRoute =
   _appPartnerCommercialSalesSaleIdRouteImport.update({
     id: '/partner/commercial-sales/$saleId',
     path: '/partner/commercial-sales/$saleId',
+    getParentRoute: () => _appLayoutRoute,
+  } as any)
+const _appFinanceInvoiceLayoutTemplatesIdRoute =
+  _appFinanceInvoiceLayoutTemplatesIdRouteImport.update({
+    id: '/finance/invoice-layout-templates/$id',
+    path: '/finance/invoice-layout-templates/$id',
+    getParentRoute: () => _appLayoutRoute,
+  } as any)
+const _appFinanceCustomerInvoicesBulkGenerateRoute =
+  _appFinanceCustomerInvoicesBulkGenerateRouteImport.update({
+    id: '/finance/customer-invoices/bulk-generate',
+    path: '/finance/customer-invoices/bulk-generate',
     getParentRoute: () => _appLayoutRoute,
   } as any)
 const _appFinanceCustomerInvoicesIdRoute =
@@ -295,10 +322,13 @@ export interface FileRoutesByFullPath {
   '/stock/': typeof _appStockIndexRoute
   '/users/': typeof _appUsersIndexRoute
   '/finance/customer-invoices/$id': typeof _appFinanceCustomerInvoicesIdRoute
+  '/finance/customer-invoices/bulk-generate': typeof _appFinanceCustomerInvoicesBulkGenerateRoute
+  '/finance/invoice-layout-templates/$id': typeof _appFinanceInvoiceLayoutTemplatesIdRoute
   '/partner/commercial-sales/$saleId': typeof _appPartnerCommercialSalesSaleIdRoute
   '/finance/collections/': typeof _appFinanceCollectionsIndexRoute
   '/finance/customer-invoices/': typeof _appFinanceCustomerInvoicesIndexRoute
   '/finance/invoice-email-templates/': typeof _appFinanceInvoiceEmailTemplatesIndexRoute
+  '/finance/invoice-layout-templates/': typeof _appFinanceInvoiceLayoutTemplatesIndexRoute
   '/finance/partner-sales/': typeof _appFinancePartnerSalesIndexRoute
   '/finance/payables/': typeof _appFinancePayablesIndexRoute
   '/finance/receivables/': typeof _appFinanceReceivablesIndexRoute
@@ -309,6 +339,7 @@ export interface FileRoutesByFullPath {
   '/partner/requests/': typeof _appPartnerRequestsIndexRoute
   '/reports/transition-pending/': typeof _appReportsTransitionPendingIndexRoute
   '/sales/new/': typeof _appSalesNewIndexRoute
+  '/stock/devices/': typeof _appStockDevicesIndexRoute
   '/partner/commercial-sales/new/': typeof _appPartnerCommercialSalesNewIndexRoute
 }
 export interface FileRoutesByTo {
@@ -336,10 +367,13 @@ export interface FileRoutesByTo {
   '/stock': typeof _appStockIndexRoute
   '/users': typeof _appUsersIndexRoute
   '/finance/customer-invoices/$id': typeof _appFinanceCustomerInvoicesIdRoute
+  '/finance/customer-invoices/bulk-generate': typeof _appFinanceCustomerInvoicesBulkGenerateRoute
+  '/finance/invoice-layout-templates/$id': typeof _appFinanceInvoiceLayoutTemplatesIdRoute
   '/partner/commercial-sales/$saleId': typeof _appPartnerCommercialSalesSaleIdRoute
   '/finance/collections': typeof _appFinanceCollectionsIndexRoute
   '/finance/customer-invoices': typeof _appFinanceCustomerInvoicesIndexRoute
   '/finance/invoice-email-templates': typeof _appFinanceInvoiceEmailTemplatesIndexRoute
+  '/finance/invoice-layout-templates': typeof _appFinanceInvoiceLayoutTemplatesIndexRoute
   '/finance/partner-sales': typeof _appFinancePartnerSalesIndexRoute
   '/finance/payables': typeof _appFinancePayablesIndexRoute
   '/finance/receivables': typeof _appFinanceReceivablesIndexRoute
@@ -350,6 +384,7 @@ export interface FileRoutesByTo {
   '/partner/requests': typeof _appPartnerRequestsIndexRoute
   '/reports/transition-pending': typeof _appReportsTransitionPendingIndexRoute
   '/sales/new': typeof _appSalesNewIndexRoute
+  '/stock/devices': typeof _appStockDevicesIndexRoute
   '/partner/commercial-sales/new': typeof _appPartnerCommercialSalesNewIndexRoute
 }
 export interface FileRoutesById {
@@ -379,10 +414,13 @@ export interface FileRoutesById {
   '/__app/stock/': typeof _appStockIndexRoute
   '/__app/users/': typeof _appUsersIndexRoute
   '/__app/finance/customer-invoices/$id': typeof _appFinanceCustomerInvoicesIdRoute
+  '/__app/finance/customer-invoices/bulk-generate': typeof _appFinanceCustomerInvoicesBulkGenerateRoute
+  '/__app/finance/invoice-layout-templates/$id': typeof _appFinanceInvoiceLayoutTemplatesIdRoute
   '/__app/partner/commercial-sales/$saleId': typeof _appPartnerCommercialSalesSaleIdRoute
   '/__app/finance/collections/': typeof _appFinanceCollectionsIndexRoute
   '/__app/finance/customer-invoices/': typeof _appFinanceCustomerInvoicesIndexRoute
   '/__app/finance/invoice-email-templates/': typeof _appFinanceInvoiceEmailTemplatesIndexRoute
+  '/__app/finance/invoice-layout-templates/': typeof _appFinanceInvoiceLayoutTemplatesIndexRoute
   '/__app/finance/partner-sales/': typeof _appFinancePartnerSalesIndexRoute
   '/__app/finance/payables/': typeof _appFinancePayablesIndexRoute
   '/__app/finance/receivables/': typeof _appFinanceReceivablesIndexRoute
@@ -393,6 +431,7 @@ export interface FileRoutesById {
   '/__app/partner/requests/': typeof _appPartnerRequestsIndexRoute
   '/__app/reports/transition-pending/': typeof _appReportsTransitionPendingIndexRoute
   '/__app/sales/new/': typeof _appSalesNewIndexRoute
+  '/__app/stock/devices/': typeof _appStockDevicesIndexRoute
   '/__app/partner/commercial-sales/new/': typeof _appPartnerCommercialSalesNewIndexRoute
 }
 export interface FileRouteTypes {
@@ -422,10 +461,13 @@ export interface FileRouteTypes {
     | '/stock/'
     | '/users/'
     | '/finance/customer-invoices/$id'
+    | '/finance/customer-invoices/bulk-generate'
+    | '/finance/invoice-layout-templates/$id'
     | '/partner/commercial-sales/$saleId'
     | '/finance/collections/'
     | '/finance/customer-invoices/'
     | '/finance/invoice-email-templates/'
+    | '/finance/invoice-layout-templates/'
     | '/finance/partner-sales/'
     | '/finance/payables/'
     | '/finance/receivables/'
@@ -436,6 +478,7 @@ export interface FileRouteTypes {
     | '/partner/requests/'
     | '/reports/transition-pending/'
     | '/sales/new/'
+    | '/stock/devices/'
     | '/partner/commercial-sales/new/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -463,10 +506,13 @@ export interface FileRouteTypes {
     | '/stock'
     | '/users'
     | '/finance/customer-invoices/$id'
+    | '/finance/customer-invoices/bulk-generate'
+    | '/finance/invoice-layout-templates/$id'
     | '/partner/commercial-sales/$saleId'
     | '/finance/collections'
     | '/finance/customer-invoices'
     | '/finance/invoice-email-templates'
+    | '/finance/invoice-layout-templates'
     | '/finance/partner-sales'
     | '/finance/payables'
     | '/finance/receivables'
@@ -477,6 +523,7 @@ export interface FileRouteTypes {
     | '/partner/requests'
     | '/reports/transition-pending'
     | '/sales/new'
+    | '/stock/devices'
     | '/partner/commercial-sales/new'
   id:
     | '__root__'
@@ -505,10 +552,13 @@ export interface FileRouteTypes {
     | '/__app/stock/'
     | '/__app/users/'
     | '/__app/finance/customer-invoices/$id'
+    | '/__app/finance/customer-invoices/bulk-generate'
+    | '/__app/finance/invoice-layout-templates/$id'
     | '/__app/partner/commercial-sales/$saleId'
     | '/__app/finance/collections/'
     | '/__app/finance/customer-invoices/'
     | '/__app/finance/invoice-email-templates/'
+    | '/__app/finance/invoice-layout-templates/'
     | '/__app/finance/partner-sales/'
     | '/__app/finance/payables/'
     | '/__app/finance/receivables/'
@@ -519,6 +569,7 @@ export interface FileRouteTypes {
     | '/__app/partner/requests/'
     | '/__app/reports/transition-pending/'
     | '/__app/sales/new/'
+    | '/__app/stock/devices/'
     | '/__app/partner/commercial-sales/new/'
   fileRoutesById: FileRoutesById
 }
@@ -696,6 +747,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof _appBillingCyclesCycleIdRouteImport
       parentRoute: typeof _appLayoutRoute
     }
+    '/__app/stock/devices/': {
+      id: '/__app/stock/devices/'
+      path: '/stock/devices'
+      fullPath: '/stock/devices/'
+      preLoaderRoute: typeof _appStockDevicesIndexRouteImport
+      parentRoute: typeof _appLayoutRoute
+    }
     '/__app/sales/new/': {
       id: '/__app/sales/new/'
       path: '/sales/new'
@@ -766,6 +824,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof _appFinancePartnerSalesIndexRouteImport
       parentRoute: typeof _appLayoutRoute
     }
+    '/__app/finance/invoice-layout-templates/': {
+      id: '/__app/finance/invoice-layout-templates/'
+      path: '/finance/invoice-layout-templates'
+      fullPath: '/finance/invoice-layout-templates/'
+      preLoaderRoute: typeof _appFinanceInvoiceLayoutTemplatesIndexRouteImport
+      parentRoute: typeof _appLayoutRoute
+    }
     '/__app/finance/invoice-email-templates/': {
       id: '/__app/finance/invoice-email-templates/'
       path: '/finance/invoice-email-templates'
@@ -792,6 +857,20 @@ declare module '@tanstack/react-router' {
       path: '/partner/commercial-sales/$saleId'
       fullPath: '/partner/commercial-sales/$saleId'
       preLoaderRoute: typeof _appPartnerCommercialSalesSaleIdRouteImport
+      parentRoute: typeof _appLayoutRoute
+    }
+    '/__app/finance/invoice-layout-templates/$id': {
+      id: '/__app/finance/invoice-layout-templates/$id'
+      path: '/finance/invoice-layout-templates/$id'
+      fullPath: '/finance/invoice-layout-templates/$id'
+      preLoaderRoute: typeof _appFinanceInvoiceLayoutTemplatesIdRouteImport
+      parentRoute: typeof _appLayoutRoute
+    }
+    '/__app/finance/customer-invoices/bulk-generate': {
+      id: '/__app/finance/customer-invoices/bulk-generate'
+      path: '/finance/customer-invoices/bulk-generate'
+      fullPath: '/finance/customer-invoices/bulk-generate'
+      preLoaderRoute: typeof _appFinanceCustomerInvoicesBulkGenerateRouteImport
       parentRoute: typeof _appLayoutRoute
     }
     '/__app/finance/customer-invoices/$id': {
@@ -836,10 +915,13 @@ interface _appLayoutRouteChildren {
   _appStockIndexRoute: typeof _appStockIndexRoute
   _appUsersIndexRoute: typeof _appUsersIndexRoute
   _appFinanceCustomerInvoicesIdRoute: typeof _appFinanceCustomerInvoicesIdRoute
+  _appFinanceCustomerInvoicesBulkGenerateRoute: typeof _appFinanceCustomerInvoicesBulkGenerateRoute
+  _appFinanceInvoiceLayoutTemplatesIdRoute: typeof _appFinanceInvoiceLayoutTemplatesIdRoute
   _appPartnerCommercialSalesSaleIdRoute: typeof _appPartnerCommercialSalesSaleIdRoute
   _appFinanceCollectionsIndexRoute: typeof _appFinanceCollectionsIndexRoute
   _appFinanceCustomerInvoicesIndexRoute: typeof _appFinanceCustomerInvoicesIndexRoute
   _appFinanceInvoiceEmailTemplatesIndexRoute: typeof _appFinanceInvoiceEmailTemplatesIndexRoute
+  _appFinanceInvoiceLayoutTemplatesIndexRoute: typeof _appFinanceInvoiceLayoutTemplatesIndexRoute
   _appFinancePartnerSalesIndexRoute: typeof _appFinancePartnerSalesIndexRoute
   _appFinancePayablesIndexRoute: typeof _appFinancePayablesIndexRoute
   _appFinanceReceivablesIndexRoute: typeof _appFinanceReceivablesIndexRoute
@@ -850,6 +932,7 @@ interface _appLayoutRouteChildren {
   _appPartnerRequestsIndexRoute: typeof _appPartnerRequestsIndexRoute
   _appReportsTransitionPendingIndexRoute: typeof _appReportsTransitionPendingIndexRoute
   _appSalesNewIndexRoute: typeof _appSalesNewIndexRoute
+  _appStockDevicesIndexRoute: typeof _appStockDevicesIndexRoute
   _appPartnerCommercialSalesNewIndexRoute: typeof _appPartnerCommercialSalesNewIndexRoute
 }
 
@@ -879,11 +962,17 @@ const _appLayoutRouteChildren: _appLayoutRouteChildren = {
   _appStockIndexRoute: _appStockIndexRoute,
   _appUsersIndexRoute: _appUsersIndexRoute,
   _appFinanceCustomerInvoicesIdRoute: _appFinanceCustomerInvoicesIdRoute,
+  _appFinanceCustomerInvoicesBulkGenerateRoute:
+    _appFinanceCustomerInvoicesBulkGenerateRoute,
+  _appFinanceInvoiceLayoutTemplatesIdRoute:
+    _appFinanceInvoiceLayoutTemplatesIdRoute,
   _appPartnerCommercialSalesSaleIdRoute: _appPartnerCommercialSalesSaleIdRoute,
   _appFinanceCollectionsIndexRoute: _appFinanceCollectionsIndexRoute,
   _appFinanceCustomerInvoicesIndexRoute: _appFinanceCustomerInvoicesIndexRoute,
   _appFinanceInvoiceEmailTemplatesIndexRoute:
     _appFinanceInvoiceEmailTemplatesIndexRoute,
+  _appFinanceInvoiceLayoutTemplatesIndexRoute:
+    _appFinanceInvoiceLayoutTemplatesIndexRoute,
   _appFinancePartnerSalesIndexRoute: _appFinancePartnerSalesIndexRoute,
   _appFinancePayablesIndexRoute: _appFinancePayablesIndexRoute,
   _appFinanceReceivablesIndexRoute: _appFinanceReceivablesIndexRoute,
@@ -895,6 +984,7 @@ const _appLayoutRouteChildren: _appLayoutRouteChildren = {
   _appReportsTransitionPendingIndexRoute:
     _appReportsTransitionPendingIndexRoute,
   _appSalesNewIndexRoute: _appSalesNewIndexRoute,
+  _appStockDevicesIndexRoute: _appStockDevicesIndexRoute,
   _appPartnerCommercialSalesNewIndexRoute:
     _appPartnerCommercialSalesNewIndexRoute,
 }

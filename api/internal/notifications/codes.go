@@ -33,6 +33,12 @@ var (
 	ProviderSlugMaxLength   = N("PROVIDER_SLUG_MAX_LENGTH", "Provider slug must not exceed 50 characters.")
 	ProviderSlugDuplicated  = N("PROVIDER_SLUG_DUPLICATED", "An provider with this slug already exists.")
 	ProviderNotFound        = N("PROVIDER_NOT_FOUND", "Provider was not found.")
+	ProviderPlanCodeRequired    = N("PROVIDER_PLAN_CODE_REQUIRED", "Plan code is required.")
+	ProviderPlanCodeMaxLength   = N("PROVIDER_PLAN_CODE_MAX_LENGTH", "Plan code must not exceed 64 characters.")
+	ProviderPlanNameRequired    = N("PROVIDER_PLAN_NAME_REQUIRED", "Plan name is required.")
+	ProviderPlanNameMaxLength   = N("PROVIDER_PLAN_NAME_MAX_LENGTH", "Plan name must not exceed 256 characters.")
+	ProviderPlanCodeDuplicated  = N("PROVIDER_PLAN_CODE_DUPLICATED", "A plan with this code already exists for the operator.")
+	ProviderPlanNotFound        = N("PROVIDER_PLAN_NOT_FOUND", "Plan was not found.")
 )
 
 // Customers
@@ -68,6 +74,28 @@ var (
 	PhoneLineOperationAlreadyReviewed  = N("PHONE_LINE_OPERATION_ALREADY_REVIEWED", "This operation request has already been reviewed.")
 	PartnerCustomerAccessDenied        = N("PARTNER_CUSTOMER_ACCESS_DENIED", "You do not have access to this customer.")
 	PartnerPhoneLineAccessDenied       = N("PARTNER_PHONE_LINE_ACCESS_DENIED", "You do not have access to this phone line.")
+)
+
+// Device stock
+var (
+	DeviceStockBrandRequired   = N("DEVICE_STOCK_BRAND_REQUIRED", "Device brand is required.")
+	DeviceStockBrandMaxLength  = N("DEVICE_STOCK_BRAND_MAX_LENGTH", "Device brand must not exceed 128 characters.")
+	DeviceStockModelRequired   = N("DEVICE_STOCK_MODEL_REQUIRED", "Device model is required.")
+	DeviceStockModelMaxLength  = N("DEVICE_STOCK_MODEL_MAX_LENGTH", "Device model must not exceed 256 characters.")
+	DeviceStockSkuMaxLength    = N("DEVICE_STOCK_SKU_MAX_LENGTH", "SKU must not exceed 64 characters.")
+	DeviceStockSkuDuplicated   = N("DEVICE_STOCK_SKU_DUPLICATED", "A device with this SKU already exists.")
+	DeviceStockImeiDuplicated  = N("DEVICE_STOCK_IMEI_DUPLICATED", "A device with this IMEI already exists.")
+	DeviceStockImeiInvalid     = N("DEVICE_STOCK_IMEI_INVALID", "IMEI must have 15 digits.")
+	DeviceStockNotFound        = N("DEVICE_STOCK_NOT_FOUND", "Device stock item was not found.")
+	DeviceStockStatusInvalid   = N("DEVICE_STOCK_STATUS_INVALID", "Invalid device stock status.")
+)
+
+// Customer devices
+var (
+	CustomerDeviceDescriptionRequired = N("CUSTOMER_DEVICE_DESCRIPTION_REQUIRED", "Device description is required.")
+	CustomerDeviceMonthlyAmountInvalid = N("CUSTOMER_DEVICE_MONTHLY_AMOUNT_INVALID", "Monthly amount must be zero or greater.")
+	CustomerDeviceNotFound            = N("CUSTOMER_DEVICE_NOT_FOUND", "Customer device link was not found.")
+	CustomerDeviceAlreadyLinked       = N("CUSTOMER_DEVICE_ALREADY_LINKED", "This device is already linked to an active customer.")
 )
 
 // Financial
@@ -162,4 +190,9 @@ var (
 	BillingCustomerEmailRequired       = N("BILLING_CUSTOMER_EMAIL_REQUIRED", "Customer billing email is required.")
 	BillingEmailNotConfigured          = N("BILLING_EMAIL_NOT_CONFIGURED", "SMTP is not configured. Set SMTP_HOST and related env vars.")
 	BillingReceivableNotOverdue        = N("BILLING_RECEIVABLE_NOT_OVERDUE", "Only overdue receivables can receive collection reminders.")
+	BillingLayoutTemplateNotFound      = N("BILLING_LAYOUT_TEMPLATE_NOT_FOUND", "Invoice layout template was not found.")
+	BillingLayoutTemplateCodeDuplicated = N("BILLING_LAYOUT_TEMPLATE_CODE_DUPLICATED", "Layout template code already exists.")
+	BillingLayoutTemplateFieldsRequired = N("BILLING_LAYOUT_TEMPLATE_FIELDS_REQUIRED", "Layout name and configuration are required.")
+	SicrediNotConfigured              = N("SICREDI_NOT_CONFIGURED", "Sicredi billing API is not configured.")
+	SicrediBoletoAlreadyIssued        = N("SICREDI_BOLETO_ALREADY_ISSUED", "A Sicredi boleto was already issued for this invoice.")
 )

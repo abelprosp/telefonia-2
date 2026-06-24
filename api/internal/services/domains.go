@@ -117,8 +117,12 @@ func (s *Service) AssignPhoneLineCustomer(ctx context.Context, phoneLineID strin
 		return nil, err
 	}
 	start := time.Now().UTC()
-	if input.StartDate != nil {
-		start = input.StartDate.UTC()
+	if input.StartDate != nil && strings.TrimSpace(*input.StartDate) != "" {
+		parsed, err := parseFinancialDate(*input.StartDate)
+		if err != nil {
+			return nil, err
+		}
+		start = parsed
 	}
 	if _, err := s.GetPhoneLine(ctx, phoneLineID); err != nil {
 		return nil, err
@@ -142,9 +146,10 @@ func (s *Service) AssignPhoneLineCustomer(ctx context.Context, phoneLineID strin
 		_ = s.Store.AddCustomerProviderLink(ctx, input.CustomerID, providerID, start)
 	}
 	_, prevCustomerID, _ := s.Store.GetActivePhoneLineCustomerLink(ctx, phoneLineID)
-	if err := s.Store.AssignPhoneLineCustomer(ctx, phoneLineID, input.CustomerID, start); err != nil {
+	if err := s.Store.AssignPhoneLineCustomer(ctx, phoneLineID, input.CustomerID, start, input.MonthlyAmount); err != nil {
 		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
+	_ = s.Store.UpdatePhoneLineStatus(ctx, phoneLineID, "active")
 	_ = s.Store.ReactivateCustomer(ctx, input.CustomerID)
 	if prevCustomerID != "" && prevCustomerID != input.CustomerID {
 		hasOther, _ := s.Store.CustomerHasOtherActivePhoneLines(ctx, orgID, prevCustomerID, phoneLineID)
@@ -160,8 +165,12 @@ func (s *Service) TransferPhoneLineCustomer(ctx context.Context, phoneLineID str
 		return nil, err
 	}
 	transferDate := time.Now().UTC()
-	if input.TransferDate != nil {
-		transferDate = input.TransferDate.UTC()
+	if input.TransferDate != nil && strings.TrimSpace(*input.TransferDate) != "" {
+		parsed, err := parseFinancialDate(*input.TransferDate)
+		if err != nil {
+			return nil, err
+		}
+		transferDate = parsed
 	}
 	if _, err := s.GetPhoneLine(ctx, phoneLineID); err != nil {
 		return nil, err
@@ -176,8 +185,33 @@ func (s *Service) TransferPhoneLineCustomer(ctx context.Context, phoneLineID str
 	if activeCustomerID == input.CustomerID {
 		return nil, httputil.BusinessError(notifications.PhoneLineCustomerTransferSame)
 	}
-	assignInput := models.AssignPhoneLineCustomerInput{CustomerID: input.CustomerID, StartDate: &transferDate}
+	transferStr := transferDate.Format("2006-01-02")
+	assignInput := models.AssignPhoneLineCustomerInput{
+		CustomerID:    input.CustomerID,
+		StartDate:     &transferStr,
+		MonthlyAmount: input.MonthlyAmount,
+	}
 	return s.AssignPhoneLineCustomer(ctx, phoneLineID, assignInput)
+}
+
+func (s *Service) UpdateActivePhoneLineCustomerLink(ctx context.Context, phoneLineID string, input models.UpdateActivePhoneLineCustomerLinkInput) (*models.PhoneLineCustomerLinkResponse, error) {
+	orgID, err := orgFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := s.GetPhoneLine(ctx, phoneLineID); err != nil {
+		return nil, err
+	}
+	if input.MonthlyAmount != nil && *input.MonthlyAmount < 0 {
+		return nil, httputil.ValidationError(notifications.N("PHONE_LINE_MONTHLY_AMOUNT_INVALID", "Monthly amount cannot be negative."))
+	}
+	if err := s.Store.UpdateActivePhoneLineCustomerLinkAmount(ctx, phoneLineID, input.MonthlyAmount); err != nil {
+		if isPgNoRows(err) {
+			return nil, httputil.NotFoundError(notifications.PhoneLineActiveCustomerLinkNotFound)
+		}
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+	return s.activePhoneLineCustomerLink(ctx, orgID, phoneLineID)
 }
 
 func (s *Service) UnassignPhoneLineCustomer(ctx context.Context, phoneLineID string, input models.UnassignPhoneLineCustomerInput) error {
@@ -186,8 +220,12 @@ func (s *Service) UnassignPhoneLineCustomer(ctx context.Context, phoneLineID str
 		return err
 	}
 	end := time.Now().UTC()
-	if input.EndDate != nil {
-		end = input.EndDate.UTC()
+	if input.EndDate != nil && strings.TrimSpace(*input.EndDate) != "" {
+		parsed, err := parseFinancialDate(*input.EndDate)
+		if err != nil {
+			return err
+		}
+		end = parsed
 	}
 	_, activeCustomerID, err := s.Store.GetActivePhoneLineCustomerLink(ctx, phoneLineID)
 	if err != nil {
@@ -202,6 +240,7 @@ func (s *Service) UnassignPhoneLineCustomer(ctx context.Context, phoneLineID str
 		}
 		return httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
+	_ = s.Store.UpdatePhoneLineStatus(ctx, phoneLineID, "in_stock")
 	hasOther, _ := s.Store.CustomerHasOtherActivePhoneLines(ctx, orgID, activeCustomerID, phoneLineID)
 	if !hasOther {
 		_ = s.Store.InactivateCustomer(ctx, activeCustomerID)

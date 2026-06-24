@@ -21,6 +21,7 @@ import (
 	"github.com/luxus-connect/telefonia/api/internal/keycloak"
 	"github.com/luxus-connect/telefonia/api/internal/messaging"
 	"github.com/luxus-connect/telefonia/api/internal/services"
+	"github.com/luxus-connect/telefonia/api/internal/sicredi"
 	"github.com/luxus-connect/telefonia/api/internal/storage"
 	"github.com/luxus-connect/telefonia/api/internal/store"
 )
@@ -64,11 +65,29 @@ func main() {
 		}
 	}
 
-	svc := &services.Service{Store: st, Publisher: publisher, Keycloak: kcAdmin, Mailer: email.NewSender(cfg)}
+	svc := &services.Service{Store: st, Publisher: publisher, Keycloak: kcAdmin, Mailer: email.NewSender(cfg), Sicredi: sicredi.NewClient(sicredi.ConfigFrom(cfg))}
 	if svc.Mailer.Enabled() {
 		logger.Info("smtp mailer enabled", "host", cfg.SMTPHost)
 	} else {
 		logger.Warn("smtp mailer disabled — configure SMTP_HOST to enable billing email")
+	}
+	if svc.Sicredi != nil && svc.Sicredi.Enabled() {
+		logger.Info("sicredi boleto integration enabled", "sandbox", cfg.SicrediSandbox)
+		go func() {
+			ticker := time.NewTicker(15 * time.Minute)
+			defer ticker.Stop()
+			svc.RunSicrediPaymentSyncAllOrgs(ctx, 7)
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					svc.RunSicrediPaymentSyncAllOrgs(ctx, 7)
+				}
+			}
+		}()
+	} else if cfg.SicrediEnabled {
+		logger.Warn("sicredi enabled but missing credentials — set SICREDI_API_KEY, SICREDI_PASSWORD, etc.")
 	}
 
 	var presigned *services.PresignedService

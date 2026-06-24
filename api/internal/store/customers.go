@@ -241,7 +241,8 @@ func (s *Store) ListCustomerPhoneLines(ctx context.Context, orgID, customerID st
 	}
 	rows, err := q.Query(ctx, `
 		SELECT l."CustomerId", l."PhoneLineId", pl."Number", pl."Status"::text,
-			pl."LineClassification"::text, l."StartDate", l."EndDate"
+			pl."LineClassification"::text, l."StartDate", l."EndDate", l."MonthlyAmount",
+			pl."BaseCost", pl."CostWithConsumption"
 		FROM "PhoneLineCustomerLinks" l
 		JOIN "Customers" c ON c."Id" = l."CustomerId"
 		JOIN "PhoneLines" pl ON pl."Id" = l."PhoneLineId"
@@ -257,7 +258,8 @@ func (s *Store) ListCustomerPhoneLines(ctx context.Context, orgID, customerID st
 		var item models.CustomerPhoneLineLinkResponse
 		var endDate *time.Time
 		if err := rows.Scan(&item.CustomerID, &item.PhoneLineID, &item.PhoneLineNumber,
-			&item.PhoneLineStatus, &item.LineClassification, &item.StartDate, &endDate); err != nil {
+			&item.PhoneLineStatus, &item.LineClassification, &item.StartDate, &endDate,
+			&item.MonthlyAmount, &item.BaseCost, &item.CostWithConsumption); err != nil {
 			return nil, 0, err
 		}
 		item.EndDate = endDate
@@ -310,6 +312,17 @@ func (s *Store) GetCustomerCNPJ(ctx context.Context, customerID string) (string,
 	err := s.q(ctx).QueryRow(ctx, `
 		SELECT "Number" FROM "CustomerDocuments"
 		WHERE "CustomerId" = $1 AND "DocumentType" = 'cnpj'::customer_document_type LIMIT 1`, customerID).Scan(&doc)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
+	}
+	return doc, err
+}
+
+func (s *Store) GetCustomerPrimaryDocument(ctx context.Context, customerID string) (string, error) {
+	var doc string
+	err := s.q(ctx).QueryRow(ctx, `
+		SELECT "Number" FROM "CustomerDocuments"
+		WHERE "CustomerId" = $1 AND "DocumentType" IN ('cpf','cnpj') LIMIT 1`, customerID).Scan(&doc)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", nil
 	}

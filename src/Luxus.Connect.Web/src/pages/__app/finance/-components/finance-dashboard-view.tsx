@@ -201,6 +201,12 @@ export function FinanceDashboardView() {
             Templates de e-mail
           </Link>
           <Link
+            to="/finance/invoice-layout-templates"
+            className="text-primary text-sm font-medium hover:underline"
+          >
+            Layouts de fatura
+          </Link>
+          <Link
             to="/finance/partner-sales"
             search={{ page: 1, pageSize: 10 }}
             className="text-primary text-sm font-medium hover:underline"

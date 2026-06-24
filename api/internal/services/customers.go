@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/google/uuid"
@@ -14,6 +15,7 @@ import (
 	"github.com/luxus-connect/telefonia/api/internal/keycloak"
 	"github.com/luxus-connect/telefonia/api/internal/models"
 	"github.com/luxus-connect/telefonia/api/internal/notifications"
+	"github.com/luxus-connect/telefonia/api/internal/sicredi"
 	"github.com/luxus-connect/telefonia/api/internal/store"
 )
 
@@ -22,6 +24,23 @@ type Service struct {
 	Publisher EventPublisher
 	Keycloak  *keycloak.AdminClient
 	Mailer    *email.Sender
+	Sicredi   SicrediBoletoIssuer
+}
+
+type SicrediBoletoIssuer interface {
+	Enabled() bool
+	Config() sicredi.Config
+	Ping(ctx context.Context) error
+	ListWebhookContracts(ctx context.Context) ([]sicredi.WebhookContract, error)
+	CreateHybridBoleto(ctx context.Context, input sicredi.CreateBoletoInput) (*sicredi.BoletoResult, error)
+	CreateTraditionalBoleto(ctx context.Context, input sicredi.CreateBoletoInput) (*sicredi.BoletoResult, error)
+	GetBoleto(ctx context.Context, nossoNumero string) (*sicredi.BoletoDetail, error)
+	GetBoletoBySeuNumero(ctx context.Context, seuNumero string) (*sicredi.BoletoDetail, error)
+	GetBoletoPDF(ctx context.Context, linhaDigitavel string) ([]byte, error)
+	CancelBoleto(ctx context.Context, nossoNumero string) error
+	AlterBoletoDueDate(ctx context.Context, nossoNumero string, dueDate time.Time) error
+	RegisterWebhookContract(ctx context.Context, input sicredi.WebhookContractInput) error
+	ListLiquidadosDia(ctx context.Context, day time.Time, page int) (*sicredi.LiquidadosPage, error)
 }
 
 type EventPublisher interface {
@@ -149,6 +168,126 @@ func validateProviderInput(name, slug string) error {
 		return httputil.ValidationError(notifications.ProviderSlugMaxLength)
 	}
 	return nil
+}
+
+const providerPlanMonthlyServiceName = "Mensalidade"
+
+func (s *Service) CreateProviderPlan(ctx context.Context, providerID string, input models.CreateProviderPlanInput) (*models.GetProviderPlanResponse, error) {
+	orgID, err := orgFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+	code, name, err := validateProviderPlanInput(input.Code, input.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	provider, err := s.Store.GetProvider(ctx, orgID, providerID)
+	if err != nil {
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+	if provider == nil {
+		return nil, httputil.NotFoundError(notifications.ProviderNotFound)
+	}
+
+	dup, err := s.Store.ProviderPlanCodeExists(ctx, providerID, code, "")
+	if err != nil {
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+	if dup {
+		return nil, httputil.BusinessError(notifications.ProviderPlanCodeDuplicated)
+	}
+
+	id := uuid.New().String()
+	if err := s.Store.CreateProviderPlan(ctx, id, providerID, code, name); err != nil {
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+
+	if input.MonthlyPrice != nil && *input.MonthlyPrice >= 0 {
+		if err := s.Store.CreatePlanService(ctx, uuid.New().String(), id, providerPlanMonthlyServiceName, true, input.MonthlyPrice); err != nil {
+			return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+		}
+	}
+
+	plan, err := s.Store.GetProviderPlan(ctx, orgID, providerID, id)
+	if err != nil {
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+	return plan, nil
+}
+
+func (s *Service) UpdateProviderPlan(ctx context.Context, providerID, planID string, input models.UpdateProviderPlanInput) (*models.GetProviderPlanResponse, error) {
+	orgID, err := orgFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+	code, name, err := validateProviderPlanInput(input.Code, input.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	existing, err := s.Store.GetProviderPlan(ctx, orgID, providerID, planID)
+	if err != nil {
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+	if existing == nil {
+		return nil, httputil.NotFoundError(notifications.ProviderPlanNotFound)
+	}
+
+	dup, err := s.Store.ProviderPlanCodeExists(ctx, providerID, code, planID)
+	if err != nil {
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+	if dup {
+		return nil, httputil.BusinessError(notifications.ProviderPlanCodeDuplicated)
+	}
+
+	if err := s.Store.UpdateProviderPlan(ctx, providerID, planID, code, name); err != nil {
+		if isPgNoRows(err) {
+			return nil, httputil.NotFoundError(notifications.ProviderPlanNotFound)
+		}
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+
+	if input.MonthlyPrice != nil {
+		serviceID, err := s.Store.GetPlanServiceByPlanAndName(ctx, planID, providerPlanMonthlyServiceName)
+		if err != nil {
+			return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+		}
+		if serviceID != "" {
+			if err := s.Store.UpdatePlanServicePrice(ctx, serviceID, input.MonthlyPrice); err != nil {
+				return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+			}
+		} else if *input.MonthlyPrice >= 0 {
+			if err := s.Store.CreatePlanService(ctx, uuid.New().String(), planID, providerPlanMonthlyServiceName, true, input.MonthlyPrice); err != nil {
+				return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+			}
+		}
+	}
+
+	plan, err := s.Store.GetProviderPlan(ctx, orgID, providerID, planID)
+	if err != nil {
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+	return plan, nil
+}
+
+func validateProviderPlanInput(code, name string) (string, string, error) {
+	code = strings.TrimSpace(code)
+	name = strings.TrimSpace(name)
+	if code == "" {
+		return "", "", httputil.ValidationError(notifications.ProviderPlanCodeRequired)
+	}
+	if utf8.RuneCountInString(code) > 64 {
+		return "", "", httputil.ValidationError(notifications.ProviderPlanCodeMaxLength)
+	}
+	if name == "" {
+		return "", "", httputil.ValidationError(notifications.ProviderPlanNameRequired)
+	}
+	if utf8.RuneCountInString(name) > 256 {
+		return "", "", httputil.ValidationError(notifications.ProviderPlanNameMaxLength)
+	}
+	return code, name, nil
 }
 
 // --- Customers ---

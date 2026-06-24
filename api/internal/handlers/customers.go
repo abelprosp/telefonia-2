@@ -82,6 +82,57 @@ func (h *Handler) listCustomerPhoneLines(w http.ResponseWriter, r *http.Request)
 	httputil.WritePaged(w, items, total)
 }
 
+func (h *Handler) listCustomerDevices(w http.ResponseWriter, r *http.Request) {
+	page := httputil.ParsePagination(r)
+	items, total, err := h.Svc.ListCustomerDevices(r.Context(), chi.URLParam(r, "id"), page)
+	if err != nil {
+		httputil.HandleServiceError(w, err)
+		return
+	}
+	httputil.WritePaged(w, items, total)
+}
+
+func (h *Handler) assignCustomerDevice(w http.ResponseWriter, r *http.Request) {
+	var input models.AssignCustomerDeviceInput
+	if err := decodeJSON(r, &input); err != nil {
+		httputil.WriteFail(w, http.StatusBadRequest, notifications.N("REQUEST_VALIDATION", "Invalid request body"))
+		return
+	}
+	item, err := h.Svc.AssignCustomerDevice(r.Context(), chi.URLParam(r, "id"), input)
+	if err != nil {
+		httputil.HandleServiceError(w, err)
+		return
+	}
+	httputil.WriteJSON(w, http.StatusCreated, item)
+}
+
+func (h *Handler) updateCustomerDevice(w http.ResponseWriter, r *http.Request) {
+	var input models.UpdateCustomerDeviceInput
+	if err := decodeJSON(r, &input); err != nil {
+		httputil.WriteFail(w, http.StatusBadRequest, notifications.N("REQUEST_VALIDATION", "Invalid request body"))
+		return
+	}
+	item, err := h.Svc.UpdateCustomerDevice(r.Context(), chi.URLParam(r, "id"), chi.URLParam(r, "deviceLinkId"), input)
+	if err != nil {
+		httputil.HandleServiceError(w, err)
+		return
+	}
+	httputil.WriteJSON(w, http.StatusOK, item)
+}
+
+func (h *Handler) unassignCustomerDevice(w http.ResponseWriter, r *http.Request) {
+	var input models.UnassignCustomerDeviceInput
+	if err := decodeJSON(r, &input); err != nil {
+		httputil.WriteFail(w, http.StatusBadRequest, notifications.N("REQUEST_VALIDATION", "Invalid request body"))
+		return
+	}
+	if err := h.Svc.UnassignCustomerDevice(r.Context(), chi.URLParam(r, "id"), chi.URLParam(r, "deviceLinkId"), input); err != nil {
+		httputil.HandleServiceError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusAccepted)
+}
+
 func (h *Handler) listCustomerAttachments(w http.ResponseWriter, r *http.Request) {
 	items, err := h.Svc.ListCustomerAttachments(r.Context(), chi.URLParam(r, "id"))
 	if err != nil {

@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { getErrorMessage, isApiHttpError } from '@/lib/api-error';
 
 import { ProviderDetailView } from './-components/provider-detail-view';
+import { ProviderPlanCreateSheet } from './-components/provider-plan-create-sheet';
 
 export const Route = createFileRoute('/__app/providers/$providerId')({
   validateSearch: (search: Record<string, unknown>) => {
@@ -23,6 +24,7 @@ function ProviderDetailRoute() {
   const { providerId } = Route.useParams();
   const listSearch = Route.useSearch();
   const [openPlanId, setOpenPlanId] = useState<string | null>(null);
+  const [planSheetOpen, setPlanSheetOpen] = useState(false);
 
   const detailQuery = useProvidersControllerGetById(providerId);
 
@@ -62,13 +64,23 @@ function ProviderDetailRoute() {
         )}
 
         {detailQuery.isSuccess && op && (
-          <ProviderDetailView
-            provider={op}
-            providerId={providerId}
-            listSearch={listSearch}
-            openPlanId={openPlanId}
-            onTogglePlan={setOpenPlanId}
-          />
+          <>
+            <ProviderDetailView
+              provider={op}
+              providerId={providerId}
+              listSearch={listSearch}
+              openPlanId={openPlanId}
+              onTogglePlan={setOpenPlanId}
+              onAddPlan={() => setPlanSheetOpen(true)}
+            />
+            <ProviderPlanCreateSheet
+              providerId={providerId}
+              providerName={op.name}
+              open={planSheetOpen}
+              onOpenChange={setPlanSheetOpen}
+              onSuccess={(planId) => setOpenPlanId(planId)}
+            />
+          </>
         )}
       </div>
     </PageWrapper>

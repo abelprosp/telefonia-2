@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { getRouteApi } from '@tanstack/react-router';
 import { PackageX, Plus } from 'lucide-react';
 
-import { useGetV1PhoneLines } from '@/api';
+import { useGetV1PhoneLines, type ListPhoneLineResponse } from '@/api';
 import { DataTable, DataTablePagination } from '@/components/data-table';
 import { ListPageHeader, ListPageSkeleton } from '@/components/list-page';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,7 @@ import {
   EmptyTitle
 } from '@/components/ui/empty';
 import { getErrorMessage, isApiHttpError } from '@/lib/api-error';
+import { LinkCustomerLineSheet } from '@/components/link-customer-line-sheet';
 import { parseTotalCount } from '@/lib/query-utils';
 
 import { createStockLinesColumns } from './columns';
@@ -37,6 +38,7 @@ export function StockLinesList() {
   const { page, pageSize } = routeApi.useSearch();
   const navigate = routeApi.useNavigate();
   const [createOpen, setCreateOpen] = useState(false);
+  const [linkLine, setLinkLine] = useState<ListPhoneLineResponse | null>(null);
 
   const pageIndex = page - 1;
 
@@ -71,7 +73,8 @@ export function StockLinesList() {
   const columns = useMemo(
     () =>
       createStockLinesColumns({
-        listSearch: { page, pageSize }
+        listSearch: { page, pageSize },
+        onLinkCustomer: (line) => setLinkLine(line)
       }),
     [page, pageSize]
   );
@@ -114,6 +117,19 @@ export function StockLinesList() {
         onOpenChange={setCreateOpen}
         onSuccess={() => void listQuery.refetch()}
       />
+
+      {linkLine ? (
+        <LinkCustomerLineSheet
+          mode="line-to-customer"
+          phoneLineId={linkLine.id}
+          phoneLineNumber={linkLine.number}
+          open={Boolean(linkLine)}
+          onOpenChange={(open) => {
+            if (!open) setLinkLine(null);
+          }}
+          onSuccess={() => void listQuery.refetch()}
+        />
+      ) : null}
 
       <DataTable
         columns={columns}

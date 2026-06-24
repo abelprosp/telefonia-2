@@ -188,6 +188,79 @@ func (s *Store) CreateProviderPlan(ctx context.Context, id, providerID, code, na
 	return err
 }
 
+func (s *Store) ProviderPlanCodeExists(ctx context.Context, providerID, code, excludeID string) (bool, error) {
+	query := `SELECT EXISTS(SELECT 1 FROM "ProviderPlans" WHERE "ProviderId" = $1 AND "Code" = $2`
+	args := []any{providerID, code}
+	if excludeID != "" {
+		query += ` AND "Id" != $3`
+		args = append(args, excludeID)
+	}
+	query += `)`
+	var exists bool
+	if err := s.q(ctx).QueryRow(ctx, query, args...).Scan(&exists); err != nil {
+		return false, err
+	}
+	return exists, nil
+}
+
+func (s *Store) GetProviderPlan(ctx context.Context, orgID, providerID, planID string) (*models.GetProviderPlanResponse, error) {
+	var exists bool
+	if err := s.q(ctx).QueryRow(ctx, `
+		SELECT EXISTS(
+			SELECT 1 FROM "ProviderPlans" pp
+			JOIN "Providers" p ON p."Id" = pp."ProviderId"
+			WHERE p."OrganizationId" = $1 AND pp."ProviderId" = $2 AND pp."Id" = $3
+		)`, orgID, providerID, planID).Scan(&exists); err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, nil
+	}
+
+	var plan models.GetProviderPlanResponse
+	if err := s.q(ctx).QueryRow(ctx, `
+		SELECT "Id", "Name", "Code"
+		FROM "ProviderPlans"
+		WHERE "Id" = $1`, planID).
+		Scan(&plan.ID, &plan.Name, &plan.Code); err != nil {
+		return nil, err
+	}
+
+	svcRows, err := s.q(ctx).Query(ctx, `
+		SELECT "Id", "Name", "Active", "Recurring", "Price"
+		FROM "ProviderPlanServices"
+		WHERE "ProviderPlanId" = $1
+		ORDER BY "Name"`, planID)
+	if err != nil {
+		return nil, err
+	}
+	defer svcRows.Close()
+	for svcRows.Next() {
+		var svc models.GetProviderPlanServiceResponse
+		if err := svcRows.Scan(&svc.ID, &svc.Name, &svc.Active, &svc.Recurring, &svc.Price); err != nil {
+			return nil, err
+		}
+		plan.Services = append(plan.Services, svc)
+	}
+	if plan.Services == nil {
+		plan.Services = []models.GetProviderPlanServiceResponse{}
+	}
+	return &plan, svcRows.Err()
+}
+
+func (s *Store) UpdateProviderPlan(ctx context.Context, providerID, planID, code, name string) error {
+	tag, err := s.q(ctx).Exec(ctx, `
+		UPDATE "ProviderPlans" SET "Code" = $3, "Name" = $4
+		WHERE "ProviderId" = $1 AND "Id" = $2`, providerID, planID, code, name)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+	return nil
+}
+
 func (s *Store) GetPlanServiceByPlanAndName(ctx context.Context, planID, name string) (id string, err error) {
 	err = s.q(ctx).QueryRow(ctx, `
 		SELECT "Id" FROM "ProviderPlanServices"
@@ -198,10 +271,18 @@ func (s *Store) GetPlanServiceByPlanAndName(ctx context.Context, planID, name st
 	return id, err
 }
 
-func (s *Store) CreatePlanService(ctx context.Context, id, planID, name string, recurring bool) error {
+func (s *Store) CreatePlanService(ctx context.Context, id, planID, name string, recurring bool, price *float64) error {
 	_, err := s.q(ctx).Exec(ctx, `
-		INSERT INTO "ProviderPlanServices" ("Id", "ProviderPlanId", "Name", "Active", "Recurring")
-		VALUES ($1, $2, $3, true, $4)`, id, planID, name, recurring)
+		INSERT INTO "ProviderPlanServices" ("Id", "ProviderPlanId", "Name", "Active", "Recurring", "Price")
+		VALUES ($1, $2, $3, true, $4, $5)`, id, planID, name, recurring, price)
+	return err
+}
+
+func (s *Store) UpdatePlanServicePrice(ctx context.Context, serviceID string, price *float64) error {
+	_, err := s.q(ctx).Exec(ctx, `
+		UPDATE "ProviderPlanServices"
+		SET "Price" = $2, "Recurring" = true, "Active" = true
+		WHERE "Id" = $1`, serviceID, price)
 	return err
 }
 

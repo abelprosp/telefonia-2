@@ -1,6 +1,7 @@
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, Link } from '@tanstack/react-router';
 
 import { PageWrapper } from '@/components/page-wrapper';
+import { Button } from '@/components/ui/button';
 
 import { StockLinesList } from './-components/stock-lines-list';
 
@@ -13,7 +14,17 @@ const RouteComponent = () => {
         { label: 'Estoque de linhas' }
       ]}
     >
-      <StockLinesList />
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" size="sm" render={<Link to="/stock" />}>
+            Estoque de linhas
+          </Button>
+          <Button variant="outline" size="sm" render={<Link to="/stock/devices" />}>
+            Estoque de aparelhos
+          </Button>
+        </div>
+        <StockLinesList />
+      </div>
     </PageWrapper>
   );
 };

@@ -54,7 +54,8 @@ const operationalMenuItems: MenuItem[] = [
       { title: 'Clientes', url: '/customers' },
       { title: 'Operadoras', url: '/providers' },
       { title: 'Linhas telefônicas', url: '/phone-lines' },
-      { title: 'Estoque de linhas', url: '/stock' }
+      { title: 'Estoque de linhas', url: '/stock' },
+      { title: 'Estoque de aparelhos', url: '/stock/devices' }
     ]
   },
   {
@@ -98,6 +99,7 @@ const financialMenuItem: MenuItem = {
     { title: 'Faturas para envio', url: '/finance/customer-invoices' },
     { title: 'Inadimplentes', url: '/finance/collections' },
     { title: 'Templates de e-mail', url: '/finance/invoice-email-templates' },
+    { title: 'Layouts de fatura', url: '/finance/invoice-layout-templates' },
     { title: 'Vendas de parceiros', url: '/finance/partner-sales' }
   ]
 };

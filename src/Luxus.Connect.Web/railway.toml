@@ -1,0 +1,13 @@
+# Railway — serviço connect-web
+# No painel: Root Directory = src/Luxus.Connect.Web
+# Defina as variáveis VITE_* em Settings → Variables (build-time).
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath = "/"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5

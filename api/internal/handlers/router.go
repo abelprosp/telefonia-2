@@ -66,6 +66,8 @@ func (h *Handler) RegisterRoutes(
 
 	r.Route("/v1", func(r chi.Router) {
 
+		r.Post("/webhooks/sicredi", h.sicrediWebhook)
+
 		r.Group(func(r chi.Router) {
 
 			r.Use(auth)
@@ -102,6 +104,10 @@ func (h *Handler) RegisterRoutes(
 
 					r.Delete("/", h.inactivateProvider)
 
+					r.Post("/plans", h.createProviderPlan)
+
+					r.Patch("/plans/{planId}", h.updateProviderPlan)
+
 				})
 
 			})
@@ -136,6 +142,14 @@ func (h *Handler) RegisterRoutes(
 
 					r.Get("/phone-lines", h.listCustomerPhoneLines)
 
+					r.Get("/devices", h.listCustomerDevices)
+
+					r.Post("/devices", h.assignCustomerDevice)
+
+					r.Patch("/devices/{deviceLinkId}", h.updateCustomerDevice)
+
+					r.Delete("/devices/{deviceLinkId}", h.unassignCustomerDevice)
+
 					r.Get("/provider-links", h.listCustomerProviderLinks)
 
 					r.Get("/attachments", h.listCustomerAttachments)
@@ -147,6 +161,8 @@ func (h *Handler) RegisterRoutes(
 					r.Get("/processing-months/{processingMonthId}/billing-readiness", h.getBillingReadiness)
 
 					r.Post("/processing-months/{processingMonthId}/manual-release", h.manualReleaseCustomer)
+
+					r.Post("/generate-billing-document", h.generateCustomerBillingDocument)
 
 				})
 
@@ -170,7 +186,27 @@ func (h *Handler) RegisterRoutes(
 
 					r.Post("/customer-links/transfer", h.transferPhoneLineCustomer)
 
+					r.Patch("/customer-links/active", h.updateActivePhoneLineCustomerLink)
+
 					r.Delete("/customer-links/active", h.unassignPhoneLineCustomer)
+
+				})
+
+			})
+
+
+
+			r.Route("/device-stock", func(r chi.Router) {
+
+				r.Get("/", h.listDeviceStockItems)
+
+				r.Post("/", h.createDeviceStockItem)
+
+				r.Route("/{id}", func(r chi.Router) {
+
+					r.Get("/", h.getDeviceStockItem)
+
+					r.Patch("/", h.updateDeviceStockItem)
 
 				})
 
@@ -364,9 +400,37 @@ func (h *Handler) RegisterRoutes(
 
 
 
+			r.Route("/invoice-layout-templates", func(r chi.Router) {
+
+				r.Get("/", h.listInvoiceLayoutTemplates)
+
+				r.Post("/", h.createInvoiceLayoutTemplate)
+
+				r.Post("/preview", h.previewInvoiceLayout)
+
+				r.Route("/{id}", func(r chi.Router) {
+
+					r.Get("/", h.getInvoiceLayoutTemplate)
+
+					r.Patch("/", h.updateInvoiceLayoutTemplate)
+
+				})
+
+			})
+
+
+
 			r.Route("/customer-billing-documents", func(r chi.Router) {
 
 				r.Get("/", h.listCustomerBillingDocuments)
+
+				r.Get("/bulk-preview", h.bulkBillingPreview)
+
+				r.Get("/manual-preview", h.manualBillingPreview)
+
+				r.Post("/bulk-generate", h.bulkGenerateBillingDocuments)
+
+				r.Post("/manual-generate", h.manualGenerateBillingDocuments)
 
 				r.Post("/from-receivable/{receivableId}", h.createCustomerBillingDocumentFromReceivable)
 
@@ -374,7 +438,19 @@ func (h *Handler) RegisterRoutes(
 
 					r.Get("/", h.getCustomerBillingDocument)
 
+					r.Get("/download", h.downloadCustomerBillingDocument)
+
 					r.Patch("/", h.updateCustomerBillingDocument)
+
+					r.Post("/issue-boleto", h.issueSicrediBoleto)
+
+					r.Get("/boleto-pdf", h.getSicrediBoletoPDF)
+
+					r.Post("/cancel-boleto", h.cancelSicrediBoleto)
+
+					r.Patch("/boleto-due-date", h.alterSicrediBoletoDueDate)
+
+					r.Post("/sync-payment", h.syncSicrediPayment)
 
 					r.Post("/send", h.sendCustomerBillingDocument)
 
@@ -391,6 +467,14 @@ func (h *Handler) RegisterRoutes(
 				r.Get("/overdue", h.listOverdueReceivables)
 
 				r.Post("/remind", h.sendCollectionReminder)
+
+				r.Post("/sync-sicredi-payments", h.syncSicrediPayments)
+
+				r.Get("/sicredi/status", h.getSicrediStatus)
+
+				r.Post("/sicredi/test-connection", h.testSicrediConnection)
+
+				r.Post("/sicredi/register-webhook", h.registerSicrediWebhook)
 
 			})
 
