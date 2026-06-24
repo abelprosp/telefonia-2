@@ -7,16 +7,12 @@ RUN npm ci
 
 COPY . .
 
-ARG VITE_API_URL
-ARG VITE_AUTH_URL
-ARG VITE_CLIENT_ID
-ARG VITE_CLIENT_SECRET
-ARG VITE_STORAGE_BUCKET_NAME
-ENV VITE_API_URL=$VITE_API_URL
-ENV VITE_AUTH_URL=$VITE_AUTH_URL
-ENV VITE_CLIENT_ID=$VITE_CLIENT_ID
-ENV VITE_CLIENT_SECRET=$VITE_CLIENT_SECRET
-ENV VITE_STORAGE_BUCKET_NAME=$VITE_STORAGE_BUCKET_NAME
+# Railway: marque VITE_* como disponíveis no build (Settings → Variables).
+# Não use ARG aqui — no Docker, ARG vazio sobrescreve variáveis injetadas pelo Railway.
+RUN if [ -z "$VITE_AUTH_URL" ] || [ -z "$VITE_API_URL" ]; then \
+      echo "ERRO: defina VITE_AUTH_URL e VITE_API_URL nas variáveis de build do Railway (connect-web)"; \
+      exit 1; \
+    fi
 
 RUN npm run build
 

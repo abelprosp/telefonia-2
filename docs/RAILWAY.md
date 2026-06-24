@@ -114,4 +114,4 @@ git push origin main
 | CORS no browser | Inclua o domínio exato do web em `CORS_ORIGINS` |
 | Web em branco / 502 | Confirme `VITE_*` no build e regenere deploy do web |
 | Sicredi 403 | `SICREDI_SANDBOX=false` para credenciais de produção |
-| Auth falha | `KEYCLOAK_PUBLIC_AUTH_SERVER_URL` deve ser a URL que o browser alcança |
+| Auth falha / Failed to fetch | O web em produção **não** usa `localhost`. Defina `VITE_AUTH_URL` (Keycloak público) e `VITE_API_URL` no serviço **connect-web**, marque como **build**, redeploy. Adicione `https://<web>/*` nos redirect URIs do Keycloak |

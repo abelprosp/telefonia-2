@@ -7,6 +7,7 @@ import { LayoutSidebar } from '@/components/layout-sidebar';
 import { PageLoader } from '@/components/page-loader';
 import { SignedIn } from '@/components/signed-in';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
+import { getAuthConfigHint } from '@/lib/auth-config-hint';
 
 const RouteComponent = () => {
   const { isLoading, error } = useAuth();
@@ -18,7 +19,7 @@ const RouteComponent = () => {
         {error ? (
           <AuthConfigError
             message={error.message}
-            hint="Confirme VITE_AUTH_URL=http://localhost:8081 no ficheiro .env do frontend."
+            hint={getAuthConfigHint()}
           />
         ) : isLoading ? (
           <PageLoader label="Carregando..." />
