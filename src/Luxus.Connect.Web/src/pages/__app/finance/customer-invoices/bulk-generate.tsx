@@ -193,21 +193,22 @@ function BulkGenerateInvoicesPage() {
       ...(description.trim() ? { description: description.trim() } : {})
     };
 
-    const mutation = mode === 'refaturamento' ? bulkGenerateMutation : manualGenerateMutation;
-    mutation.mutate(
-      mode === 'refaturamento'
-        ? { ...body, processing_month_id: processingMonthId }
-        : body,
-      {
-        onSuccess: (data) => {
-          setResult(data);
-          toast.success(
-            `${data.created} fatura(s) criada(s) com boleto, ${data.skipped} ignorada(s), ${data.failed} falha(s).`
-          );
-        },
-        onError: (e) => toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
-      }
-    );
+    const onSuccess = (data: BulkGenerateResult) => {
+      setResult(data);
+      toast.success(
+        `${data.created} fatura(s) criada(s) com boleto, ${data.skipped} ignorada(s), ${data.failed} falha(s).`
+      );
+    };
+    const onError = (e: unknown) => toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e));
+
+    if (mode === 'refaturamento') {
+      bulkGenerateMutation.mutate(
+        { ...body, processing_month_id: processingMonthId },
+        { onSuccess, onError }
+      );
+    } else {
+      manualGenerateMutation.mutate(body, { onSuccess, onError });
+    }
   };
 
   const showTable = mode === 'manual' || Boolean(processingMonthId);
