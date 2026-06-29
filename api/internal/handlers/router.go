@@ -64,6 +64,8 @@ func (h *Handler) RegisterRoutes(
 
 ) {
 
+	r.Post("/setup/keycloak", h.setupKeycloak)
+
 	r.Route("/v1", func(r chi.Router) {
 
 		r.Post("/webhooks/sicredi", h.sicrediWebhook)
