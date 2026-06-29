@@ -30,6 +30,11 @@ func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	cfg := config.Load()
 
+	if cfg.MonitoringTestEnabled {
+		logger.Error("MONITORING_TEST_ENABLED=true — API encerrada de propósito (crash loop para teste de monitoramento)")
+		os.Exit(1)
+	}
+
 	if cfg.DatabaseURL == "" {
 		logger.Error("DATABASE_URL or CONNECTION_STRING is required")
 		os.Exit(1)

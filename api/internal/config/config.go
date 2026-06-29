@@ -40,6 +40,7 @@ type Config struct {
 	SicrediWebhookToken       string
 	SicrediPublicAPIURL       string
 	SicrediAutoRegisterWebhook bool
+	MonitoringTestEnabled    bool
 }
 
 func Load() Config {
@@ -108,6 +109,7 @@ func Load() Config {
 		SicrediWebhookToken:       strings.TrimSpace(os.Getenv("SICREDI_WEBHOOK_TOKEN")),
 		SicrediPublicAPIURL:       sicrediPublicURL,
 		SicrediAutoRegisterWebhook: strings.EqualFold(os.Getenv("SICREDI_AUTO_REGISTER_WEBHOOK"), "true"),
+		MonitoringTestEnabled:    strings.EqualFold(os.Getenv("MONITORING_TEST_ENABLED"), "true"),
 	}
 }
 
