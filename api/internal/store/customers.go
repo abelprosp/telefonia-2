@@ -38,7 +38,8 @@ func (s *Store) ListCustomers(ctx context.Context, orgID string, providerID *str
 	selectQuery := `
 		SELECT DISTINCT c."Id", c."Active", c."Type"::text, c."Name",
 			COALESCE(cd."Number", ''), sr."Number", c."LegalName",
-			c."BirthOrOpeningDate", c."ResponsibleSalespersonUserId", c."BillingEmail"
+			c."BirthOrOpeningDate", c."ResponsibleSalespersonUserId", c."BillingEmail",
+			COALESCE(c."IsReseller", false)
 		` + base + `
 		ORDER BY c."Name"
 		OFFSET $` + itoa(len(args)+1) + ` LIMIT $` + itoa(len(args)+2)
@@ -54,7 +55,7 @@ func (s *Store) ListCustomers(ctx context.Context, orgID string, providerID *str
 	for rows.Next() {
 		var item models.ListCustomerResponse
 		if err := rows.Scan(&item.ID, &item.Active, &item.Type, &item.Name, &item.CpfCnpj,
-			&item.StateRegistration, &item.LegalName, &item.BirthOrOpeningDate, &item.ResponsibleSalespersonUserID, &item.BillingEmail); err != nil {
+			&item.StateRegistration, &item.LegalName, &item.BirthOrOpeningDate, &item.ResponsibleSalespersonUserID, &item.BillingEmail, &item.IsReseller); err != nil {
 			return nil, 0, err
 		}
 		items = append(items, item)
@@ -74,7 +75,8 @@ func (s *Store) GetCustomerInOrg(ctx context.Context, orgID, id string, salesper
 				WHERE cd."CustomerId" = c."Id" AND cd."DocumentType" IN ('cpf','cnpj') LIMIT 1), ''),
 			(SELECT sr."Number" FROM "CustomerDocuments" sr
 				WHERE sr."CustomerId" = c."Id" AND sr."DocumentType" = 'state_registration' LIMIT 1),
-			c."LegalName", c."BirthOrOpeningDate", c."ResponsibleSalespersonUserId", c."BillingEmail"
+			c."LegalName", c."BirthOrOpeningDate", c."ResponsibleSalespersonUserId", c."BillingEmail",
+			COALESCE(c."IsReseller", false)
 		FROM "Customers" c
 		WHERE c."Id" = $1`
 	args := []any{id}
@@ -89,7 +91,7 @@ func (s *Store) GetCustomerInOrg(ctx context.Context, orgID, id string, salesper
 	var item models.ListCustomerResponse
 	err := q.QueryRow(ctx, query, args...).
 		Scan(&item.ID, &item.Active, &item.Type, &item.Name, &item.CpfCnpj,
-			&item.StateRegistration, &item.LegalName, &item.BirthOrOpeningDate, &item.ResponsibleSalespersonUserID, &item.BillingEmail)
+			&item.StateRegistration, &item.LegalName, &item.BirthOrOpeningDate, &item.ResponsibleSalespersonUserID, &item.BillingEmail, &item.IsReseller)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}

@@ -183,6 +183,30 @@ func (s *Store) AssignPhoneLineCustomer(ctx context.Context, phoneLineID, custom
 	return err
 }
 
+func (s *Store) UpdateActivePhoneLineCustomerLinkAmountByLinkID(ctx context.Context, linkID string, monthlyAmount *float64) error {
+	tag, err := s.q(ctx).Exec(ctx, `
+		UPDATE "PhoneLineCustomerLinks"
+		SET "MonthlyAmount" = $2
+		WHERE "Id" = $1 AND "EndDate" IS NULL`, linkID, monthlyAmount)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+	return nil
+}
+
+func (s *Store) GetPhoneLineIDForLink(ctx context.Context, linkID string) (string, error) {
+	var phoneLineID string
+	err := s.q(ctx).QueryRow(ctx, `
+		SELECT "PhoneLineId" FROM "PhoneLineCustomerLinks" WHERE "Id" = $1`, linkID).Scan(&phoneLineID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
+	}
+	return phoneLineID, err
+}
+
 func (s *Store) UpdateActivePhoneLineCustomerLinkAmount(ctx context.Context, phoneLineID string, monthlyAmount *float64) error {
 	tag, err := s.q(ctx).Exec(ctx, `
 		UPDATE "PhoneLineCustomerLinks"

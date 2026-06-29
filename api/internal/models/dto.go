@@ -102,6 +102,7 @@ type UpdateCustomerInput struct {
 	BirthOrOpeningDate           *string `json:"birth_or_opening_date"`
 	ResponsibleSalespersonUserID *string `json:"responsible_salesperson_user_id"`
 	BillingEmail                 *string `json:"billing_email"`
+	IsReseller                   *bool   `json:"is_reseller"`
 }
 
 type ListCustomerResponse struct {
@@ -115,6 +116,7 @@ type ListCustomerResponse struct {
 	BirthOrOpeningDate           *time.Time `json:"birth_or_opening_date"`
 	ResponsibleSalespersonUserID *string    `json:"responsible_salesperson_user_id"`
 	BillingEmail                 *string    `json:"billing_email"`
+	IsReseller                   bool       `json:"is_reseller"`
 }
 
 type CreateCustomerResponse = ListCustomerResponse
@@ -306,6 +308,69 @@ type UnassignPhoneLineCustomerInput struct {
 
 type UpdateActivePhoneLineCustomerLinkInput struct {
 	MonthlyAmount *float64 `json:"monthly_amount"`
+}
+
+type LineBillingCompositionItemResponse struct {
+	ID                 string     `json:"id"`
+	ItemType           string     `json:"item_type"`
+	Description        string     `json:"description"`
+	Amount             float64    `json:"amount"`
+	Quantity           float64    `json:"quantity"`
+	InstallmentCount   *int       `json:"installment_count,omitempty"`
+	InstallmentCurrent *int       `json:"installment_current,omitempty"`
+	StartDate          *time.Time `json:"start_date,omitempty"`
+	EndDate            *time.Time `json:"end_date,omitempty"`
+}
+
+type LineBillingProcessingResponse struct {
+	ID                string                               `json:"id"`
+	Perspective       string                               `json:"perspective"`
+	Label             *string                              `json:"label,omitempty"`
+	MirrorFromPrimary bool                                 `json:"mirror_from_primary"`
+	TotalAmount       float64                              `json:"total_amount"`
+	Items             []LineBillingCompositionItemResponse `json:"items"`
+}
+
+type ListLineBillingProcessingsResponse struct {
+	Processings []LineBillingProcessingResponse `json:"processings"`
+	LinkID      string                          `json:"link_id"`
+}
+
+type UpdateLineBillingProcessingInput struct {
+	Label             *string `json:"label"`
+	MirrorFromPrimary *bool   `json:"mirror_from_primary"`
+}
+
+type CreateLineBillingCompositionItemInput struct {
+	ItemType           string   `json:"item_type"`
+	Description        string   `json:"description"`
+	Amount             float64  `json:"amount"`
+	Quantity           *float64 `json:"quantity"`
+	InstallmentCount   *int     `json:"installment_count"`
+	InstallmentCurrent *int     `json:"installment_current"`
+	StartDate          *string  `json:"start_date"`
+	EndDate            *string  `json:"end_date"`
+}
+
+type UpdateLineBillingCompositionItemInput struct {
+	Description        *string  `json:"description"`
+	Amount             *float64 `json:"amount"`
+	Quantity           *float64 `json:"quantity"`
+	InstallmentCount   *int     `json:"installment_count"`
+	InstallmentCurrent *int     `json:"installment_current"`
+	StartDate          *string  `json:"start_date"`
+	EndDate            *string  `json:"end_date"`
+}
+
+type AuditLogResponse struct {
+	ID         string    `json:"id"`
+	ChangeType string    `json:"change_type"`
+	EntityName string    `json:"entity_name"`
+	KeyValues  string    `json:"key_values"`
+	ChangedBy  *string   `json:"changed_by,omitempty"`
+	OldValues  *string   `json:"old_values,omitempty"`
+	NewValues  *string   `json:"new_values,omitempty"`
+	Timestamp  time.Time `json:"timestamp"`
 }
 
 // --- Billing Cycles ---

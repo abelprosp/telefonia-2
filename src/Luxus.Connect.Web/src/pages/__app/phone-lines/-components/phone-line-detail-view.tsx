@@ -59,6 +59,8 @@ import {
 } from '@/lib/phone-line-api';
 import { cn } from '@/lib/utils';
 
+import { BillingProcessingPanel } from './billing-processing-panel';
+
 type PhoneLinesListSearch = {
   page: number;
   pageSize: number;
@@ -433,6 +435,15 @@ export function PhoneLineDetailView({
             </div>
           )}
         </div>
+      </DetailSection>
+
+      <Separator />
+
+      <DetailSection
+        title="Processamentos financeiros"
+        description="Dois cálculos paralelos: Luxus→Cliente (cobrança) e Cliente→Usuário final (revenda PJ). Composição com serviços, descontos, parcelas e extras."
+      >
+        <BillingProcessingPanel phoneLineId={line.id} hasActiveCustomer={Boolean(activeLink)} />
       </DetailSection>
 
       <Separator />

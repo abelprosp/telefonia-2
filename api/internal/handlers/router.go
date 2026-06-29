@@ -190,6 +190,17 @@ func (h *Handler) RegisterRoutes(
 
 					r.Delete("/customer-links/active", h.unassignPhoneLineCustomer)
 
+					r.Get("/billing-processings", h.listLineBillingProcessings)
+					r.Post("/billing-processings/end-user", h.enableEndUserBillingProcessing)
+					r.Route("/billing-processings/{processingId}", func(r chi.Router) {
+						r.Patch("/", h.updateLineBillingProcessing)
+						r.Post("/mirror-from-primary", h.mirrorLineBillingProcessing)
+						r.Get("/audit", h.listLineBillingProcessingAudit)
+						r.Post("/items", h.createLineBillingCompositionItem)
+						r.Patch("/items/{itemId}", h.updateLineBillingCompositionItem)
+						r.Delete("/items/{itemId}", h.deleteLineBillingCompositionItem)
+					})
+
 				})
 
 			})

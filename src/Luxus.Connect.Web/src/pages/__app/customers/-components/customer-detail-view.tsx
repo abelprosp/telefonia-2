@@ -146,6 +146,9 @@ export function CustomerDetailView({
   const [linkLineOpen, setLinkLineOpen] = useState(false);
   const [linkDeviceOpen, setLinkDeviceOpen] = useState(false);
   const [generateInvoiceOpen, setGenerateInvoiceOpen] = useState(false);
+  const [isReseller, setIsReseller] = useState(
+    Boolean((customer as ListCustomerResponse & { is_reseller?: boolean }).is_reseller)
+  );
 
   const isPj = customer.type.trim().toUpperCase() === 'PJ';
   const schema = useMemo(() => buildSchema(isPj), [isPj]);
@@ -169,6 +172,9 @@ export function CustomerDetailView({
       responsible_salesperson_user_id:
         customer.responsible_salesperson_user_id ?? ''
     });
+    setIsReseller(
+      Boolean((customer as ListCustomerResponse & { is_reseller?: boolean }).is_reseller)
+    );
   }, [customer, form]);
 
   const saveMutation = usePatchV1CustomersId({
@@ -269,7 +275,8 @@ export function CustomerDetailView({
               state_registration: v.state_registration.trim() || null,
               birth_or_opening_date: customer.birth_or_opening_date ?? null,
               responsible_salesperson_user_id:
-                v.responsible_salesperson_user_id.trim() || null
+                v.responsible_salesperson_user_id.trim() || null,
+              ...(isPj ? { is_reseller: isReseller } : {})
             }
           })
         )}
@@ -310,6 +317,24 @@ export function CustomerDetailView({
                     {...form.register('legal_name')}
                   />
                   <FieldError errors={[form.formState.errors.legal_name]} />
+                </Field>
+              ) : null}
+              {isPj ? (
+                <Field className="sm:col-span-2">
+                  <FieldLabel className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      className="size-4 rounded border"
+                      checked={isReseller}
+                      disabled={!isActive}
+                      onChange={(e) => setIsReseller(e.target.checked)}
+                    />
+                    PJ Revendedor (processamento duplo)
+                  </FieldLabel>
+                  <p className="text-muted-foreground text-xs">
+                    Habilita o 2º processamento financeiro nas linhas: preço Luxus→Cliente e
+                    Cliente→Usuário final com composições independentes.
+                  </p>
                 </Field>
               ) : null}
               <Field>

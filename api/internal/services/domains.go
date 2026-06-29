@@ -149,6 +149,10 @@ func (s *Service) AssignPhoneLineCustomer(ctx context.Context, phoneLineID strin
 	if err := s.Store.AssignPhoneLineCustomer(ctx, phoneLineID, input.CustomerID, start, input.MonthlyAmount); err != nil {
 		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
+	linkID, _, _ := s.Store.GetActivePhoneLineCustomerLink(ctx, phoneLineID)
+	if linkID != "" {
+		_ = s.EnsureBillingProcessingsForLink(ctx, linkID, input.CustomerID, input.MonthlyAmount)
+	}
 	_ = s.Store.UpdatePhoneLineStatus(ctx, phoneLineID, "active")
 	_ = s.Store.ReactivateCustomer(ctx, input.CustomerID)
 	if prevCustomerID != "" && prevCustomerID != input.CustomerID {
@@ -210,6 +214,23 @@ func (s *Service) UpdateActivePhoneLineCustomerLink(ctx context.Context, phoneLi
 			return nil, httputil.NotFoundError(notifications.PhoneLineActiveCustomerLinkNotFound)
 		}
 		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+	linkID, err := s.Store.GetActiveLinkIDForPhoneLine(ctx, orgID, phoneLineID)
+	if err == nil && linkID != "" && input.MonthlyAmount != nil {
+		processings, _ := s.Store.ListBillingProcessingsForLink(ctx, linkID)
+		for _, p := range processings {
+			if p.Perspective == perspectiveLuxusCustomer {
+				items, _ := s.Store.ListBillingCompositionItems(ctx, p.ID)
+				for _, it := range items {
+					if it.ItemType == "service" && strings.Contains(strings.ToLower(it.Description), "mensalidade") {
+						now := time.Now().UTC()
+						amt := *input.MonthlyAmount
+						_ = s.Store.UpdateBillingCompositionItem(ctx, it.ID, nil, &amt, nil, nil, nil, nil, nil, now)
+						break
+					}
+				}
+			}
+		}
 	}
 	return s.activePhoneLineCustomerLink(ctx, orgID, phoneLineID)
 }

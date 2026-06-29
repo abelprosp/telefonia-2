@@ -397,6 +397,27 @@ func (s *Service) UpdateCustomer(ctx context.Context, id string, input models.Up
 			return httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 		}
 	}
+	if input.IsReseller != nil {
+		orgID, err := orgFrom(ctx)
+		if err != nil {
+			return err
+		}
+		if err := s.Store.UpdateCustomerIsReseller(ctx, orgID, id, *input.IsReseller); err != nil {
+			if isPgNoRows(err) {
+				return httputil.NotFoundError(notifications.CustomerNotFound)
+			}
+			return httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+		}
+		if *input.IsReseller {
+			linkIDs, err := s.Store.ListActiveCustomerLinkIDs(ctx, id)
+			if err != nil {
+				return httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+			}
+			for _, linkID := range linkIDs {
+				_ = s.EnsureBillingProcessingsForLink(ctx, linkID, id, nil)
+			}
+		}
+	}
 	return nil
 }
 

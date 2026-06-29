@@ -460,12 +460,7 @@ func (s *Store) ListBulkBillingCandidates(ctx context.Context, orgID, processing
 				l."CustomerId" AS customer_id,
 				COUNT(DISTINCT pl."Id")::int AS line_count,
 				COALESCE(SUM(COALESCE(pl."CostWithConsumption", pl."BaseCost", 0)), 0) AS provider_cost,
-				COALESCE(SUM(
-					CASE
-						WHEN COALESCE(l."MonthlyAmount", 0) > 0 THEN l."MonthlyAmount"
-						ELSE COALESCE(pl."CostWithConsumption", pl."BaseCost", 0)
-					END
-				), 0) AS line_amount
+				COALESCE(SUM(` + lineLuxusBillingAmountSQL + `), 0) AS line_amount
 			FROM "PhoneLineCustomerLinks" l
 			JOIN "PhoneLines" pl ON pl."Id" = l."PhoneLineId"
 			JOIN "ProviderInvoicePhoneLines" j ON j."PhoneLinesId" = pl."Id"
@@ -550,12 +545,7 @@ func (s *Store) ListManualBillingCandidates(ctx context.Context, orgID string, c
 			SELECT
 				l."CustomerId" AS customer_id,
 				COUNT(DISTINCT pl."Id")::int AS line_count,
-				COALESCE(SUM(
-					CASE
-						WHEN COALESCE(l."MonthlyAmount", 0) > 0 THEN l."MonthlyAmount"
-						ELSE COALESCE(pl."CostWithConsumption", pl."BaseCost", 0)
-					END
-				), 0) AS line_amount
+				COALESCE(SUM(` + lineLuxusBillingAmountSQL + `), 0) AS line_amount
 			FROM "PhoneLineCustomerLinks" l
 			JOIN "PhoneLines" pl ON pl."Id" = l."PhoneLineId"
 			WHERE l."EndDate" IS NULL
@@ -684,10 +674,7 @@ func (s *Store) ListCustomerBillingItemsForProcessingMonth(ctx context.Context, 
 			SELECT
 				COALESCE(pp."Name", pl."Number") || ' — ' || pl."Number" AS description,
 				'Mensal' AS item_type,
-				CASE
-					WHEN COALESCE(l."MonthlyAmount", 0) > 0 THEN l."MonthlyAmount"
-					ELSE COALESCE(pl."CostWithConsumption", pl."BaseCost", 0)
-				END AS amount
+				` + lineLuxusBillingAmountSQL + ` AS amount
 			FROM "PhoneLineCustomerLinks" l
 			JOIN "PhoneLines" pl ON pl."Id" = l."PhoneLineId"
 			LEFT JOIN "ProviderPlans" pp ON pp."Id" = pl."ProviderPlanId"
