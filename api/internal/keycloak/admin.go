@@ -45,6 +45,10 @@ func (c *AdminClient) Enabled() bool {
 	return c.baseURL != "" && c.realm != "" && c.adminPass != ""
 }
 
+func (c *AdminClient) Realm() string {
+	return c.realm
+}
+
 type UserRecord struct {
 	ID        string   `json:"id"`
 	Username  string   `json:"username"`
