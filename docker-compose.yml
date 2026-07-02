@@ -1,22 +1,25 @@
+version: '3.9'
+
 name: luxus-connect
 
 services:
   postgres:
-    image: postgres:latest
     container_name: postgres.connect.luxus
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    ports:
-      - '5432:5432'
+    image: luxus/postgres.connect.luxus:latest
+    build:
+      context: .
+      dockerfile: ./docker/test/database/Dockerfile
+      args:
+        - TZ=America/Sao_Paulo
+    env_file:
+      - ./docker/test/database/.database.env
     volumes:
-      - postgres-vol:/var/lib/postgresql
-      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
-    healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER}']
-      interval: 5s
-      timeout: 5s
-      retries: 5
+      - postgres-vol:/var/lib/pgsql/pgdata
+      - '/etc/timezone:/etc/timezone:ro'
+      - '/etc/localtime:/etc/localtime:ro'
+    ports:
+      - "5001:5001"
+    restart: unless-stopped
 
   rabbitmq:
     hostname: 'mabbit'
@@ -25,9 +28,8 @@ services:
     ports:
       - 5672:5672
       - 15672:15672
-    environment:
-      - RABBITMQ_DEFAULT_USER=${RMQ_USER}
-      - RABBITMQ_DEFAULT_PASS=${RMQ_PWD}
+    env_file:
+      - ./docker/test/rabbitmq/.rabbitmq.env
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq/
       - rabbitmq-mnesia:/var/lib/rabbitmq/mnesia/
@@ -38,32 +40,30 @@ services:
     ports:
       - 81:80
       - 5341:5341
-    environment:
-      - ACCEPT_EULA=Y
-      - SEQ_FIRSTRUN_ADMINPASSWORDHASH=${SEQ_PWD_HASH}
+    env_file:
+      - ./docker/test/seq/.seq.env
     volumes:
       - seq-data:/var/lib/seq/data/
 
   keycloak:
-    image: 'quay.io/keycloak/keycloak:latest'
     container_name: keycloak.connect.luxus
-    hostname: keycloak.connect.luxus
+    image: luxus/keycloak.connect.luxus:latest
     user: root
-    ports:
-      - '8081:8080'
-      - '8443:8443'
-    environment:
-      - KEYCLOAK_ADMIN=admin
-      - KEYCLOAK_ADMIN_PASSWORD=${KC_ADMIN_PWD}
-      - KC_DB=postgres
-      - KC_DB_USERNAME=${KC_DB_USERNAME}
-      - KC_DB_PASSWORD=${KC_DB_PASSWORD}
-      - KC_DB_URL=jdbc:postgresql://postgres:5432/luxus_kc_dev
+    build:
+      context: .
+      dockerfile: ./docker/test/keycloak/Dockerfile
+    command: [ "start", "--optimized", "--import-realm", "--spi-theme-static-max-age=-1", "--spi-theme-cache-themes=false", "--spi-theme-cache-templates=false" ]
+    env_file:
+      - ./docker/test/keycloak/.keycloak.env
+    depends_on:
+      - postgres
     volumes:
       - keycloak-data:/opt/keycloak/data
       - ./resources/theme/:/opt/keycloak/themes/
-      - ./docker/keycloak/luxus-realm.json:/opt/keycloak/data/import/luxus-realm.json:ro
-    entrypoint: /opt/keycloak/bin/kc.sh --verbose start-dev --import-realm --spi-theme-static-max-age=-1 --spi-theme-cache-themes=false --spi-theme-cache-templates=false
+      - ./docker/test/keycloak/data/luxus-realm.json:/opt/keycloak/data/import/luxus-realm.json:ro
+    ports:
+      - "8081:8080"
+      - "8443:8443"
 
   connect-api:
     image: ${REGISTRY:-luxus/connect/api}:${PLATFORM:-linux}-${TAG:-latest}
@@ -89,8 +89,8 @@ services:
     image: node:22-alpine
     container_name: web-dev.connect.luxus
     working_dir: /app
-    environment:
-      - VITE_USE_POLLING=true
+    env_file:
+      - ./docker/test/frontend/.frontend.env
     volumes:
       - ./src/Luxus.Connect.Web:/app
       - web_dev_node_modules:/app/node_modules

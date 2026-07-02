@@ -1,0 +1,225 @@
+{
+  "realm": "luxus",
+  "enabled": true,
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": false,
+  "roles": {
+    "realm": [
+      {
+        "name": "admin",
+        "description": "Administrador Luxus Connect"
+      },
+      {
+        "name": "user",
+        "description": "Utilizador padrão"
+      },
+      {
+        "name": "partner",
+        "description": "Parceiro comercial com acesso restrito"
+      },
+      {
+        "name": "master",
+        "description": "Acesso total ao sistema e gestão de usuários"
+      },
+      {
+        "name": "employee",
+        "description": "Funcionário — operação básica sem módulo financeiro"
+      },
+      {
+        "name": "financial",
+        "description": "Financeiro — controle financeiro completo"
+      }
+    ]
+  },
+  "defaultRoles": ["user"],
+  "users": [
+    {
+      "username": "dev",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Dev",
+      "lastName": "Luxus",
+      "email": "dev@luxus.local",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["master", "admin", "user"],
+      "attributes": {
+        "organization": [
+          "{\"luxus\":{\"id\":\"00000000-0000-0000-0000-000000000001\",\"name\":[\"Luxus Connect\"]}}"
+        ]
+      }
+    },
+    {
+      "username": "parceiro",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Parceiro",
+      "lastName": "Luxus",
+      "email": "parceiro@luxus.local",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "parceiro",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["partner", "user"],
+      "attributes": {
+        "organization": [
+          "{\"luxus\":{\"id\":\"00000000-0000-0000-0000-000000000001\",\"name\":[\"Luxus Connect\"]}}"
+        ]
+      }
+    },
+    {
+      "username": "funcionario",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Funcionario",
+      "lastName": "Luxus",
+      "email": "funcionario@luxus.local",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "funcionario",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["employee", "user"],
+      "attributes": {
+        "organization": [
+          "{\"luxus\":{\"id\":\"00000000-0000-0000-0000-000000000001\",\"name\":[\"Luxus Connect\"]}}"
+        ]
+      }
+    },
+    {
+      "username": "financeiro",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Financeiro",
+      "lastName": "Luxus",
+      "email": "financeiro@luxus.local",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "financeiro",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["financial", "user"],
+      "attributes": {
+        "organization": [
+          "{\"luxus\":{\"id\":\"00000000-0000-0000-0000-000000000001\",\"name\":[\"Luxus Connect\"]}}"
+        ]
+      }
+    }
+  ],
+  "clientScopes": [
+    {
+      "name": "organization",
+      "description": "Claim organization no token",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "organization-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "organization",
+            "claim.name": "organization",
+            "jsonType.label": "JSON",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "multivalued": "false"
+          }
+        }
+      ]
+    },
+    {
+      "name": "luxus-roles",
+      "description": "Realm roles no access token",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "realm-roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "multivalued": "true",
+            "userinfo.token.claim": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "roles",
+            "jsonType.label": "String"
+          }
+        }
+      ]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "connect-cli",
+      "name": "Luxus Connect SPA",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost:5173/*",
+        "http://localhost:3000/*",
+        "http://localhost:8002/*",
+        "http://127.0.0.1:5173/*"
+      ],
+      "webOrigins": [
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://localhost:8002",
+        "http://127.0.0.1:5173"
+      ],
+      "protocol": "openid-connect",
+      "fullScopeAllowed": true,
+      "attributes": {
+        "client.use.lightweight.access.token.enabled": "false"
+      },
+      "defaultClientScopes": ["openid", "profile", "email", "organization", "luxus-roles"],
+      "optionalClientScopes": ["offline_access"],
+      "protocolMappers": [
+        {
+          "name": "realm-roles-direct",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "multivalued": "true",
+            "userinfo.token.claim": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "roles",
+            "jsonType.label": "String"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -10,7 +10,6 @@ RUN apk add --no-cache tzdata \
 COPY ./docker/test/database/scripts/is-database-up.sh ./
 COPY ./docker/test/database/init /docker-entrypoint-initdb.d/
 
-RUN chmod +x /docker-entrypoint-initdb.d/entrypoint.sh
 RUN chmod +x is-database-up.sh
 
 EXPOSE 5000

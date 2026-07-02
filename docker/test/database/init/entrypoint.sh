@@ -24,6 +24,7 @@ main() {
     check_environment
     create_empty_db
     configure_db_port
+    create_db_structure
 }
 
 # Checks if all of the required environment
@@ -54,10 +55,10 @@ create_empty_db() {
     GRANT CREATE ON SCHEMA public TO $DB_USERNAME;
     GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO $DB_USERNAME;
     GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO $DB_USERNAME;
-    SELECT 'CREATE DATABASE "luxus_connect_dev_db"' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'luxus_connect_dev_db');\gexec
-    SELECT 'CREATE DATABASE "luxus_keycloak_dev_db"' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'luxus_keycloak_dev_db');\gexec
-    ALTER DATABASE "luxus_connect_dev_db" OWNER TO $DB_USERNAME; GRANT ALL PRIVILEGES ON DATABASE "luxus_connect_dev_db" TO $DB_USERNAME;
-    ALTER DATABASE "luxus_keycloak_dev_db" OWNER TO $DB_USERNAME; GRANT ALL PRIVILEGES ON DATABASE "luxus_keycloak_dev_db" TO $DB_USERNAME;
+    SELECT 'CREATE DATABASE "luxus_connect_dev"' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'luxus_connect_dev');\gexec
+    SELECT 'CREATE DATABASE "luxus_kc_dev"' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'luxus_kc_dev');\gexec
+    ALTER DATABASE "luxus_connect_dev" OWNER TO $DB_USERNAME; GRANT ALL PRIVILEGES ON DATABASE "luxus_connect_dev" TO $DB_USERNAME;
+    ALTER DATABASE "luxus_kc_dev" OWNER TO $DB_USERNAME; GRANT ALL PRIVILEGES ON DATABASE "luxus_kc_dev" TO $DB_USERNAME;
 EOSQL
 }
 
@@ -83,6 +84,25 @@ configure_db_port() {
     fi
 }
 
+create_db_structure() {
+    dir_path="/docker-entrypoint-initdb.d/sql"
+
+    # Use nullglob so the loop won't run if the directory is empty
+    shopt -s nullglob
+
+    # Loop through all items in the folder
+    for full_path in "$dir_path"/*; do
+        # Check if the item is a regular file (skips folders)
+        if [ -f "$full_path" ]; then
+            # Extract just the filename without the path
+            file_name=$(basename "$full_path")
+            
+            echo "Applying SQL migration fiie: '$file_name'..."
+            echo "--------------------------------------------"
+            psql -v ON_ERROR_STOP=1 -U "$DB_USERNAME" -p $POSTGRES_PORT -d luxus_connect_dev -f $full_path
+        fi
+    done
+}
 # Executes the main routine with environment variables
 # passed through the command line. We don't use them in
 # this script but now you know ;)
