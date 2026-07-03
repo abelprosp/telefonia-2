@@ -6,7 +6,11 @@ builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-healthcheckPath = "/health"
-healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
-restartPolicyMaxRetries = 5
+restartPolicyMaxRetries = 10
+
+# Healthcheck
+[deploy.healthcheck]
+path = "/health"
+interval = "30s"
+timeout = "10s"

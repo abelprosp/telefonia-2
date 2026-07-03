@@ -118,8 +118,8 @@ function Get-ComposeYamlPath {
     <#
         Equivalente a 'docker-compose.sh yamlpath <env>'.
 
-        ASSUNÇÃO: o arquivo de compose segue a convenção 'docker-compose.<env>.yml'
-        na raiz do projeto (ex: docker-compose.dev.yml, docker-compose.prod.yml),
+        O arquivo de compose segue a convenção 'docker-compose.<env>.yml'
+        na raiz do projeto (ex: docker-compose-dev.yml, docker-compose.prod.yml),
         com fallback para 'docker-compose.yml' quando nenhum env= for informado.
         Ajuste esta função se seu script original resolvia o caminho de outra forma
         (ex: pasta 'deploy/<env>/docker-compose.yml', arquivo único com profiles, etc).
@@ -130,7 +130,7 @@ function Get-ComposeYamlPath {
         return "docker-compose.yml"
     }
 
-    $candidate = "docker-compose.$($EnvArg.ToLower()).yml"
+    $candidate = "docker-compose-$($EnvArg.ToLower()).yml"
     $fullPath = Join-Path $RootDir $candidate
 
     if (-not (Test-Path $fullPath)) {
