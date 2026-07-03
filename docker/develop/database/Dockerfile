@@ -7,8 +7,8 @@ RUN apk add --no-cache tzdata \
     && echo $TZ > /etc/timezone
 
 # Healthcheck script to verify if database is up.
-COPY ./docker/test/database/scripts/is-database-up.sh ./
-COPY ./docker/test/database/init /docker-entrypoint-initdb.d/
+COPY ./docker/develop/database/scripts/is-database-up.sh ./
+COPY ./docker/develop/database/init /docker-entrypoint-initdb.d/
 
 RUN chmod +x is-database-up.sh
 

@@ -1,0 +1,14 @@
+{
+  "name": "sub-claim",
+  "protocol": "openid-connect",
+  "protocolMapper": "oidc-usermodel-property-mapper",
+  "config": {
+    "introspection.token.claim": "true",
+    "userinfo.token.claim": "true",
+    "id.token.claim": "true",
+    "access.token.claim": "true",
+    "claim.name": "sub",
+    "jsonType.label": "String",
+    "property": "id"
+  }
+}

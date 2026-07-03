@@ -7,8 +7,8 @@ services:
     container_name: postgres.connect.luxus
     image: luxus/postgres.connect.luxus:latest
     build:
-      context: .
-      dockerfile: ./docker/develop/database/Dockerfile
+      context: ../../..
+      dockerfile: ./infra/docker/develop/database/Dockerfile
       args:
         - TZ=America/Sao_Paulo
     env_file:
@@ -29,7 +29,7 @@ services:
       - 5672:5672
       - 15672:15672
     env_file:
-      - ./docker/develop/rabbitmq/.rabbitmq.env
+      - ./rabbitmq/.rabbitmq.env
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq/
       - rabbitmq-mnesia:/var/lib/rabbitmq/mnesia/
@@ -41,7 +41,7 @@ services:
       - 81:80
       - 5341:5341
     env_file:
-      - ./docker/develop/seq/.seq.env
+      - ./seq/.seq.env
     volumes:
       - seq-data:/var/lib/seq/data/
 
@@ -50,17 +50,17 @@ services:
     image: luxus/keycloak.connect.luxus:latest
     user: root
     build:
-      context: .
-      dockerfile: ./docker/develop/keycloak/Dockerfile
+      context: ../../..
+      dockerfile: ./infra/docker/develop/keycloak/Dockerfile
     command: [ "start", "--optimized", "--import-realm", "--spi-theme-static-max-age=-1", "--spi-theme-cache-themes=false", "--spi-theme-cache-templates=false" ]
     env_file:
-      - ./docker/develop/keycloak/.keycloak.env
+      - ./keycloak/.keycloak.env
     depends_on:
       - postgres
     volumes:
       - keycloak-data:/opt/keycloak/data
-      - ./resources/theme/:/opt/keycloak/themes/
-      - ./docker/develop/keycloak/data/luxus-realm.json:/opt/keycloak/data/import/luxus-realm.json:ro
+      - ../../../resources/theme/:/opt/keycloak/themes/
+      - ./keycloak/data/luxus-realm.json:/opt/keycloak/data/import/luxus-realm.json:ro
     ports:
       - "8081:8080"
       - "8443:8443"
@@ -70,7 +70,7 @@ services:
     container_name: api.connect.luxus
     restart: always
     build:
-      context: ./api
+      context: ../../../api
       dockerfile: Dockerfile
     ports:
       - '8002:80'
@@ -80,7 +80,7 @@ services:
     container_name: web.connect.luxus
     restart: always
     build:
-      context: ./src/Luxus.Connect.Web
+      context: ../../../src/Luxus.Connect.Web
       dockerfile: Dockerfile
 
   connect-web-dev:
@@ -90,7 +90,7 @@ services:
     container_name: web-dev.connect.luxus
     working_dir: /app
     env_file:
-      - ./docker/develop/frontend/.frontend.env
+      - ./frontend/.frontend.env
     volumes:
       - ./src/Luxus.Connect.Web:/app
       - web_dev_node_modules:/app/node_modules
