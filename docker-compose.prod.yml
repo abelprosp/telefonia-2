@@ -27,7 +27,7 @@ services:
     environment:
       - KC_HTTP_RELATIVE_PATH=/auth
       - KC_PROXY_HEADERS=xforwarded
-      - KC_HOSTNAME=luxus.bitpulse.com.br
+      - KC_HOSTNAME=telefonia.redobrai.online
       - KC_HOSTNAME_STRICT=false
     ports: []
     restart: on-failure
@@ -39,12 +39,12 @@ services:
       - DATABASE_URL=Host=postgres;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};Database=luxus_connect_dev;
       - RABBITMQ_URL=amqp://${RMQ_USER}:${RMQ_PWD}@rabbitmq:5672
       - KEYCLOAK_REALM=luxus
-      - KEYCLOAK_AUTH_SERVER_URL=https://luxus.bitpulse.com.br/auth
+      - KEYCLOAK_AUTH_SERVER_URL=https://telefonia.redobrai.online/auth
       - KEYCLOAK_RESOURCE=connect-cli
       - OBJECT_STORAGE_SERVICE_URL=${OBJECT_STORAGE_SERVICE_URL}
       - OBJECT_STORAGE_ACCESS_KEY_ID=${OBJECT_STORAGE_ACCESS_KEY_ID}
       - OBJECT_STORAGE_SECRET_ACCESS_KEY=${OBJECT_STORAGE_SECRET_ACCESS_KEY}
-      - CORS_ORIGINS=https://luxus.bitpulse.com.br
+      - CORS_ORIGINS=https://telefonia.redobrai.online
     ports: []
     depends_on:
       postgres:
@@ -63,8 +63,8 @@ services:
       context: ./src/Luxus.Connect.Web
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: https://luxus.bitpulse.com.br/api
-        VITE_AUTH_URL: https://luxus.bitpulse.com.br/auth
+        VITE_API_URL: https://telefonia.redobrai.online/api
+        VITE_AUTH_URL: https://telefonia.redobrai.online/auth
         VITE_CLIENT_ID: connect-cli
         VITE_CLIENT_SECRET: ${KC_CLIENT_SECRET}
         VITE_STORAGE_BUCKET_NAME: luxus-connect
@@ -73,5 +73,5 @@ services:
       - '443:443'
     volumes:
       - ./docker/nginx/connect-web.vps.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./docker/ssl/luxus.bitpulse.com.br:/etc/nginx/ssl:ro
+      - ./docker/ssl/telefonia.redobrai.online:/etc/nginx/ssl:ro
     restart: on-failure
