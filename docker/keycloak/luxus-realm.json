@@ -1,6 +1,7 @@
 {
   "realm": "luxus",
   "enabled": true,
+  "sslRequired": "NONE",
   "registrationAllowed": false,
   "loginWithEmailAllowed": true,
   "duplicateEmailsAllowed": false,
