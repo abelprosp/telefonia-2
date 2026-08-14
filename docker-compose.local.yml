@@ -1,0 +1,14 @@
+# Override local: portas 5432, 3000, 9000 e 9001 já estão ocupadas nesta máquina.
+services:
+  postgres:
+    ports: !override
+      - '5434:5432'
+
+  minio:
+    ports: !override
+      - '19000:9000'
+      - '19001:9001'
+
+  connect-web:
+    ports: !override
+      - '3001:80'

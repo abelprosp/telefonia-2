@@ -20,6 +20,9 @@ func (s *Service) ManualBillingPreview(ctx context.Context, customerIDs []string
 	if err != nil {
 		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
+	if items == nil {
+		items = []models.BulkBillingPreviewItem{}
+	}
 	eligible := 0
 	for _, item := range items {
 		if item.Eligible {
@@ -77,6 +80,21 @@ func (s *Service) ManualGenerateBillingDocuments(ctx context.Context, input mode
 		}
 		candidates = filtered
 	}
+	if len(input.BillingGroupIDs) > 0 {
+		selected := make(map[string]struct{}, len(input.BillingGroupIDs))
+		for _, id := range input.BillingGroupIDs {
+			if id = strings.TrimSpace(id); id != "" {
+				selected[id] = struct{}{}
+			}
+		}
+		filtered := candidates[:0]
+		for _, c := range candidates {
+			if _, ok := selected[c.BillingGroupID]; ok {
+				filtered = append(filtered, c)
+			}
+		}
+		candidates = filtered
+	}
 
 	return s.generateBillingDocumentsForCandidates(ctx, orgID, candidates, nil, issueDate, dueDate, descriptionTemplate, templateCode, layoutCode)
 }
@@ -125,27 +143,49 @@ func (s *Service) GenerateCustomerBillingDocument(ctx context.Context, customerI
 	if len(candidates) == 0 {
 		return nil, httputil.ValidationError(notifications.N("BILLING_NO_LINES", "Cliente sem linhas ou aparelhos ativos vinculados."))
 	}
-	candidate := candidates[0]
-	amount := candidate.MonthlyAmount
-	if input.Amount != nil && *input.Amount > 0 {
-		amount = *input.Amount
+	if input.Amount != nil && *input.Amount > 0 && len(candidates) == 1 {
+		candidates[0].MonthlyAmount = *input.Amount
+		candidates[0].Eligible = *input.Amount > 0
 	}
-	if amount <= 0 {
-		return nil, httputil.ValidationError(notifications.N("BILLING_NO_AMOUNT", "Informe um valor maior que zero para a fatura."))
+	bulk, err := s.generateBillingDocumentsForCandidates(ctx, orgID, candidates, nil, issueDate, dueDate, description, templateCode, layoutCode)
+	if err != nil {
+		return nil, err
 	}
-
-	docID, receivableID, genErr := s.createBillingDocumentForAmount(ctx, orgID, candidate.CustomerID, description, amount, nil, issueDate, dueDate, templateCode, layoutCode)
-	if genErr != nil {
-		return nil, genErr
+	var firstID, firstRec string
+	var total float64
+	ids := make([]string, 0, bulk.Created)
+	for _, item := range bulk.Items {
+		if item.Status == "created" && item.DocumentID != nil {
+			if firstID == "" {
+				firstID = *item.DocumentID
+				if item.ReceivableID != nil {
+					firstRec = *item.ReceivableID
+				}
+			}
+			ids = append(ids, *item.DocumentID)
+			total += item.Amount
+		}
+	}
+	if bulk.Created == 0 {
+		msg := "Nenhuma fatura gerada."
+		if len(bulk.Items) > 0 && bulk.Items[0].Message != "" {
+			msg = bulk.Items[0].Message
+		}
+		return nil, httputil.ValidationError(notifications.N("BILLING_NO_AMOUNT", msg))
 	}
 	msg := "Fatura criada com sucesso."
-	resp := &models.GenerateCustomerBillingDocumentResponse{
-		ID:           docID,
-		ReceivableID: receivableID,
-		Amount:       amount,
-		Message:      msg,
+	if bulk.Created > 1 {
+		msg = "Faturas criadas (um boleto por linha Normal e um por grupo Titular+dependentes)."
 	}
-	s.applySicrediFeedback(ctx, docID, &resp.Message, &resp.SicrediBoletoStatus, &resp.SicrediNossoNumero, &resp.SicrediBoletoError)
+	resp := &models.GenerateCustomerBillingDocumentResponse{
+		ID:           firstID,
+		ReceivableID: firstRec,
+		Amount:       total,
+		Message:      msg,
+		CreatedCount: bulk.Created,
+		DocumentIDs:  ids,
+	}
+	s.applySicrediFeedback(ctx, firstID, &resp.Message, &resp.SicrediBoletoStatus, &resp.SicrediNossoNumero, &resp.SicrediBoletoError)
 	return resp, nil
 }
 
@@ -163,9 +203,12 @@ func (s *Service) generateBillingDocumentsForCandidates(
 
 	for _, c := range candidates {
 		result := models.BulkBillingGenerateItemResult{
-			CustomerID:   c.CustomerID,
-			CustomerName: c.CustomerName,
-			Amount:       c.MonthlyAmount,
+			BillingGroupID:   c.BillingGroupID,
+			BillingGroupType: c.BillingGroupType,
+			GroupLabel:       c.GroupLabel,
+			CustomerID:       c.CustomerID,
+			CustomerName:     c.CustomerName,
+			Amount:           c.MonthlyAmount,
 		}
 		if !c.Eligible {
 			result.Status = "skipped"
@@ -175,7 +218,11 @@ func (s *Service) generateBillingDocumentsForCandidates(
 			continue
 		}
 
-		docID, receivableID, err := s.createBillingDocumentForAmount(ctx, orgID, c.CustomerID, descriptionTemplate, c.MonthlyAmount, processingMonthID, issueDate, dueDate, templateCode, layoutCode)
+		desc := descriptionTemplate
+		if c.GroupLabel != "" {
+			desc = descriptionTemplate + " — " + c.GroupLabel
+		}
+		docID, receivableID, err := s.createBillingDocumentForAmount(ctx, orgID, c.CustomerID, desc, c.MonthlyAmount, processingMonthID, issueDate, dueDate, templateCode, layoutCode, c.PhoneLineID, c.BillingGroupType)
 		if err != nil {
 			result.Status = "failed"
 			if svcErr, ok := err.(*httputil.AppError); ok {
@@ -206,6 +253,8 @@ func (s *Service) createBillingDocumentForAmount(
 	processingMonthID *string,
 	issueDate, dueDate time.Time,
 	templateCode, layoutCode string,
+	phoneLineID *string,
+	groupType string,
 ) (documentID, receivableID string, err error) {
 	receivableID = uuid.New().String()
 	now := time.Now().UTC()
@@ -215,6 +264,10 @@ func (s *Service) createBillingDocumentForAmount(
 	rec, err := s.Store.GetReceivableForBilling(ctx, orgID, receivableID)
 	if err != nil || rec == nil {
 		return "", "", httputil.InternalError(notifications.N("BILLING_RECEIVABLE_FAILED", "Falha ao carregar conta a receber criada."))
+	}
+	rec.PhoneLineID = phoneLineID
+	if groupType != "" {
+		rec.BillingGroupType = &groupType
 	}
 	docID, err := s.createBillingDocumentFromReceivable(ctx, orgID, rec, templateCode, layoutCode)
 	if err != nil {

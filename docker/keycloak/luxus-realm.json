@@ -120,6 +120,27 @@
           "{\"luxus\":{\"id\":\"00000000-0000-0000-0000-000000000001\",\"name\":[\"Luxus Connect\"]}}"
         ]
       }
+    },
+    {
+      "username": "arturabel",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Artur",
+      "lastName": "Abel",
+      "email": "arturabel@luxus.local",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "arturabel",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["master", "admin", "user"],
+      "attributes": {
+        "organization": [
+          "{\"luxus\":{\"id\":\"00000000-0000-0000-0000-000000000001\",\"name\":[\"Luxus Connect\"]}}"
+        ]
+      }
     }
   ],
   "clientScopes": [

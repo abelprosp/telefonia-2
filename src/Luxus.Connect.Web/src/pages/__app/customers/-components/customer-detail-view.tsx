@@ -44,6 +44,7 @@ import {
   TableHeader,
   TableRow
 } from '@/components/ui/table';
+import { BillingReadinessPanel } from './billing-readiness-panel';
 import { getErrorMessage, isApiHttpError } from '@/lib/api-error';
 import {
   useCustomerDevices,
@@ -149,6 +150,15 @@ export function CustomerDetailView({
   const [isReseller, setIsReseller] = useState(
     Boolean((customer as ListCustomerResponse & { is_reseller?: boolean }).is_reseller)
   );
+  const customerExtra = customer as ListCustomerResponse & {
+    is_reseller?: boolean;
+    commercial_activation_date?: string | null;
+    contracted_luxus_cnpj?: string | null;
+  };
+  const [commercialActivation, setCommercialActivation] = useState(
+    (customerExtra.commercial_activation_date ?? '').toString().slice(0, 10)
+  );
+  const [luxusCnpj, setLuxusCnpj] = useState(customerExtra.contracted_luxus_cnpj ?? '');
 
   const isPj = customer.type.trim().toUpperCase() === 'PJ';
   const schema = useMemo(() => buildSchema(isPj), [isPj]);
@@ -276,7 +286,9 @@ export function CustomerDetailView({
               birth_or_opening_date: customer.birth_or_opening_date ?? null,
               responsible_salesperson_user_id:
                 v.responsible_salesperson_user_id.trim() || null,
-              ...(isPj ? { is_reseller: isReseller } : {})
+              ...(isPj ? { is_reseller: isReseller } : {}),
+              commercial_activation_date: commercialActivation || null,
+              contracted_luxus_cnpj: luxusCnpj || null
             }
           })
         )}
@@ -361,6 +373,26 @@ export function CustomerDetailView({
                 />
               </Field>
               <Field>
+                <FieldLabel htmlFor="customer-activation">Data de ativação comercial</FieldLabel>
+                <Input
+                  id="customer-activation"
+                  type="date"
+                  disabled={!isActive}
+                  value={commercialActivation}
+                  onChange={(e) => setCommercialActivation(e.target.value)}
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="customer-luxus-cnpj">CNPJ Luxus (contratada)</FieldLabel>
+                <Input
+                  id="customer-luxus-cnpj"
+                  disabled={!isActive}
+                  placeholder="Somente números"
+                  value={luxusCnpj}
+                  onChange={(e) => setLuxusCnpj(e.target.value)}
+                />
+              </Field>
+              <Field>
                 <FieldLabel htmlFor="customer-salesperson">
                   Vendedor responsável (ID do usuário)
                 </FieldLabel>
@@ -378,6 +410,15 @@ export function CustomerDetailView({
               </Field>
             </div>
           </FieldGroup>
+        </DetailSection>
+
+        <Separator />
+
+        <DetailSection
+          title="Liberação para faturamento"
+          description="Um cliente só entra no lote quando todas as contas do mês foram processadas, ou após liberação manual com justificativa."
+        >
+          <BillingReadinessPanel customerId={customer.id} />
         </DetailSection>
 
         <Separator />

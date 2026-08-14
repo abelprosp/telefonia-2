@@ -115,9 +115,10 @@ func main() {
 			logger.Warn("object storage unavailable", "error", err)
 		} else {
 			presigned = &services.PresignedService{Storage: s3Client}
+			processor := &importservice.Processor{Store: st, Storage: s3Client, Log: logger}
+			svc.Processor = processor
 
 			if cfg.RabbitMQURL != "" {
-				processor := &importservice.Processor{Store: st, Storage: s3Client, Log: logger}
 				consumer, err := messaging.NewConsumer(cfg.RabbitMQURL, processor, logger)
 				if err != nil {
 					logger.Warn("rabbitmq consumer unavailable", "error", err)

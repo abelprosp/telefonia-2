@@ -4,13 +4,16 @@ import { FilePenLine, Link2 } from 'lucide-react';
 
 import type { ListPhoneLineResponse } from '@/api';
 import { DataTableColumnHeader } from '@/components/data-table/data-table-column-header';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger
 } from '@/components/ui/tooltip';
+import { formatMoney } from '@/lib/financial-api';
 import {
+  formatCpfCnpj,
   formatLineClassification,
   formatPhoneLineStatus,
   formatPhoneNumber
@@ -29,17 +32,8 @@ export function createStockLinesColumns(opts: {
         <DataTableColumnHeader column={column} title="Número" />
       ),
       cell: ({ row }) => (
-        <span>{formatPhoneNumber(row.original.number) ?? '—'}</span>
-      )
-    },
-    {
-      accessorKey: 'line_classification',
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Classificação" />
-      ),
-      cell: ({ row }) => (
-        <span>
-          {formatLineClassification(row.original.line_classification)}
+        <span className="font-medium text-foreground">
+          {formatPhoneNumber(row.original.number) ?? '—'}
         </span>
       )
     },
@@ -48,8 +42,92 @@ export function createStockLinesColumns(opts: {
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title="Status" />
       ),
+      cell: ({ row }) => {
+        const s = row.original.status?.toLowerCase();
+        const isStock = s === 'in_stock' || s === '0';
+        return (
+          <Badge variant={isStock ? 'success-light' : 'secondary'} size="sm">
+            {formatPhoneLineStatus(row.original.status)}
+          </Badge>
+        );
+      }
+    },
+    {
+      id: 'provider_name',
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Operadora" />
+      ),
       cell: ({ row }) => (
-        <span>{formatPhoneLineStatus(row.original.status)}</span>
+        <span>{row.original.provider_name || '—'}</span>
+      )
+    },
+    {
+      id: 'contracted_luxus_cnpj',
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="CNPJ Luxus" />
+      ),
+      cell: ({ row }) => (
+        <span className="text-xs text-muted-foreground">
+          {row.original.contracted_luxus_cnpj
+            ? formatCpfCnpj(row.original.contracted_luxus_cnpj)
+            : '—'}
+        </span>
+      )
+    },
+    {
+      accessorKey: 'provider_account_number',
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Conta" />
+      ),
+      cell: ({ row }) => (
+        <span>{row.original.provider_account_number || '—'}</span>
+      )
+    },
+    {
+      accessorKey: 'base_cost',
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Custo Base" />
+      ),
+      cell: ({ row }) => (
+        <span>{formatMoney(row.original.base_cost)}</span>
+      )
+    },
+    {
+      id: 'has_consumption',
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Com Consumo" />
+      ),
+      cell: ({ row }) => {
+        const base = row.original.base_cost ?? 0;
+        const totalWith = row.original.cost_with_consumption ?? 0;
+        const hasConsumption = totalWith > base;
+        return (
+          <Badge variant={hasConsumption ? 'info-light' : 'outline'} size="sm">
+            {hasConsumption ? 'Sim' : 'Não'}
+          </Badge>
+        );
+      }
+    },
+    {
+      accessorKey: 'last_invoice_number',
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Última Fatura" />
+      ),
+      cell: ({ row }) => (
+        <span className="text-xs text-muted-foreground">
+          {row.original.last_invoice_number ?? '—'}
+        </span>
+      )
+    },
+    {
+      accessorKey: 'line_classification',
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Classificação" />
+      ),
+      cell: ({ row }) => (
+        <span className="text-xs">
+          {formatLineClassification(row.original.line_classification)}
+        </span>
       )
     },
     {
@@ -99,7 +177,7 @@ export function createStockLinesColumns(opts: {
                   />
                 }
               />
-              <TooltipContent>Abrir</TooltipContent>
+              <TooltipContent>Detalhes / Editar</TooltipContent>
             </Tooltip>
           </div>
         );

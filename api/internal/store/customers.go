@@ -39,7 +39,7 @@ func (s *Store) ListCustomers(ctx context.Context, orgID string, providerID *str
 		SELECT DISTINCT c."Id", c."Active", c."Type"::text, c."Name",
 			COALESCE(cd."Number", ''), sr."Number", c."LegalName",
 			c."BirthOrOpeningDate", c."ResponsibleSalespersonUserId", c."BillingEmail",
-			COALESCE(c."IsReseller", false)
+			COALESCE(c."IsReseller", false), c."CommercialActivationDate", c."ContractedLuxusCnpj"
 		` + base + `
 		ORDER BY c."Name"
 		OFFSET $` + itoa(len(args)+1) + ` LIMIT $` + itoa(len(args)+2)
@@ -55,7 +55,8 @@ func (s *Store) ListCustomers(ctx context.Context, orgID string, providerID *str
 	for rows.Next() {
 		var item models.ListCustomerResponse
 		if err := rows.Scan(&item.ID, &item.Active, &item.Type, &item.Name, &item.CpfCnpj,
-			&item.StateRegistration, &item.LegalName, &item.BirthOrOpeningDate, &item.ResponsibleSalespersonUserID, &item.BillingEmail, &item.IsReseller); err != nil {
+			&item.StateRegistration, &item.LegalName, &item.BirthOrOpeningDate, &item.ResponsibleSalespersonUserID, &item.BillingEmail, &item.IsReseller,
+			&item.CommercialActivationDate, &item.ContractedLuxusCnpj); err != nil {
 			return nil, 0, err
 		}
 		items = append(items, item)
@@ -76,7 +77,7 @@ func (s *Store) GetCustomerInOrg(ctx context.Context, orgID, id string, salesper
 			(SELECT sr."Number" FROM "CustomerDocuments" sr
 				WHERE sr."CustomerId" = c."Id" AND sr."DocumentType" = 'state_registration' LIMIT 1),
 			c."LegalName", c."BirthOrOpeningDate", c."ResponsibleSalespersonUserId", c."BillingEmail",
-			COALESCE(c."IsReseller", false)
+			COALESCE(c."IsReseller", false), c."CommercialActivationDate", c."ContractedLuxusCnpj"
 		FROM "Customers" c
 		WHERE c."Id" = $1`
 	args := []any{id}
@@ -91,7 +92,8 @@ func (s *Store) GetCustomerInOrg(ctx context.Context, orgID, id string, salesper
 	var item models.ListCustomerResponse
 	err := q.QueryRow(ctx, query, args...).
 		Scan(&item.ID, &item.Active, &item.Type, &item.Name, &item.CpfCnpj,
-			&item.StateRegistration, &item.LegalName, &item.BirthOrOpeningDate, &item.ResponsibleSalespersonUserID, &item.BillingEmail, &item.IsReseller)
+			&item.StateRegistration, &item.LegalName, &item.BirthOrOpeningDate, &item.ResponsibleSalespersonUserID, &item.BillingEmail, &item.IsReseller,
+			&item.CommercialActivationDate, &item.ContractedLuxusCnpj)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -165,6 +167,15 @@ func (s *Store) CreateCustomerAddress(ctx context.Context, customerID string, ad
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
 		newUUID(), customerID, addr.Street, addr.Number, addr.Neighborhood,
 		addr.City, addr.State, addr.ZipCode, addr.Complement, country)
+	return err
+}
+
+func (s *Store) UpdateCustomerCommercial(ctx context.Context, id string, activation *time.Time, cnpj *string) error {
+	_, err := s.q(ctx).Exec(ctx, `
+		UPDATE "Customers"
+		SET "CommercialActivationDate" = COALESCE($2, "CommercialActivationDate"),
+			"ContractedLuxusCnpj" = COALESCE($3, "ContractedLuxusCnpj")
+		WHERE "Id" = $1`, id, activation, cnpj)
 	return err
 }
 

@@ -24,4 +24,28 @@ export type GetProviderPlanServiceResponse = {
    * @type null,number, decimal
    */
   price: number | null;
+  /**
+   * @type null,string
+   */
+  service_type?: string | null;
+  /**
+   * @type null,string
+   */
+  invoice_name?: string | null;
+  /**
+   * @type null,string
+   */
+  application_type?: string | null;
+  /**
+   * @type null,string
+   */
+  availability_rule?: string | null;
+  /**
+   * @type null,string
+   */
+  exclusive_customer_id?: string | null;
+  /**
+   * @type null,string
+   */
+  exclusive_customer_name?: string | null;
 };

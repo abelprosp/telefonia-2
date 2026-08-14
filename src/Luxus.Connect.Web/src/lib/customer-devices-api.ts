@@ -22,6 +22,7 @@ export type AssignCustomerDeviceInput = {
   model?: string | null;
   monthly_amount: number;
   start_date?: string | null;
+  renew_fidelity?: boolean;
 };
 
 export type UpdateCustomerDeviceInput = {

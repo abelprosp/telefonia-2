@@ -42,6 +42,9 @@ export type CustomerBillingDocument = {
   sicredi_boleto_status?: string | null;
   sicredi_boleto_error?: string | null;
   sicredi_paid_at?: string | null;
+  phone_line_id?: string | null;
+  phone_line_number?: string | null;
+  billing_group_type?: string | null;
 };
 
 export type BillingSendLog = {
@@ -86,6 +89,11 @@ export const billingKeys = {
 };
 
 export type BulkBillingPreviewItem = {
+  billing_group_id?: string;
+  billing_group_type?: string;
+  group_label?: string;
+  phone_line_id?: string | null;
+  phone_line_number?: string | null;
   customer_id: string;
   customer_name: string;
   customer_document: string;
@@ -97,6 +105,8 @@ export type BulkBillingPreviewItem = {
   already_billed: boolean;
   eligible: boolean;
   skip_reason?: string;
+  is_released_for_billing?: boolean;
+  billing_readiness_label?: string;
 };
 
 export type BulkBillingPreview = {
@@ -293,6 +303,7 @@ export function useManualGenerateBillingDocuments() {
       due_date: string;
       description?: string;
       customer_ids?: string[];
+      billing_group_ids?: string[];
     }) => {
       const { data } = await client<BulkGenerateResult>({
         url: '/v1/customer-billing-documents/manual-generate',
@@ -326,11 +337,13 @@ export function useGenerateCustomerBillingDocument() {
       description?: string;
       amount?: number;
     }) => {
-      const { data } = await client<{
+      const       { data } = await client<{
         id: string;
         receivable_id: string;
         amount: number;
         message: string;
+        created_count?: number;
+        document_ids?: string[];
       }>({
         url: `/v1/customers/${customerId}/generate-billing-document`,
         method: 'POST',
@@ -361,6 +374,7 @@ export function useBulkGenerateBillingDocuments() {
       template_code?: string;
       layout_template_code?: string;
       customer_ids?: string[];
+      billing_group_ids?: string[];
     }) => {
       const { data } = await client<BulkGenerateResult>({
         url: '/v1/customer-billing-documents/bulk-generate',

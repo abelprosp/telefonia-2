@@ -7,7 +7,7 @@ import {
 } from 'react';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useQueryClient } from '@tanstack/react-query';
+
 import { File, FileText, X } from 'lucide-react';
 import { Controller, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
@@ -15,7 +15,6 @@ import { z } from 'zod';
 
 import type { ListProcessingMonthResponse, ListProvidersResponse } from '@/api';
 import {
-  getV1ProviderInvoicesQueryKey,
   useGetV1ProcessingMonths,
   useGetV1Providers,
   usePostV1ProviderInvoices
@@ -23,7 +22,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Field, FieldError, FieldLabel } from '@/components/ui/field';
-import { Progress } from '@/components/ui/progress';
 import {
   Select,
   SelectContent,
@@ -47,20 +45,24 @@ import {
   buildInvoiceStorageObjectKey,
   uploadFileFromPresignedUrl
 } from '@/lib/invoice-import-upload';
-import { cn } from '@/lib/utils';
+
+import type { ImportProgressState } from './invoice-import-progress-banner';
 
 const MAX_IMPORT_FILE_BYTES = 256 * 1024 * 1024;
 
-const INVOICE_IMPORT_ACCEPT = '.txt';
+const INVOICE_IMPORT_ACCEPT = '.txt,.pdf,application/pdf,text/plain';
 
 const validInvoiceFile = (file: File) => {
   const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
-  if (ext !== 'txt') {
+  if (ext !== 'txt' && ext !== 'pdf') {
     return false;
   }
   const mime = file.type;
   if (!mime) {
     return true;
+  }
+  if (ext === 'pdf') {
+    return mime === 'application/pdf';
   }
   return mime === 'text/plain';
 };
@@ -83,15 +85,17 @@ type InvoiceImportSheetProps = {
   preferredProviderId?: string;
   /** Pré-seleciona o mês quando a lista de faturas está filtrada por mês. */
   preferredProcessingMonthId?: string;
+  /** Chamado quando o progresso muda — permite a página pai exibir o banner e iniciar polling. */
+  onProgressChange?: (state: ImportProgressState & { importRequestId?: string }) => void;
 };
 
 export function InvoiceImportSheet({
   open,
   onOpenChange,
   preferredProviderId = '',
-  preferredProcessingMonthId = ''
+  preferredProcessingMonthId = '',
+  onProgressChange
 }: InvoiceImportSheetProps) {
-  const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importFile, setImportFile] = useState<File | null>(null);
 
@@ -141,25 +145,49 @@ export function InvoiceImportSheet({
 
   const importMutation = usePostV1ProviderInvoices({
     mutation: {
-      onSuccess: (_data) => {
-        toast.success(
-          'Importação solicitada. O processamento ocorre em segundo plano.'
-        );
-        void queryClient.invalidateQueries({
-          queryKey: getV1ProviderInvoicesQueryKey()
-        });
-        onOpenChange(false);
-        form.reset({
-          providerId: '',
-          processingMonthId: '',
-          originalFileName: ''
-        });
-        setImportFile(null);
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
+      onSuccess: (data) => {
+        if (data.status === 'completed') {
+          onProgressChange?.({
+            stage: 'done',
+            progress: 100,
+            fileName: importFile?.name ?? ''
+          });
+        } else if (data.status === 'failed') {
+          onProgressChange?.({
+            stage: 'error',
+            progress: 0,
+            fileName: importFile?.name ?? '',
+            errorMessage: data.error ?? 'Falha no processamento do arquivo.'
+          });
+        } else if (data.status === 'pdf_unparsed') {
+          onProgressChange?.({
+            stage: 'error',
+            progress: 0,
+            fileName: importFile?.name ?? '',
+            errorMessage:
+              'PDF recebido. O parse ainda não está disponível — use o TXT da operadora para faturar.'
+          });
+        } else {
+          // Still processing in background -> pass importRequestId so the parent can poll
+          onProgressChange?.({
+            stage: 'registering',
+            progress: 95,
+            fileName: importFile?.name ?? '',
+            importRequestId: data.id
+          });
         }
+        // Reset local state
+        form.reset({ providerId: '', processingMonthId: '', originalFileName: '' });
+        setImportFile(null);
+        if (fileInputRef.current) fileInputRef.current.value = '';
       },
       onError: (e) => {
+        onProgressChange?.({
+          stage: 'error',
+          progress: 0,
+          fileName: importFile?.name ?? '',
+          errorMessage: isApiHttpError(e) ? e.message : getErrorMessage(e)
+        });
         toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e));
       }
     }
@@ -172,15 +200,42 @@ export function InvoiceImportSheet({
         ? buildInvoiceStorageObjectKey(file, values.providerId)
         : `manual/${values.providerId}/${crypto.randomUUID()}`;
 
+      // Close the sheet immediately so the user sees the page progress banner
+      onOpenChange(false);
+
       if (file) {
         if (!defaultBucket.trim()) {
-          toast.error(
-            'Defina VITE_STORAGE_BUCKET_NAME no ambiente para enviar o arquivo.'
-          );
+          onProgressChange?.({
+            stage: 'error',
+            progress: 0,
+            fileName: file.name,
+            errorMessage: 'Defina VITE_STORAGE_BUCKET_NAME no ambiente para enviar o arquivo.'
+          });
+          toast.error('Defina VITE_STORAGE_BUCKET_NAME no ambiente para enviar o arquivo.');
           return;
         }
-        await uploadFileFromPresignedUrl(file, defaultBucket, storageObjectKey);
+
+        // Stage 1: presigning (0 → 10%)
+        onProgressChange?.({ stage: 'presigning', progress: 5, fileName: file.name });
+
+        // Stage 2: upload with real XHR progress (10 → 85%)
+        onProgressChange?.({ stage: 'uploading', progress: 10, fileName: file.name });
+        await uploadFileFromPresignedUrl(file, defaultBucket, storageObjectKey, (pct) => {
+          // Map XHR 0–100% to the 10–85% range
+          onProgressChange?.({
+            stage: 'uploading',
+            progress: 10 + Math.round(pct * 0.75),
+            fileName: file.name
+          });
+        });
       }
+
+      // Stage 3: API registration (85 → ~95%)
+      onProgressChange?.({
+        stage: 'registering',
+        progress: file ? 85 : 50,
+        fileName: file?.name ?? values.originalFileName ?? ''
+      });
 
       importMutation.mutate({
         data: {
@@ -192,14 +247,18 @@ export function InvoiceImportSheet({
         }
       });
     } catch (e) {
+      onProgressChange?.({
+        stage: 'error',
+        progress: 0,
+        fileName: importFile?.name ?? '',
+        errorMessage: isApiHttpError(e) ? e.message : getErrorMessage(e)
+      });
       toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e));
     }
   });
 
   const formatFileSize = (bytes: number) => {
-    if (bytes === 0) {
-      return '0 Bytes';
-    }
+    if (bytes === 0) return '0 Bytes';
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -207,21 +266,16 @@ export function InvoiceImportSheet({
   };
 
   const handleImportFile = (file: File | undefined) => {
-    if (!file) {
-      return;
-    }
+    if (!file) return;
     if (!validInvoiceFile(file)) {
-      toast.error('Envie um arquivo TXT.', {
+      toast.error('Envie um arquivo TXT (fatura VIVO) ou PDF (recebido, parse ainda não disponível).', {
         position: 'bottom-right',
         duration: 3000
       });
       return;
     }
     if (file.size > MAX_IMPORT_FILE_BYTES) {
-      toast.error('O arquivo excede 256 MB.', {
-        position: 'bottom-right',
-        duration: 3000
-      });
+      toast.error('O arquivo excede 256 MB.', { position: 'bottom-right', duration: 3000 });
       return;
     }
     setImportFile(file);
@@ -240,20 +294,14 @@ export function InvoiceImportSheet({
   const resetImportFile = () => {
     setImportFile(null);
     form.setValue('originalFileName', '');
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const getImportFileIcon = () => {
-    if (!importFile) {
-      return <File />;
-    }
+    if (!importFile) return <File />;
     const ext = importFile.name.split('.').pop()?.toLowerCase() ?? '';
     if (ext === 'txt') {
-      return (
-        <FileText className="text-foreground h-5 w-5" aria-hidden={true} />
-      );
+      return <FileText className="text-foreground h-5 w-5" aria-hidden={true} />;
     }
     return <File className="text-foreground h-5 w-5" aria-hidden={true} />;
   };
@@ -273,9 +321,7 @@ export function InvoiceImportSheet({
         if (!next) {
           setImportFile(null);
           form.setValue('originalFileName', '');
-          if (fileInputRef.current) {
-            fileInputRef.current.value = '';
-          }
+          if (fileInputRef.current) fileInputRef.current.value = '';
         }
         onOpenChange(next);
       }}
@@ -309,8 +355,7 @@ export function InvoiceImportSheet({
                     <SelectTrigger className="border-input bg-background w-full max-w-none rounded-xl border">
                       <SelectValue placeholder="Selecione">
                         {openProcessingMonths.find(
-                          (m: ListProcessingMonthResponse) =>
-                            m.id === field.value
+                          (m: ListProcessingMonthResponse) => m.id === field.value
                         )?.display_name ?? 'Selecione'}
                       </SelectValue>
                     </SelectTrigger>
@@ -407,7 +452,7 @@ export function InvoiceImportSheet({
               </div>
 
               <p className="text-muted-foreground mt-2 text-xs leading-5 text-pretty sm:flex sm:items-center sm:justify-between">
-                <span>Tipos aceitos: TXT.</span>
+                <span>Tipos aceitos: TXT (preferencial) ou PDF (recebido, parse ainda não disponível).</span>
                 <span className="pl-1 sm:pl-0">Tamanho máx.: 256 MB</span>
               </p>
 
@@ -420,7 +465,6 @@ export function InvoiceImportSheet({
                     className="text-muted-foreground hover:text-foreground absolute top-1 right-1"
                     aria-label="Remover arquivo"
                     onClick={resetImportFile}
-                    disabled={importMutation.isPending}
                   >
                     <X className="h-5 w-5 shrink-0" aria-hidden={true} />
                   </Button>
@@ -438,19 +482,6 @@ export function InvoiceImportSheet({
                       </p>
                     </div>
                   </div>
-
-                  <div className="flex items-center space-x-3">
-                    <Progress
-                      value={importMutation.isPending ? 100 : 0}
-                      className={cn(
-                        'h-1.5',
-                        importMutation.isPending && 'opacity-90'
-                      )}
-                    />
-                    <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
-                      {importMutation.isPending ? '…' : '0%'}
-                    </span>
-                  </div>
                 </Card>
               ) : null}
             </div>
@@ -460,8 +491,8 @@ export function InvoiceImportSheet({
             <SheetClose render={<Button type="button" variant="outline" />}>
               Cancelar
             </SheetClose>
-            <Button type="submit" disabled={importMutation.isPending}>
-              {importMutation.isPending ? 'Enviando…' : 'Enviar'}
+            <Button type="submit">
+              Enviar
             </Button>
           </SheetFooter>
         </form>

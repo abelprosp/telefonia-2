@@ -101,8 +101,8 @@ export function StockLineCreateSheet({ open, onOpenChange, onSuccess }: StockLin
         <SheetHeader>
           <SheetTitle>Cadastrar linha no estoque</SheetTitle>
           <SheetDescription>
-            Informe operadora, conta, plano e número. A conta precisa existir no sistema (geralmente
-            criada ao importar a primeira fatura da operadora).
+            Informe operadora, número da conta, plano e número da linha. Se a conta não existir,
+            ela será vinculada e criada automaticamente no sistema.
           </SheetDescription>
         </SheetHeader>
 
@@ -110,24 +110,31 @@ export function StockLineCreateSheet({ open, onOpenChange, onSuccess }: StockLin
           <Controller
             control={form.control}
             name="providerId"
-            render={({ field, fieldState }) => (
-              <Field data-invalid={fieldState.invalid}>
-                <FieldLabel>Operadora</FieldLabel>
-                <Select value={field.value} onValueChange={(v) => field.onChange(v ?? '')}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(providersQuery.data?.items ?? []).map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FieldError>{fieldState.error?.message}</FieldError>
-              </Field>
-            )}
+            render={({ field, fieldState }) => {
+              const selectedProvider = (providersQuery.data?.items ?? []).find(
+                (p) => String(p.id) === String(field.value)
+              );
+              return (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel>Operadora</FieldLabel>
+                  <Select value={field.value} onValueChange={(v) => field.onChange(v ?? '')}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione">
+                        {selectedProvider?.name ?? 'Selecione'}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(providersQuery.data?.items ?? []).map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FieldError>{fieldState.error?.message}</FieldError>
+                </Field>
+              );
+            }}
           />
 
           <Controller
@@ -145,50 +152,60 @@ export function StockLineCreateSheet({ open, onOpenChange, onSuccess }: StockLin
           <Controller
             control={form.control}
             name="providerPlanId"
-            render={({ field, fieldState }) => (
-              <Field data-invalid={fieldState.invalid}>
-                <FieldLabel>Plano</FieldLabel>
-                <Select
-                  value={field.value}
-                  onValueChange={(v) => field.onChange(v ?? '')}
-                  disabled={!providerId || plans.length === 0}
-                >
-                  <SelectTrigger>
-                    <SelectValue
-                      placeholder={
-                        !providerId
-                          ? 'Selecione a operadora primeiro'
-                          : plans.length === 0
-                            ? 'Nenhum plano cadastrado'
-                            : 'Selecione o plano'
-                      }
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {plans.map((plan) => (
-                      <SelectItem key={plan.id} value={plan.id}>
-                        {plan.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FieldError>{fieldState.error?.message}</FieldError>
-                {providerId && plans.length === 0 && !providerDetailQuery.isPending && (
-                  <p className="text-muted-foreground text-xs">
-                    Nenhum plano nesta operadora.{' '}
-                    <Link
-                      to="/providers/$providerId"
-                      params={{ providerId }}
-                      search={{ page: 1, pageSize: 10 }}
-                      className="text-primary font-medium hover:underline"
-                    >
-                      Cadastre um plano
-                    </Link>{' '}
-                    antes de incluir a linha no estoque.
-                  </p>
-                )}
-              </Field>
-            )}
+            render={({ field, fieldState }) => {
+              const selectedPlan = plans.find((pl) => String(pl.id) === String(field.value));
+              return (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel>Plano</FieldLabel>
+                  <Select
+                    value={field.value}
+                    onValueChange={(v) => field.onChange(v ?? '')}
+                    disabled={!providerId || plans.length === 0}
+                  >
+                    <SelectTrigger>
+                      <SelectValue
+                        placeholder={
+                          !providerId
+                            ? 'Selecione a operadora primeiro'
+                            : plans.length === 0
+                              ? 'Nenhum plano cadastrado'
+                              : 'Selecione o plano'
+                        }
+                      >
+                        {selectedPlan?.name ??
+                          (!providerId
+                            ? 'Selecione a operadora primeiro'
+                            : plans.length === 0
+                              ? 'Nenhum plano cadastrado'
+                              : 'Selecione o plano')}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {plans.map((plan) => (
+                        <SelectItem key={plan.id} value={plan.id}>
+                          {plan.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FieldError>{fieldState.error?.message}</FieldError>
+                  {providerId && plans.length === 0 && !providerDetailQuery.isPending && (
+                    <p className="text-muted-foreground text-xs">
+                      Nenhum plano nesta operadora.{' '}
+                      <Link
+                        to="/providers/$providerId"
+                        params={{ providerId }}
+                        search={{ page: 1, pageSize: 10 }}
+                        className="text-primary font-medium hover:underline"
+                      >
+                        Cadastre um plano
+                      </Link>{' '}
+                      antes de incluir a linha no estoque.
+                    </p>
+                  )}
+                </Field>
+              );
+            }}
           />
 
           <Controller

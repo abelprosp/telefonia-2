@@ -119,6 +119,7 @@ func (s *Store) ListCustomerBillingDocuments(ctx context.Context, orgID string, 
 	base := `
 		FROM "CustomerBillingDocuments" d
 		JOIN "Customers" c ON c."Id" = d."CustomerId"
+		LEFT JOIN "PhoneLines" pl ON pl."Id" = d."PhoneLineId"
 		WHERE d."OrganizationId" = $1`
 	args := []any{orgID}
 	if status != nil && *status != "" {
@@ -139,7 +140,7 @@ func (s *Store) ListCustomerBillingDocuments(ctx context.Context, orgID string, 
 			d."RecipientEmail", d."EmailSubject", d."SendCount", d."SentAt", d."LastSentAt", d."CreatedAt",
 			d."SicrediNossoNumero", d."SicrediLinhaDigitavel", d."SicrediCodigoBarras",
 			d."SicrediPixQrCode", d."SicrediPixTxId", d."SicrediBoletoStatus", d."SicrediBoletoError",
-			d."SicrediPaidAt"
+			d."SicrediPaidAt", d."PhoneLineId", d."BillingGroupType", pl."Number"
 		` + base + `
 		ORDER BY d."CreatedAt" DESC
 		OFFSET $` + itoa(len(args)+1) + ` LIMIT $` + itoa(len(args)+2)
@@ -158,7 +159,7 @@ func (s *Store) ListCustomerBillingDocuments(ctx context.Context, orgID string, 
 			&item.RecipientEmail, &item.EmailSubject, &item.SendCount, &item.SentAt, &item.LastSentAt, &item.CreatedAt,
 			&item.SicrediNossoNumero, &item.SicrediLinhaDigitavel, &item.SicrediCodigoBarras,
 			&item.SicrediPixQrCode, &item.SicrediPixTxID, &item.SicrediBoletoStatus, &item.SicrediBoletoError,
-			&item.SicrediPaidAt,
+			&item.SicrediPaidAt, &item.PhoneLineID, &item.BillingGroupType, &item.PhoneLineNumber,
 		); err != nil {
 			return nil, 0, err
 		}
@@ -176,9 +177,10 @@ func (s *Store) GetCustomerBillingDocument(ctx context.Context, orgID, id string
 			d."CreatedAt", d."UpdatedAt",
 			d."SicrediNossoNumero", d."SicrediLinhaDigitavel", d."SicrediCodigoBarras",
 			d."SicrediPixQrCode", d."SicrediPixTxId", d."SicrediBoletoStatus", d."SicrediBoletoError",
-			d."SicrediPaidAt"
+			d."SicrediPaidAt", d."PhoneLineId", d."BillingGroupType", pl."Number"
 		FROM "CustomerBillingDocuments" d
 		JOIN "Customers" c ON c."Id" = d."CustomerId"
+		LEFT JOIN "PhoneLines" pl ON pl."Id" = d."PhoneLineId"
 		WHERE d."OrganizationId" = $1 AND d."Id" = $2`, orgID, id).Scan(
 		&item.ID, &item.CustomerID, &item.CustomerName, &item.AccountsReceivableID, &item.ProcessingMonthID,
 		&item.InvoiceNumber, &item.IssueDate, &item.DueDate, &item.Amount, &item.Status,
@@ -186,7 +188,7 @@ func (s *Store) GetCustomerBillingDocument(ctx context.Context, orgID, id string
 		&item.CreatedAt, &item.UpdatedAt,
 		&item.SicrediNossoNumero, &item.SicrediLinhaDigitavel, &item.SicrediCodigoBarras,
 		&item.SicrediPixQrCode, &item.SicrediPixTxID, &item.SicrediBoletoStatus, &item.SicrediBoletoError,
-		&item.SicrediPaidAt,
+		&item.SicrediPaidAt, &item.PhoneLineID, &item.BillingGroupType, &item.PhoneLineNumber,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -202,11 +204,13 @@ func (s *Store) CreateCustomerBillingDocument(ctx context.Context, doc models.Cu
 		INSERT INTO "CustomerBillingDocuments" (
 			"Id", "OrganizationId", "CustomerId", "AccountsReceivableId", "ProcessingMonthId",
 			"InvoiceNumber", "IssueDate", "DueDate", "Amount", "Status",
-			"RecipientEmail", "EmailSubject", "EmailBodyHtml", "CreatedAt", "UpdatedAt"
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::customer_billing_document_status, $11, $12, $13, $14, $14)`,
+			"RecipientEmail", "EmailSubject", "EmailBodyHtml", "CreatedAt", "UpdatedAt",
+			"PhoneLineId", "BillingGroupType"
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::customer_billing_document_status, $11, $12, $13, $14, $14, $15, $16)`,
 		doc.ID, doc.OrganizationID, doc.CustomerID, doc.AccountsReceivableID, doc.ProcessingMonthID,
 		doc.InvoiceNumber, doc.IssueDate, doc.DueDate, doc.Amount, doc.Status,
-		doc.RecipientEmail, doc.EmailSubject, doc.EmailBodyHTML, doc.CreatedAt)
+		doc.RecipientEmail, doc.EmailSubject, doc.EmailBodyHTML, doc.CreatedAt,
+		doc.PhoneLineID, doc.BillingGroupType)
 	return err
 }
 
@@ -361,6 +365,8 @@ type ReceivableForBilling struct {
 	Amount            float64
 	Balance           float64
 	Status            string
+	PhoneLineID       *string
+	BillingGroupType  *string
 }
 
 func (s *Store) GetReceivableForBilling(ctx context.Context, orgID, receivableID string) (*ReceivableForBilling, error) {
@@ -447,35 +453,76 @@ func (s *Store) CountProviderInvoicesForMonth(ctx context.Context, orgID, proces
 	return count, err
 }
 
-func (s *Store) ListBulkBillingCandidates(ctx context.Context, orgID, processingMonthID string, customerIDs []string) ([]models.BulkBillingPreviewItem, error) {
-	args := []any{orgID, processingMonthID}
-	customerFilter := ""
-	if len(customerIDs) > 0 {
-		args = append(args, customerIDs)
-		customerFilter = ` AND c."Id" = ANY($` + itoa(len(args)) + `::text[])`
+func billingGroupSelectSQL(requireInvoice bool) string {
+	invoiceJoin := ""
+	alreadyBilled := "false"
+	if requireInvoice {
+		invoiceJoin = `
+			JOIN "ProviderInvoicePhoneLines" j ON j."PhoneLinesId" = pl."Id"
+			JOIN "ProviderInvoices" i ON i."Id" = j."ProviderInvoicesId" AND i."ProcessingMonthId" = $2`
+		alreadyBilled = `EXISTS(
+				SELECT 1 FROM "CustomerBillingDocuments" d
+				WHERE d."OrganizationId" = $1 AND d."CustomerId" = c."Id"
+					AND d."Status" != 'cancelled' AND d."ProcessingMonthId" = $2
+					AND COALESCE(d."PhoneLineId", '') = COALESCE(g.group_line_id, '')
+					AND COALESCE(d."BillingGroupType", '') = g.billing_group_type
+			)`
 	}
-	q := `
-		WITH customer_lines AS (
+	deviceExists := ""
+	if requireInvoice {
+		deviceExists = ` AND EXISTS (SELECT 1 FROM grouped_lines gl WHERE gl.customer_id = d."CustomerId")`
+	}
+	return `
+		WITH line_rows AS (
 			SELECT
-				l."CustomerId" AS customer_id,
-				COUNT(DISTINCT pl."Id")::int AS line_count,
-				COALESCE(SUM(COALESCE(pl."CostWithConsumption", pl."BaseCost", 0)), 0) AS provider_cost,
-				COALESCE(SUM(` + lineLuxusBillingAmountSQL + `), 0) AS line_amount
+				CASE
+					WHEN pl."LineClassification" = 'dependent' AND tit_link."CustomerId" IS NOT NULL
+						THEN tit_link."CustomerId"
+					ELSE l."CustomerId"
+				END AS customer_id,
+				CASE
+					WHEN pl."LineClassification" = 'dependent' AND pl."TitularLineId" IS NOT NULL
+						THEN pl."TitularLineId"
+					ELSE pl."Id"
+				END AS group_line_id,
+				CASE
+					WHEN pl."LineClassification" IN ('titular', 'dependent') THEN 'titular_group'
+					ELSE 'normal'
+				END AS billing_group_type,
+				` + lineLuxusBillingAmountSQL + ` AS line_amount,
+				COALESCE(pl."CostWithConsumption", pl."BaseCost", 0) AS provider_cost
 			FROM "PhoneLineCustomerLinks" l
 			JOIN "PhoneLines" pl ON pl."Id" = l."PhoneLineId"
-			JOIN "ProviderInvoicePhoneLines" j ON j."PhoneLinesId" = pl."Id"
-			JOIN "ProviderInvoices" i ON i."Id" = j."ProviderInvoicesId" AND i."ProcessingMonthId" = $2
+			` + invoiceJoin + `
+			LEFT JOIN "PhoneLineCustomerLinks" tit_link
+				ON tit_link."PhoneLineId" = pl."TitularLineId" AND tit_link."EndDate" IS NULL
 			WHERE l."EndDate" IS NULL
-			GROUP BY l."CustomerId"
 		),
-		customer_devices AS (
+		grouped_lines AS (
+			SELECT customer_id, group_line_id, billing_group_type,
+				COUNT(*)::int AS line_count,
+				COALESCE(SUM(line_amount), 0) AS line_amount,
+				COALESCE(SUM(provider_cost), 0) AS provider_cost
+			FROM line_rows
+			GROUP BY 1, 2, 3
+		),
+		device_rows AS (
 			SELECT
 				d."CustomerId" AS customer_id,
 				COUNT(d."Id")::int AS device_count,
 				COALESCE(SUM(d."MonthlyAmount"), 0) AS device_amount
 			FROM "CustomerDeviceLinks" d
-			WHERE d."EndDate" IS NULL
+			WHERE d."EndDate" IS NULL` + deviceExists + `
 			GROUP BY d."CustomerId"
+		),
+		groups AS (
+			SELECT gl.customer_id, gl.group_line_id, gl.billing_group_type,
+				gl.line_count, 0 AS device_count, gl.line_amount AS monthly_amount, gl.provider_cost
+			FROM grouped_lines gl
+			UNION ALL
+			SELECT dr.customer_id, NULL::text, 'devices',
+				0, dr.device_count, dr.device_amount, 0::numeric
+			FROM device_rows dr
 		)
 		SELECT
 			c."Id", c."Name",
@@ -485,43 +532,55 @@ func (s *Store) ListBulkBillingCandidates(ctx context.Context, orgID, processing
 				LIMIT 1
 			), '') AS customer_document,
 			COALESCE(c."BillingEmail", '') AS billing_email,
-			COALESCE(cl.line_count, 0),
-			COALESCE(cd.device_count, 0),
-			COALESCE(cl.line_amount, 0) + COALESCE(cd.device_amount, 0) AS monthly_amount,
-			COALESCE(cl.provider_cost, 0),
-			EXISTS(
-				SELECT 1 FROM "CustomerBillingDocuments" d
-				WHERE d."OrganizationId" = $1 AND d."CustomerId" = c."Id"
-					AND d."Status" != 'cancelled' AND d."ProcessingMonthId" = $2
-			) AS already_billed
-		FROM "Customers" c
-		LEFT JOIN customer_lines cl ON cl.customer_id = c."Id"
-		LEFT JOIN customer_devices cd ON cd.customer_id = c."Id"
-		WHERE c."OrganizationId" = $1 AND c."Active" = true
-			AND COALESCE(cl.line_count, 0) > 0` + customerFilter + `
-		ORDER BY c."Name"`
-	rows, err := s.q(ctx).Query(ctx, q, args...)
-	if err != nil {
-		return nil, err
+			g.line_count, g.device_count, g.monthly_amount, g.provider_cost,
+			` + alreadyBilled + ` AS already_billed,
+			g.group_line_id, g.billing_group_type, pln."Number"
+		FROM groups g
+		JOIN "Customers" c ON c."Id" = g.customer_id
+		LEFT JOIN "PhoneLines" pln ON pln."Id" = g.group_line_id
+		WHERE c."OrganizationId" = $1 AND c."Active" = true`
+}
+
+func finalizeBillingPreviewItem(item *models.BulkBillingPreviewItem) {
+	lineID := ""
+	if item.PhoneLineID != nil {
+		lineID = *item.PhoneLineID
 	}
-	defer rows.Close()
-	var items []models.BulkBillingPreviewItem
-	for rows.Next() {
-		var item models.BulkBillingPreviewItem
-		if err := rows.Scan(
-			&item.CustomerID, &item.CustomerName, &item.CustomerDocument, &item.BillingEmail,
-			&item.LineCount, &item.DeviceCount, &item.MonthlyAmount, &item.ProviderCost, &item.AlreadyBilled,
-		); err != nil {
-			return nil, err
-		}
-		item.Eligible, item.SkipReason = bulkBillingEligibility(item)
-		items = append(items, item)
+	if item.BillingGroupType == "" {
+		item.BillingGroupType = "normal"
 	}
-	return items, rows.Err()
+	item.BillingGroupID = item.CustomerID + ":" + lineID + ":" + item.BillingGroupType
+	num := ""
+	if item.PhoneLineNumber != nil {
+		num = *item.PhoneLineNumber
+	}
+	switch item.BillingGroupType {
+	case "titular_group":
+		item.GroupLabel = "Titular " + num + " + dependentes"
+	case "devices":
+		item.GroupLabel = "Aparelhos"
+	default:
+		item.GroupLabel = "Linha " + num
+	}
+}
+
+func (s *Store) ListBulkBillingCandidates(ctx context.Context, orgID, processingMonthID string, customerIDs []string) ([]models.BulkBillingPreviewItem, error) {
+	args := []any{orgID, processingMonthID}
+	q := billingGroupSelectSQL(true)
+	if len(customerIDs) > 0 {
+		args = append(args, customerIDs)
+		q += ` AND c."Id" = ANY($` + itoa(len(args)) + `::text[])`
+	}
+	q += ` ORDER BY c."Name", g.billing_group_type, pln."Number"`
+	return s.scanBillingCandidates(ctx, q, args, true)
 }
 
 func bulkBillingEligibility(item models.BulkBillingPreviewItem) (bool, string) {
-	if item.LineCount == 0 {
+	if item.BillingGroupType == "devices" {
+		if item.DeviceCount == 0 {
+			return false, "no_active_lines"
+		}
+	} else if item.LineCount == 0 {
 		return false, "no_lines_on_invoice"
 	}
 	if item.MonthlyAmount <= 0 {
@@ -535,50 +594,16 @@ func bulkBillingEligibility(item models.BulkBillingPreviewItem) (bool, string) {
 
 func (s *Store) ListManualBillingCandidates(ctx context.Context, orgID string, customerIDs []string) ([]models.BulkBillingPreviewItem, error) {
 	args := []any{orgID}
-	customerFilter := ""
+	q := billingGroupSelectSQL(false)
 	if len(customerIDs) > 0 {
 		args = append(args, customerIDs)
-		customerFilter = ` AND c."Id" = ANY($` + itoa(len(args)) + `::text[])`
+		q += ` AND c."Id" = ANY($` + itoa(len(args)) + `::text[])`
 	}
-	q := `
-		WITH customer_lines AS (
-			SELECT
-				l."CustomerId" AS customer_id,
-				COUNT(DISTINCT pl."Id")::int AS line_count,
-				COALESCE(SUM(` + lineLuxusBillingAmountSQL + `), 0) AS line_amount
-			FROM "PhoneLineCustomerLinks" l
-			JOIN "PhoneLines" pl ON pl."Id" = l."PhoneLineId"
-			WHERE l."EndDate" IS NULL
-			GROUP BY l."CustomerId"
-		),
-		customer_devices AS (
-			SELECT
-				d."CustomerId" AS customer_id,
-				COUNT(d."Id")::int AS device_count,
-				COALESCE(SUM(d."MonthlyAmount"), 0) AS device_amount
-			FROM "CustomerDeviceLinks" d
-			WHERE d."EndDate" IS NULL
-			GROUP BY d."CustomerId"
-		)
-		SELECT
-			c."Id", c."Name",
-			COALESCE((
-				SELECT cd."Number" FROM "CustomerDocuments" cd
-				WHERE cd."CustomerId" = c."Id" AND cd."DocumentType" IN ('cpf', 'cnpj')
-				LIMIT 1
-			), '') AS customer_document,
-			COALESCE(c."BillingEmail", '') AS billing_email,
-			COALESCE(cl.line_count, 0),
-			COALESCE(cd.device_count, 0),
-			COALESCE(cl.line_amount, 0) + COALESCE(cd.device_amount, 0) AS monthly_amount,
-			0::float8 AS provider_cost,
-			false AS already_billed
-		FROM "Customers" c
-		LEFT JOIN customer_lines cl ON cl.customer_id = c."Id"
-		LEFT JOIN customer_devices cd ON cd.customer_id = c."Id"
-		WHERE c."OrganizationId" = $1 AND c."Active" = true
-			AND (COALESCE(cl.line_count, 0) > 0 OR COALESCE(cd.device_count, 0) > 0)` + customerFilter + `
-		ORDER BY c."Name"`
+	q += ` ORDER BY c."Name", g.billing_group_type, pln."Number"`
+	return s.scanBillingCandidates(ctx, q, args, false)
+}
+
+func (s *Store) scanBillingCandidates(ctx context.Context, q string, args []any, bulk bool) ([]models.BulkBillingPreviewItem, error) {
 	rows, err := s.q(ctx).Query(ctx, q, args...)
 	if err != nil {
 		return nil, err
@@ -590,10 +615,16 @@ func (s *Store) ListManualBillingCandidates(ctx context.Context, orgID string, c
 		if err := rows.Scan(
 			&item.CustomerID, &item.CustomerName, &item.CustomerDocument, &item.BillingEmail,
 			&item.LineCount, &item.DeviceCount, &item.MonthlyAmount, &item.ProviderCost, &item.AlreadyBilled,
+			&item.PhoneLineID, &item.BillingGroupType, &item.PhoneLineNumber,
 		); err != nil {
 			return nil, err
 		}
-		item.Eligible, item.SkipReason = manualBillingEligibility(item)
+		finalizeBillingPreviewItem(&item)
+		if bulk {
+			item.Eligible, item.SkipReason = bulkBillingEligibility(item)
+		} else {
+			item.Eligible, item.SkipReason = manualBillingEligibility(item)
+		}
 		items = append(items, item)
 	}
 	return items, rows.Err()

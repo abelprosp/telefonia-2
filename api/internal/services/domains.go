@@ -79,7 +79,23 @@ func (s *Service) CreateStockPhoneLine(ctx context.Context, input models.CreateS
 		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
 	if account == nil {
-		return nil, httputil.ValidationError(notifications.PhoneLineProviderAccountNotFound)
+		company, err := s.Store.GetFirstContractingCompanyForProvider(ctx, providerID)
+		if err != nil {
+			return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+		}
+		if company == nil {
+			companyID := uuid.New().String()
+			legalName := provider.Name
+			if err := s.Store.CreateContractingCompany(ctx, companyID, providerID, legalName, "00000000000000"); err != nil {
+				return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+			}
+			company = &store.ContractingCompanyRow{ID: companyID, ProviderID: providerID, LegalName: legalName, TaxID: "00000000000000"}
+		}
+		accountID := uuid.New().String()
+		if err := s.Store.CreateProviderAccount(ctx, accountID, company.ID, accountNumber); err != nil {
+			return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+		}
+		account = &store.ProviderAccountRow{ID: accountID, ContractingCompanyID: company.ID, AccountNumber: accountNumber}
 	}
 
 	existing, err := s.Store.GetPhoneLineByNumber(ctx, number)
@@ -127,6 +143,12 @@ func (s *Service) AssignPhoneLineCustomer(ctx context.Context, phoneLineID strin
 	if _, err := s.GetPhoneLine(ctx, phoneLineID); err != nil {
 		return nil, err
 	}
+	if err := s.blockRetroactiveIfClosed(ctx, orgID, phoneLineID, start); err != nil {
+		return nil, err
+	}
+	if err := s.requireActiveServiceToLink(ctx, phoneLineID, input.MonthlyAmount); err != nil {
+		return nil, err
+	}
 	ok, err := s.Store.CustomerExistsInOrg(ctx, orgID, input.CustomerID)
 	if err != nil {
 		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
@@ -155,12 +177,15 @@ func (s *Service) AssignPhoneLineCustomer(ctx context.Context, phoneLineID strin
 	}
 	_ = s.Store.UpdatePhoneLineStatus(ctx, phoneLineID, "active")
 	_ = s.Store.ReactivateCustomer(ctx, input.CustomerID)
+	s.auditLog(ctx, "Assign", "PhoneLineCustomerLink", phoneLineID, map[string]any{"previous_customer_id": prevCustomerID},
+		map[string]any{"customer_id": input.CustomerID, "start_date": start.Format("2006-01-02")})
 	if prevCustomerID != "" && prevCustomerID != input.CustomerID {
 		hasOther, _ := s.Store.CustomerHasOtherActivePhoneLines(ctx, orgID, prevCustomerID, phoneLineID)
 		if !hasOther {
 			_ = s.Store.InactivateCustomer(ctx, prevCustomerID)
 		}
 	}
+	s.maybeGenerateAutomaticContract(ctx, orgID, input.CustomerID, phoneLineID, "line_assign", "Vínculo de linha ao cliente.")
 	return s.activePhoneLineCustomerLink(ctx, orgID, phoneLineID)
 }
 
@@ -225,7 +250,7 @@ func (s *Service) UpdateActivePhoneLineCustomerLink(ctx context.Context, phoneLi
 					if it.ItemType == "service" && strings.Contains(strings.ToLower(it.Description), "mensalidade") {
 						now := time.Now().UTC()
 						amt := *input.MonthlyAmount
-						_ = s.Store.UpdateBillingCompositionItem(ctx, it.ID, nil, &amt, nil, nil, nil, nil, nil, now)
+						_ = s.Store.UpdateBillingCompositionItem(ctx, it.ID, nil, &amt, nil, nil, nil, nil, nil, now, nil, nil)
 						break
 					}
 				}
@@ -255,6 +280,13 @@ func (s *Service) UnassignPhoneLineCustomer(ctx context.Context, phoneLineID str
 	if activeCustomerID == "" {
 		return httputil.BusinessError(notifications.PhoneLineActiveCustomerLinkNotFound)
 	}
+	if err := s.blockRetroactiveIfClosed(ctx, orgID, phoneLineID, end); err != nil {
+		return err
+	}
+	class, _, _, _ := s.Store.GetPhoneLineClassification(ctx, phoneLineID)
+	if class == "titular" {
+		_ = s.reclassifyDependentsOf(ctx, phoneLineID, "titular unlinked")
+	}
 	if err := s.Store.UnassignPhoneLineCustomer(ctx, phoneLineID, end); err != nil {
 		if isPgNoRows(err) {
 			return httputil.BusinessError(notifications.PhoneLineActiveCustomerLinkNotFound)
@@ -262,6 +294,8 @@ func (s *Service) UnassignPhoneLineCustomer(ctx context.Context, phoneLineID str
 		return httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
 	_ = s.Store.UpdatePhoneLineStatus(ctx, phoneLineID, "in_stock")
+	s.auditLog(ctx, "Unassign", "PhoneLineCustomerLink", phoneLineID,
+		map[string]any{"customer_id": activeCustomerID}, map[string]any{"end_date": end.Format("2006-01-02")})
 	hasOther, _ := s.Store.CustomerHasOtherActivePhoneLines(ctx, orgID, activeCustomerID, phoneLineID)
 	if !hasOther {
 		_ = s.Store.InactivateCustomer(ctx, activeCustomerID)
@@ -458,6 +492,7 @@ func (s *Service) CloseProcessingMonth(ctx context.Context, id string) (*models.
 	if err := s.Store.CloseProcessingMonth(ctx, orgID, id, user.ID, false, nil); err != nil {
 		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
+	s.auditLog(ctx, "Close", "ProcessingMonth", id, map[string]any{"status": "open"}, map[string]any{"status": "closed", "closed_by": user.ID})
 	return s.GetProcessingMonth(ctx, id)
 }
 
@@ -490,6 +525,7 @@ func (s *Service) CloseProcessingMonthContingency(ctx context.Context, id string
 	if err := s.Store.CloseProcessingMonth(ctx, orgID, id, user.ID, true, &j); err != nil {
 		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
+	s.auditLog(ctx, "CloseContingency", "ProcessingMonth", id, nil, map[string]any{"justification": j, "closed_by": user.ID})
 	return s.GetProcessingMonth(ctx, id)
 }
 
@@ -500,6 +536,35 @@ func (s *Service) ListProviderInvoices(ctx context.Context, processingMonthID *s
 	}
 	return s.Store.ListProviderInvoices(ctx, orgID, processingMonthID, page)
 }
+
+func (s *Service) GetImportRequestStatus(ctx context.Context, id string) (*models.RequestProviderInvoiceImportResponse, error) {
+	orgID, _ := orgFrom(ctx)
+	var row *store.ImportRequestRow
+	var err error
+	if orgID != "" {
+		row, err = s.Store.GetImportRequestForOrg(ctx, orgID, id)
+	}
+	if err != nil {
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+	if row == nil {
+		row, err = s.Store.GetImportRequest(ctx, id)
+		if err != nil {
+			return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+		}
+		if row == nil {
+			return nil, httputil.NotFoundError(notifications.ImportRequestNotFound)
+		}
+	}
+	return &models.RequestProviderInvoiceImportResponse{
+		ID:                row.ID,
+		ProcessingMonthID: row.ProcessingMonthID,
+		Status:            httputil.ImportRequestStatusString(row.Status),
+		Error:             row.Error,
+		CompletedAt:       row.CompletedAt,
+	}, nil
+}
+
 
 func (s *Service) GetProviderInvoice(ctx context.Context, id string) (*models.GetProviderInvoiceResponse, error) {
 	orgID, err := orgFrom(ctx)
@@ -567,12 +632,27 @@ func (s *Service) RequestProviderInvoiceImport(ctx context.Context, input models
 	if err := s.Store.CreateImportRequest(ctx, row); err != nil {
 		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
-	if s.Publisher != nil {
+	if s.Processor != nil {
+		_ = s.Processor.ProcessImport(ctx, id)
+	} else if s.Publisher != nil {
 		_ = s.Publisher.PublishInvoiceImportRequested(ctx, id, input.StorageBucket, input.StorageObjectKey, input.OriginalFileName, user.ID)
 	}
+
+	status := 0
+	var errMsg *string
+	var completedAt *time.Time
+	if req, err := s.Store.GetImportRequest(ctx, id); err == nil && req != nil {
+		status = req.Status
+		errMsg = req.Error
+		completedAt = req.CompletedAt
+	}
+
 	return &models.RequestProviderInvoiceImportResponse{
-		ID: id, ProcessingMonthID: input.ProcessingMonthID,
-		Status: httputil.ImportRequestStatusString(0),
+		ID:                id,
+		ProcessingMonthID: input.ProcessingMonthID,
+		Status:            httputil.ImportRequestStatusString(status),
+		Error:             errMsg,
+		CompletedAt:       completedAt,
 	}, nil
 }
 

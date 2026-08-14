@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/luxus-connect/telefonia/api/internal/httputil"
@@ -227,17 +228,26 @@ func (s *Store) GetProviderPlan(ctx context.Context, orgID, providerID, planID s
 	}
 
 	svcRows, err := s.q(ctx).Query(ctx, `
-		SELECT "Id", "Name", "Active", "Recurring", "Price"
-		FROM "ProviderPlanServices"
-		WHERE "ProviderPlanId" = $1
-		ORDER BY "Name"`, planID)
+		SELECT pps."Id", pps."Name", pps."Active", pps."Recurring", pps."Price",
+			COALESCE(pps."ServiceType"::text, 'other'),
+			pps."InvoiceName",
+			COALESCE(pps."ApplicationType", 'both'),
+			COALESCE(pps."AvailabilityRule", 'global'),
+			pps."ExclusiveCustomerId",
+			c."Name" AS "ExclusiveCustomerName"
+		FROM "ProviderPlanServices" pps
+		LEFT JOIN "Customers" c ON c."Id" = pps."ExclusiveCustomerId"
+		WHERE pps."ProviderPlanId" = $1
+		ORDER BY pps."Name"`, planID)
 	if err != nil {
 		return nil, err
 	}
 	defer svcRows.Close()
 	for svcRows.Next() {
 		var svc models.GetProviderPlanServiceResponse
-		if err := svcRows.Scan(&svc.ID, &svc.Name, &svc.Active, &svc.Recurring, &svc.Price); err != nil {
+		if err := svcRows.Scan(&svc.ID, &svc.Name, &svc.Active, &svc.Recurring, &svc.Price,
+			&svc.ServiceType, &svc.InvoiceName, &svc.ApplicationType, &svc.AvailabilityRule,
+			&svc.ExclusiveCustomerID, &svc.ExclusiveCustomerName); err != nil {
 			return nil, err
 		}
 		plan.Services = append(plan.Services, svc)
@@ -273,9 +283,110 @@ func (s *Store) GetPlanServiceByPlanAndName(ctx context.Context, planID, name st
 
 func (s *Store) CreatePlanService(ctx context.Context, id, planID, name string, recurring bool, price *float64) error {
 	_, err := s.q(ctx).Exec(ctx, `
-		INSERT INTO "ProviderPlanServices" ("Id", "ProviderPlanId", "Name", "Active", "Recurring", "Price")
-		VALUES ($1, $2, $3, true, $4, $5)`, id, planID, name, recurring, price)
+		INSERT INTO "ProviderPlanServices" ("Id", "ProviderPlanId", "Name", "Active", "Recurring", "Price", "ApplicationType", "AvailabilityRule")
+		VALUES ($1, $2, $3, true, $4, $5, 'both', 'global')`, id, planID, name, recurring, price)
 	return err
+}
+
+func (s *Store) CreatePlanServiceFull(ctx context.Context, id, planID, name string, invoiceName *string, serviceType string, recurring bool, price *float64, appType, availRule string, exclusiveCustomerID *string) error {
+	if serviceType == "" {
+		serviceType = "other"
+	}
+	if appType == "" {
+		appType = "both"
+	}
+	if availRule == "" {
+		availRule = "global"
+	}
+	_, err := s.q(ctx).Exec(ctx, `
+		INSERT INTO "ProviderPlanServices" (
+			"Id", "ProviderPlanId", "Name", "InvoiceName", "ServiceType", "Active", "Recurring", "Price",
+			"ApplicationType", "AvailabilityRule", "ExclusiveCustomerId"
+		) VALUES ($1, $2, $3, $4, $5::service_type, true, $6, $7, $8, $9, $10)`,
+		id, planID, name, invoiceName, serviceType, recurring, price, appType, availRule, exclusiveCustomerID)
+	return err
+}
+
+func (s *Store) UpdatePlanServiceFull(ctx context.Context, serviceID string, name, invoiceName *string, serviceType *string, recurring, active *bool, price *float64, appType, availRule *string, exclusiveCustomerID *string) error {
+	q := `UPDATE "ProviderPlanServices" SET `
+	var updates []string
+	var args []any
+	argIdx := 1
+
+	if name != nil {
+		updates = append(updates, `"Name" = $`+itoa(argIdx))
+		args = append(args, *name)
+		argIdx++
+	}
+	if invoiceName != nil {
+		updates = append(updates, `"InvoiceName" = $`+itoa(argIdx))
+		args = append(args, *invoiceName)
+		argIdx++
+	}
+	if serviceType != nil && *serviceType != "" {
+		updates = append(updates, `"ServiceType" = $`+itoa(argIdx)+`::service_type`)
+		args = append(args, *serviceType)
+		argIdx++
+	}
+	if recurring != nil {
+		updates = append(updates, `"Recurring" = $`+itoa(argIdx))
+		args = append(args, *recurring)
+		argIdx++
+	}
+	if active != nil {
+		updates = append(updates, `"Active" = $`+itoa(argIdx))
+		args = append(args, *active)
+		argIdx++
+	}
+	if price != nil {
+		updates = append(updates, `"Price" = $`+itoa(argIdx))
+		args = append(args, *price)
+		argIdx++
+	}
+	if appType != nil && *appType != "" {
+		updates = append(updates, `"ApplicationType" = $`+itoa(argIdx))
+		args = append(args, *appType)
+		argIdx++
+	}
+	if availRule != nil && *availRule != "" {
+		updates = append(updates, `"AvailabilityRule" = $`+itoa(argIdx))
+		args = append(args, *availRule)
+		argIdx++
+	}
+	if exclusiveCustomerID != nil {
+		updates = append(updates, `"ExclusiveCustomerId" = $`+itoa(argIdx))
+		args = append(args, *exclusiveCustomerID)
+		argIdx++
+	}
+
+	if len(updates) == 0 {
+		return nil
+	}
+
+	q += strings.Join(updates, ", ") + ` WHERE "Id" = $` + itoa(argIdx)
+	args = append(args, serviceID)
+
+	tag, err := s.q(ctx).Exec(ctx, q, args...)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+	return nil
+}
+
+func (s *Store) DeactivatePlanService(ctx context.Context, serviceID string) error {
+	tag, err := s.q(ctx).Exec(ctx, `
+		UPDATE "ProviderPlanServices" SET "Active" = false
+		WHERE "Id" = $1`, serviceID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+	return nil
 }
 
 func (s *Store) UpdatePlanServicePrice(ctx context.Context, serviceID string, price *float64) error {
@@ -314,6 +425,23 @@ func (s *Store) CreateContractingCompany(ctx context.Context, id, providerID, le
 		INSERT INTO "ContractingCompanies" ("Id", "ProviderId", "LegalName", "TaxId")
 		VALUES ($1, $2, $3, $4)`, id, providerID, legalName, taxID)
 	return err
+}
+
+func (s *Store) GetFirstContractingCompanyForProvider(ctx context.Context, providerID string) (*ContractingCompanyRow, error) {
+	var c ContractingCompanyRow
+	err := s.q(ctx).QueryRow(ctx, `
+		SELECT "Id", "ProviderId", "LegalName", "TaxId"
+		FROM "ContractingCompanies"
+		WHERE "ProviderId" = $1
+		ORDER BY "Id" LIMIT 1`, providerID).
+		Scan(&c.ID, &c.ProviderID, &c.LegalName, &c.TaxID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &c, nil
 }
 
 type ProviderAccountRow struct {

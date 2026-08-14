@@ -87,6 +87,24 @@ func (s *Store) UpdateImportRequestStatus(ctx context.Context, id string, status
 	return err
 }
 
+// GetImportRequestForOrg returns the import request only if it belongs to the given organization.
+func (s *Store) GetImportRequestForOrg(ctx context.Context, orgID, id string) (*ImportRequestRow, error) {
+	var r ImportRequestRow
+	err := s.q(ctx).QueryRow(ctx, `
+		SELECT ir."Id", ir."OrganizationId", ir."ProviderId", ir."ProcessingMonthId",
+			ir."StorageBucket", ir."StorageObjectKey", ir."OriginalFileName", ir."Status",
+			ir."Error", ir."CompletedAt", ir."CreatedBy"
+		FROM "ProviderInvoiceImportRequests" ir
+		WHERE ir."Id" = $1 AND ir."OrganizationId" = $2`, id, orgID).
+		Scan(&r.ID, &r.OrganizationID, &r.ProviderID, &r.ProcessingMonthID,
+			&r.StorageBucket, &r.StorageObjectKey, &r.OriginalFileName, &r.Status,
+			&r.Error, &r.CompletedAt, &r.CreatedBy)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	return &r, err
+}
+
 func (s *Store) GetDashboardStats(ctx context.Context, orgID string) (*models.DashboardStatsResponse, error) {
 	providers, err := s.CountDashboardProviders(ctx, orgID)
 	if err != nil {

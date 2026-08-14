@@ -19,9 +19,14 @@ import (
 	"github.com/luxus-connect/telefonia/api/internal/store"
 )
 
+type ImportProcessor interface {
+	ProcessImport(ctx context.Context, importRequestID string) error
+}
+
 type Service struct {
 	Store     *store.Store
 	Publisher EventPublisher
+	Processor ImportProcessor
 	Keycloak  *keycloak.AdminClient
 	Mailer    *email.Sender
 	Sicredi   SicrediBoletoIssuer
@@ -346,6 +351,9 @@ func (s *Service) CreateCustomer(ctx context.Context, input models.CreateCustome
 		input.ResponsibleSalespersonUserID, birthDate); err != nil {
 		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
+	if err := s.applyCustomerCommercial(ctx, id, input.CommercialActivationDate, input.ContractedLuxusCnpj); err != nil {
+		return nil, err
+	}
 	for _, addr := range input.Addresses {
 		if err := s.Store.CreateCustomerAddress(ctx, id, addr); err != nil {
 			return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
@@ -397,6 +405,9 @@ func (s *Service) UpdateCustomer(ctx context.Context, id string, input models.Up
 			return httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 		}
 	}
+	if err := s.applyCustomerCommercial(ctx, id, input.CommercialActivationDate, input.ContractedLuxusCnpj); err != nil {
+		return err
+	}
 	if input.IsReseller != nil {
 		orgID, err := orgFrom(ctx)
 		if err != nil {
@@ -417,6 +428,36 @@ func (s *Service) UpdateCustomer(ctx context.Context, id string, input models.Up
 				_ = s.EnsureBillingProcessingsForLink(ctx, linkID, id, nil)
 			}
 		}
+	}
+	return nil
+}
+
+func (s *Service) applyCustomerCommercial(ctx context.Context, id string, activationDate, cnpj *string) error {
+	var activation *time.Time
+	if activationDate != nil && strings.TrimSpace(*activationDate) != "" {
+		t, err := httputil.ParseOptionalDate(activationDate)
+		if err != nil {
+			return httputil.ValidationError(notifications.N("INVALID_DATE", "Data de ativação comercial inválida."))
+		}
+		activation = t
+	}
+	var tax *string
+	if cnpj != nil {
+		digits := httputil.NormalizeDigits(*cnpj)
+		if digits != "" && len(digits) != 14 {
+			return httputil.ValidationError(notifications.N("CUSTOMER_LUXUS_CNPJ_INVALID", "CNPJ Luxus contratada deve ter 14 dígitos."))
+		}
+		if digits == "" {
+			tax = cnpj
+		} else {
+			tax = &digits
+		}
+	}
+	if activation == nil && tax == nil {
+		return nil
+	}
+	if err := s.Store.UpdateCustomerCommercial(ctx, id, activation, tax); err != nil {
+		return httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
 	return nil
 }
@@ -515,6 +556,9 @@ func (s *Service) ManualReleaseCustomer(ctx context.Context, customerID, process
 	if err := s.Store.CreateManualRelease(ctx, orgID, customerID, processingMonthID, uuid.New().String(), j, user.ID); err != nil {
 		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
+	s.auditLog(ctx, "ManualRelease", "CustomerProcessingMonth", customerID, nil, map[string]any{
+		"processing_month_id": processingMonthID, "justification": j, "released_by": user.ID,
+	})
 	return s.GetBillingReadiness(ctx, customerID, processingMonthID)
 }
 
@@ -563,6 +607,158 @@ func (s *Service) DeleteCustomerAttachment(ctx context.Context, customerID, atta
 	if err := s.Store.DeleteCustomerAttachment(ctx, orgID, customerID, attachmentID); err != nil {
 		if isPgNoRows(err) {
 			return httputil.NotFoundError(notifications.CustomerNotFound)
+		}
+		return httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+	return nil
+}
+
+func (s *Service) CreateProviderPlanService(ctx context.Context, providerID, planID string, input models.CreateProviderPlanServiceInput) (*models.GetProviderPlanServiceResponse, error) {
+	orgID, err := orgFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+	name := strings.TrimSpace(input.Name)
+	if name == "" {
+		return nil, httputil.ValidationError(notifications.N("PLAN_SERVICE_NAME_REQUIRED", "Nome do serviço é obrigatório."))
+	}
+	plan, err := s.Store.GetProviderPlan(ctx, orgID, providerID, planID)
+	if err != nil {
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+	if plan == nil {
+		return nil, httputil.NotFoundError(notifications.ProviderPlanNotFound)
+	}
+
+	appType := "both"
+	if input.ApplicationType != nil && *input.ApplicationType != "" {
+		appType = strings.ToLower(strings.TrimSpace(*input.ApplicationType))
+	}
+	availRule := "global"
+	if input.AvailabilityRule != nil && *input.AvailabilityRule != "" {
+		availRule = strings.ToLower(strings.TrimSpace(*input.AvailabilityRule))
+	}
+	var exclCustID *string
+	if availRule == "customer_exclusive" && input.ExclusiveCustomerID != nil && strings.TrimSpace(*input.ExclusiveCustomerID) != "" {
+		cid := strings.TrimSpace(*input.ExclusiveCustomerID)
+		exclCustID = &cid
+	}
+
+	svcType := strings.ToLower(strings.TrimSpace(input.ServiceType))
+	if svcType == "" {
+		svcType = "other"
+	}
+
+	id := uuid.New().String()
+	if err := s.Store.CreatePlanServiceFull(ctx, id, planID, name, input.InvoiceName, svcType, input.Recurring, input.Price, appType, availRule, exclCustID); err != nil {
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+
+	updatedPlan, err := s.Store.GetProviderPlan(ctx, orgID, providerID, planID)
+	if err != nil {
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+	for _, svc := range updatedPlan.Services {
+		if svc.ID == id {
+			return &svc, nil
+		}
+	}
+	return &models.GetProviderPlanServiceResponse{
+		ID:                  id,
+		Name:                name,
+		Active:              true,
+		Recurring:           input.Recurring,
+		Price:               input.Price,
+		ServiceType:         &svcType,
+		InvoiceName:         input.InvoiceName,
+		ApplicationType:     appType,
+		AvailabilityRule:    availRule,
+		ExclusiveCustomerID: exclCustID,
+	}, nil
+}
+
+func (s *Service) UpdateProviderPlanService(ctx context.Context, providerID, planID, serviceID string, input models.UpdateProviderPlanServiceInput) (*models.GetProviderPlanServiceResponse, error) {
+	orgID, err := orgFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+	plan, err := s.Store.GetProviderPlan(ctx, orgID, providerID, planID)
+	if err != nil {
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+	if plan == nil {
+		return nil, httputil.NotFoundError(notifications.ProviderPlanNotFound)
+	}
+
+	var namePtr *string
+	if input.Name != nil {
+		n := strings.TrimSpace(*input.Name)
+		if n == "" {
+			return nil, httputil.ValidationError(notifications.N("PLAN_SERVICE_NAME_REQUIRED", "Nome do serviço não pode ser vazio."))
+		}
+		namePtr = &n
+	}
+
+	var svcTypePtr *string
+	if input.ServiceType != nil && *input.ServiceType != "" {
+		st := strings.ToLower(strings.TrimSpace(*input.ServiceType))
+		svcTypePtr = &st
+	}
+
+	var appTypePtr *string
+	if input.ApplicationType != nil && *input.ApplicationType != "" {
+		at := strings.ToLower(strings.TrimSpace(*input.ApplicationType))
+		appTypePtr = &at
+	}
+
+	var availRulePtr *string
+	if input.AvailabilityRule != nil && *input.AvailabilityRule != "" {
+		ar := strings.ToLower(strings.TrimSpace(*input.AvailabilityRule))
+		availRulePtr = &ar
+	}
+
+	var exclCustID *string
+	if input.ExclusiveCustomerID != nil {
+		cid := strings.TrimSpace(*input.ExclusiveCustomerID)
+		if cid != "" {
+			exclCustID = &cid
+		}
+	}
+
+	if err := s.Store.UpdatePlanServiceFull(ctx, serviceID, namePtr, input.InvoiceName, svcTypePtr, input.Recurring, input.Active, input.Price, appTypePtr, availRulePtr, exclCustID); err != nil {
+		if isPgNoRows(err) {
+			return nil, httputil.NotFoundError(notifications.N("PLAN_SERVICE_NOT_FOUND", "Serviço do plano não encontrado."))
+		}
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+
+	updatedPlan, err := s.Store.GetProviderPlan(ctx, orgID, providerID, planID)
+	if err != nil {
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+	for _, svc := range updatedPlan.Services {
+		if svc.ID == serviceID {
+			return &svc, nil
+		}
+	}
+	return nil, httputil.NotFoundError(notifications.N("PLAN_SERVICE_NOT_FOUND", "Serviço do plano não encontrado."))
+}
+
+func (s *Service) DeleteProviderPlanService(ctx context.Context, providerID, planID, serviceID string) error {
+	orgID, err := orgFrom(ctx)
+	if err != nil {
+		return err
+	}
+	plan, err := s.Store.GetProviderPlan(ctx, orgID, providerID, planID)
+	if err != nil {
+		return httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+	if plan == nil {
+		return httputil.NotFoundError(notifications.ProviderPlanNotFound)
+	}
+	if err := s.Store.DeactivatePlanService(ctx, serviceID); err != nil {
+		if isPgNoRows(err) {
+			return httputil.NotFoundError(notifications.N("PLAN_SERVICE_NOT_FOUND", "Serviço do plano não encontrado."))
 		}
 		return httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}

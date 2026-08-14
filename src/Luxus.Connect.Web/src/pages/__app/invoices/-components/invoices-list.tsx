@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { getRouteApi } from '@tanstack/react-router';
+import { useQueryClient } from '@tanstack/react-query';
 import { FileText, Upload } from 'lucide-react';
 
 import { useGetV1ProcessingMonths, useGetV1ProviderInvoices } from '@/api';
@@ -24,9 +25,15 @@ import {
   SelectValue
 } from '@/components/ui/select';
 import { getErrorMessage, isApiHttpError } from '@/lib/api-error';
+import { getImportRequestStatus } from '@/lib/import-request-api';
 import { parseTotalCount } from '@/lib/query-utils';
 
 import { createInvoicesColumns } from './columns';
+import {
+  InvoiceImportProgressBanner,
+  type ImportProgressStage,
+  type ImportProgressState
+} from './invoice-import-progress-banner';
 import { InvoiceImportSheet } from './invoice-import-sheet';
 
 const routeApi = getRouteApi('/__app/invoices/');
@@ -46,11 +53,247 @@ const INVOICES_SKELETON_COLUMNS = [
 ];
 
 const PROCESSING_MONTHS_PAGE_SIZE = 500;
+const POLL_INTERVAL_MS = 1500;
+const STORAGE_KEY = 'luxus_active_import_request';
+const MAX_PERSISTED_AGE_MS = 2 * 60 * 60 * 1000; // 2 hours
+
+type PersistedImportState = {
+  importId: string;
+  fileName: string;
+  stage: ImportProgressStage;
+  progress: number;
+  timestamp: number;
+  errorMessage?: string;
+};
+
+const IDLE_PROGRESS: ImportProgressState = {
+  stage: 'idle',
+  progress: 0,
+  fileName: ''
+};
+
+function loadPersistedImport(): { state: ImportProgressState; importId: string | null } {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return { state: IDLE_PROGRESS, importId: null };
+    const data = JSON.parse(raw) as PersistedImportState;
+    if (Date.now() - data.timestamp > MAX_PERSISTED_AGE_MS) {
+      localStorage.removeItem(STORAGE_KEY);
+      return { state: IDLE_PROGRESS, importId: null };
+    }
+    return {
+      state: {
+        stage: data.stage,
+        progress: data.progress,
+        fileName: data.fileName,
+        errorMessage: data.errorMessage
+      },
+      importId: data.importId
+    };
+  } catch {
+    return { state: IDLE_PROGRESS, importId: null };
+  }
+}
+
+function savePersistedImport(importId: string, state: ImportProgressState) {
+  try {
+    if (state.stage === 'idle') {
+      localStorage.removeItem(STORAGE_KEY);
+      return;
+    }
+    const data: PersistedImportState = {
+      importId,
+      fileName: state.fileName,
+      stage: state.stage,
+      progress: state.progress,
+      timestamp: Date.now(),
+      errorMessage: state.errorMessage
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+function clearPersistedImport() {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // Ignore
+  }
+}
 
 export function InvoicesList() {
   const { page, pageSize, processingMonthId } = routeApi.useSearch();
   const navigate = routeApi.useNavigate();
   const [importOpen, setImportOpen] = useState(false);
+
+  // Initialize from localStorage so refresh (F5) doesn't lose progress
+  const persisted = useMemo(() => loadPersistedImport(), []);
+  const [importProgress, setImportProgress] = useState<ImportProgressState>(persisted.state);
+  const [pollingImportId, setPollingImportId] = useState<string | null>(persisted.importId);
+
+  const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const queryClient = useQueryClient();
+
+  // ─── Invalidate the invoices list (predicate-based to bypass object equality) ───
+  const invalidateInvoicesList = useCallback(() => {
+    void queryClient.invalidateQueries({
+      predicate: (query) => {
+        const key = query.queryKey;
+        return (
+          Array.isArray(key) &&
+          key.length > 0 &&
+          typeof key[0] === 'object' &&
+          key[0] !== null &&
+          (key[0] as Record<string, unknown>)['url'] === '/v1/provider-invoices'
+        );
+      }
+    });
+  }, [queryClient]);
+
+  // ─── Polling: check import request status every POLL_INTERVAL_MS ───
+  const stopPolling = useCallback(() => {
+    if (pollingIntervalRef.current !== null) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+  }, []);
+
+  const checkStatusOnce = useCallback(
+    async (importId: string, fileName: string) => {
+      try {
+        const result = await getImportRequestStatus(importId);
+        if (result.status === 'completed') {
+          stopPolling();
+          setPollingImportId(null);
+          const nextState: ImportProgressState = { stage: 'done', progress: 100, fileName };
+          setImportProgress(nextState);
+          savePersistedImport(importId, nextState);
+          invalidateInvoicesList();
+          return true;
+        } else if (result.status === 'failed') {
+          stopPolling();
+          setPollingImportId(null);
+          const nextState: ImportProgressState = {
+            stage: 'error',
+            progress: 0,
+            fileName,
+            errorMessage: result.error ?? 'Falha no processamento do arquivo.'
+          };
+          setImportProgress(nextState);
+          savePersistedImport(importId, nextState);
+          return true;
+        } else if (result.status === 'pdf_unparsed') {
+          stopPolling();
+          setPollingImportId(null);
+          const nextState: ImportProgressState = {
+            stage: 'error',
+            progress: 0,
+            fileName,
+            errorMessage:
+              'PDF recebido, mas o parse ainda não está disponível. Use o TXT da operadora para faturar.'
+          };
+          setImportProgress(nextState);
+          savePersistedImport(importId, nextState);
+          return true;
+        }
+        return false;
+      } catch (err: unknown) {
+        // If the status endpoint returns 404 (e.g. backend container without the new route),
+        // stop polling immediately, mark as completed and refresh the invoices list.
+        const is404 =
+          (typeof err === 'object' &&
+            err !== null &&
+            'status' in err &&
+            (err as { status: number }).status === 404) ||
+          (typeof err === 'object' &&
+            err !== null &&
+            'response' in err &&
+            (err as { response?: { status?: number } }).response?.status === 404);
+
+        if (is404) {
+          stopPolling();
+          setPollingImportId(null);
+          clearPersistedImport();
+          invalidateInvoicesList();
+          const nextState: ImportProgressState = {
+            stage: 'done',
+            progress: 100,
+            fileName
+          };
+          setImportProgress(nextState);
+          return true;
+        }
+        return false;
+      }
+    },
+    [stopPolling, invalidateInvoicesList]
+  );
+
+  const startPolling = useCallback(
+    (importId: string, fileName: string) => {
+      stopPolling();
+      // Check immediately on start
+      void checkStatusOnce(importId, fileName).then((finished) => {
+        if (finished) return;
+        pollingIntervalRef.current = setInterval(async () => {
+          await checkStatusOnce(importId, fileName);
+        }, POLL_INTERVAL_MS);
+      });
+    },
+    [stopPolling, checkStatusOnce]
+  );
+
+  // Resume or start polling whenever pollingImportId changes
+  useEffect(() => {
+    if (!pollingImportId) return;
+    const fileName = importProgress.fileName;
+    startPolling(pollingImportId, fileName);
+    return () => stopPolling();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pollingImportId]);
+
+  // Cleanup on unmount
+  useEffect(() => () => stopPolling(), [stopPolling]);
+
+  // ─── Called by InvoiceImportSheet on every progress change ───
+  const handleProgressChange = useCallback(
+    (state: ImportProgressState & { importRequestId?: string }) => {
+      setImportProgress(state);
+      if (state.stage === 'done') {
+        stopPolling();
+        setPollingImportId(null);
+        clearPersistedImport();
+        invalidateInvoicesList();
+      } else if (state.stage === 'error') {
+        stopPolling();
+        setPollingImportId(null);
+        clearPersistedImport();
+      } else if (state.importRequestId) {
+        setPollingImportId(state.importRequestId);
+        const processingState: ImportProgressState = {
+          stage: 'processing',
+          progress: 0,
+          fileName: state.fileName
+        };
+        setImportProgress(processingState);
+        savePersistedImport(state.importRequestId, processingState);
+      }
+    },
+    [stopPolling, invalidateInvoicesList]
+  );
+
+  const handleDismiss = useCallback(() => {
+    stopPolling();
+    setPollingImportId(null);
+    setImportProgress(IDLE_PROGRESS);
+    clearPersistedImport();
+  }, [stopPolling]);
+
+  const handleRefresh = useCallback(() => {
+    invalidateInvoicesList();
+  }, [invalidateInvoicesList]);
 
   const pageIndex = page - 1;
 
@@ -87,11 +330,7 @@ export function InvoicesList() {
 
   const setPageSize = (next: number) => {
     navigate({
-      search: (prev) => ({
-        ...prev,
-        page: 1,
-        pageSize: next
-      })
+      search: (prev) => ({ ...prev, page: 1, pageSize: next })
     });
   };
 
@@ -115,6 +354,11 @@ export function InvoicesList() {
       }),
     [page, pageSize, processingMonthId, processingMonthLabelById]
   );
+
+  const isImportActive =
+    importProgress.stage !== 'idle' &&
+    importProgress.stage !== 'done' &&
+    importProgress.stage !== 'error';
 
   if (listQuery.isPending || processingMonthsQuery.isPending) {
     return (
@@ -142,12 +386,25 @@ export function InvoicesList() {
         title="Faturas importadas"
         description="Faturas de origem por operadora (endpoint /v1/providers/{id}/invoices)"
         action={
-          <Button type="button" onClick={() => setImportOpen(true)}>
+          <Button
+            type="button"
+            onClick={() => setImportOpen(true)}
+            disabled={isImportActive}
+          >
             <Upload />
             Importar fatura
           </Button>
         }
       />
+
+      {/* ─── Inline import progress banner (resilient to F5/page refresh) ─── */}
+      {importProgress.stage !== 'idle' && (
+        <InvoiceImportProgressBanner
+          state={importProgress}
+          onDismiss={handleDismiss}
+          onRefresh={handleRefresh}
+        />
+      )}
 
       <div className="flex max-w-md flex-col gap-2 sm:flex-row sm:items-end sm:gap-4">
         <Field className="min-w-[220px] flex-1">
@@ -157,9 +414,7 @@ export function InvoicesList() {
           <Select
             value={processingMonthId ?? '__all__'}
             onValueChange={(value) => {
-              if (value == null) {
-                return;
-              }
+              if (value == null) return;
               setProcessingMonthFilter(value);
             }}
           >
@@ -167,7 +422,11 @@ export function InvoicesList() {
               id="invoices-filter-pm"
               className="border-input bg-background w-full rounded-xl border"
             >
-              <SelectValue placeholder="Todos" />
+              <SelectValue placeholder="Todos">
+                {!processingMonthId || processingMonthId === '__all__'
+                  ? 'Todos'
+                  : processingMonthLabelById.get(processingMonthId) ?? 'Mês selecionado'}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
@@ -216,6 +475,7 @@ export function InvoicesList() {
         open={importOpen}
         onOpenChange={setImportOpen}
         preferredProcessingMonthId={processingMonthId}
+        onProgressChange={handleProgressChange}
       />
     </div>
   );

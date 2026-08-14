@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { type ColumnDef } from '@tanstack/react-table';
-import { CheckCircle2, FileStack, XCircle } from 'lucide-react';
+import { CheckCircle2, Download, FileStack, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useGetV1ProcessingMonths } from '@/api';
@@ -29,6 +29,9 @@ import {
   useManualGenerateBillingDocuments
 } from '@/lib/billing-api';
 import { formatMoney, todayISO } from '@/lib/financial-api';
+import { downloadFinancialExport } from '@/lib/fidelity-api';
+
+const EMPTY_PREVIEW_ITEMS: BulkBillingPreviewItem[] = [];
 
 export const Route = createFileRoute('/__app/finance/customer-invoices/bulk-generate')({
   component: BulkGenerateInvoicesPage
@@ -36,6 +39,15 @@ export const Route = createFileRoute('/__app/finance/customer-invoices/bulk-gene
 
 type GenerateMode = 'manual' | 'refaturamento';
 
+function previewRowId(row: BulkBillingPreviewItem) {
+  return row.billing_group_id || row.customer_id;
+}
+
+function groupLabel(row: BulkBillingPreviewItem) {
+  if (row.group_label) return row.group_label;
+  if (row.phone_line_number) return `Linha ${row.phone_line_number}`;
+  return 'Cliente';
+}
 function skipReasonLabel(reason?: string) {
   const map: Record<string, string> = {
     no_billing_email: 'Sem e-mail de cobrança',
@@ -43,7 +55,8 @@ function skipReasonLabel(reason?: string) {
     no_lines_on_invoice: 'Linha não está na fatura importada',
     no_provider_invoice: 'Nenhuma fatura da operadora neste mês',
     no_active_lines: 'Sem linhas ou aparelhos ativos',
-    already_billed: 'Já faturado neste mês'
+    already_billed: 'Já faturado neste mês',
+    not_billing_ready: 'Pendente de liberação para faturamento'
   };
   return reason ? (map[reason] ?? reason) : '—';
 }
@@ -67,6 +80,7 @@ function BulkGenerateInvoicesPage() {
 
   const preview =
     mode === 'refaturamento' ? refaturamentoPreviewQuery.data : manualPreviewQuery.data;
+  const previewItems = preview?.items ?? EMPTY_PREVIEW_ITEMS;
   const previewLoading =
     mode === 'refaturamento' ? refaturamentoPreviewQuery.isPending : manualPreviewQuery.isPending;
 
@@ -76,14 +90,14 @@ function BulkGenerateInvoicesPage() {
   }, [mode, processingMonthId]);
 
   useEffect(() => {
-    if (!preview?.items.length) {
+    if (!previewItems.length) {
       setSelectedIds(new Set());
       return;
     }
     setSelectedIds(
-      new Set(preview.items.filter((i) => i.eligible).map((i) => i.customer_id))
+      new Set(previewItems.filter((i) => i.eligible).map((i) => previewRowId(i)))
     );
-  }, [preview?.items]);
+  }, [previewItems]);
 
   const toggleCustomer = (customerId: string, checked: boolean) => {
     setSelectedIds((prev) => {
@@ -97,7 +111,7 @@ function BulkGenerateInvoicesPage() {
   const toggleAllEligible = (checked: boolean) => {
     if (!preview) return;
     if (checked) {
-      setSelectedIds(new Set(preview.items.filter((i) => i.eligible).map((i) => i.customer_id)));
+      setSelectedIds(new Set(previewItems.filter((i) => i.eligible).map((i) => previewRowId(i))));
     } else {
       setSelectedIds(new Set());
     }
@@ -105,8 +119,8 @@ function BulkGenerateInvoicesPage() {
 
   const selectedEligibleCount = useMemo(() => {
     if (!preview) return 0;
-    return preview.items.filter((i) => i.eligible && selectedIds.has(i.customer_id)).length;
-  }, [preview, selectedIds]);
+    return previewItems.filter((i) => i.eligible && selectedIds.has(previewRowId(i))).length;
+  }, [previewItems, selectedIds]);
 
   const columns = useMemo<ColumnDef<BulkBillingPreviewItem>[]>(
     () => [
@@ -117,9 +131,8 @@ function BulkGenerateInvoicesPage() {
             type="checkbox"
             aria-label="Selecionar todos elegíveis"
             checked={
-              preview != null &&
-              preview.items.some((i) => i.eligible) &&
-              preview.items.filter((i) => i.eligible).every((i) => selectedIds.has(i.customer_id))
+              previewItems.some((i) => i.eligible) &&
+              previewItems.filter((i) => i.eligible).every((i) => selectedIds.has(previewRowId(i)))
             }
             onChange={(e) => toggleAllEligible(e.target.checked)}
           />
@@ -129,12 +142,17 @@ function BulkGenerateInvoicesPage() {
             type="checkbox"
             aria-label={`Selecionar ${row.original.customer_name}`}
             disabled={!row.original.eligible}
-            checked={selectedIds.has(row.original.customer_id)}
-            onChange={(e) => toggleCustomer(row.original.customer_id, e.target.checked)}
+            checked={selectedIds.has(previewRowId(row.original))}
+            onChange={(e) => toggleCustomer(previewRowId(row.original), e.target.checked)}
           />
         )
       },
       { accessorKey: 'customer_name', header: 'Cliente' },
+      {
+        id: 'group',
+        header: 'Boleto',
+        cell: ({ row }) => groupLabel(row.original)
+      },
       { accessorKey: 'billing_email', header: 'E-mail cobrança' },
       {
         accessorKey: 'line_count',
@@ -162,6 +180,20 @@ function BulkGenerateInvoicesPage() {
         cell: ({ row }) => formatMoney(row.original.monthly_amount)
       },
       {
+        id: 'readiness',
+        header: 'Liberação',
+        cell: ({ row }) =>
+          row.original.is_released_for_billing ? (
+            <Badge variant="default">
+              {row.original.billing_readiness_label || 'Liberado'}
+            </Badge>
+          ) : (
+            <Badge variant="secondary">
+              {row.original.billing_readiness_label || 'Pendente'}
+            </Badge>
+          )
+      },
+      {
         id: 'status',
         header: 'Situação',
         cell: ({ row }) =>
@@ -172,13 +204,13 @@ function BulkGenerateInvoicesPage() {
           )
       }
     ],
-    [mode, preview, selectedIds]
+    [mode, previewItems, selectedIds]
   );
 
   const handleGenerate = () => {
-    const customerIds = [...selectedIds];
-    if (customerIds.length === 0) {
-      toast.error('Selecione ao menos um cliente.');
+    const billingGroupIds = [...selectedIds];
+    if (billingGroupIds.length === 0) {
+      toast.error('Selecione ao menos um boleto.');
       return;
     }
     if (mode === 'refaturamento' && !processingMonthId) {
@@ -189,7 +221,7 @@ function BulkGenerateInvoicesPage() {
     const body = {
       issue_date: issueDate,
       due_date: dueDate,
-      customer_ids: customerIds,
+      billing_group_ids: billingGroupIds,
       ...(description.trim() ? { description: description.trim() } : {})
     };
 
@@ -218,11 +250,45 @@ function BulkGenerateInvoicesPage() {
     <div className="flex flex-1 flex-col gap-4 p-6">
       <ListPageHeader
         title="Gerar faturas"
-        description="Crie faturas com boleto Sicredi (código de barras + QR PIX) para clientes selecionados"
+      description="Crie faturas com boleto Sicredi: um boleto por linha Normal e um por grupo Titular+dependentes."
         action={
-          <Button variant="outline" render={<Link to="/finance/customer-invoices" search={{ page: 1, pageSize: 10 }} />}>
-            Voltar à lista
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {processingMonthId ? (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    void downloadFinancialExport(processingMonthId, 'csv').then(
+                      () => toast.success('CSV baixado.'),
+                      (e: unknown) =>
+                        toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+                    );
+                  }}
+                >
+                  <Download className="mr-2 size-4" />
+                  Exportar CSV
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    void downloadFinancialExport(processingMonthId, 'json').then(
+                      () => toast.success('JSON baixado.'),
+                      (e: unknown) =>
+                        toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+                    );
+                  }}
+                >
+                  <Download className="mr-2 size-4" />
+                  Exportar JSON
+                </Button>
+              </>
+            ) : null}
+            <Button variant="outline" render={<Link to="/finance/customer-invoices" search={{ page: 1, pageSize: 10 }} />}>
+              Voltar à lista
+            </Button>
+          </div>
         }
       />
 
@@ -309,7 +375,7 @@ function BulkGenerateInvoicesPage() {
           )}
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm">
-              <span className="font-medium">{preview.items.length}</span> cliente(s) ·{' '}
+              <span className="font-medium">{previewItems.length}</span> boleto(s) ·{' '}
               <span className="font-medium text-green-600">{selectedEligibleCount}</span>{' '}
               selecionado(s) para gerar
             </p>
@@ -323,7 +389,7 @@ function BulkGenerateInvoicesPage() {
                 : `Gerar ${selectedEligibleCount} fatura(s) + boleto`}
             </Button>
           </div>
-          <DataTable columns={columns} data={preview.items} getRowId={(r) => r.customer_id} />
+          <DataTable columns={columns} data={previewItems} getRowId={(r) => previewRowId(r)} />
         </div>
       )}
 

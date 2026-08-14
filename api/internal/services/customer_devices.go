@@ -106,6 +106,17 @@ func (s *Service) AssignCustomerDevice(ctx context.Context, customerID string, i
 	if err := s.Store.CreateCustomerDeviceLink(ctx, id, customerID, deviceStockID, description, brand, model, input.MonthlyAmount, start, now); err != nil {
 		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
+	s.maybeGenerateAutomaticContract(ctx, orgID, customerID, "", "device", "Aquisição de aparelho: "+description)
+	if input.RenewFidelity != nil {
+		lines, _, err := s.Store.ListCustomerPhoneLines(ctx, orgID, customerID, httputil.PageSearch{PageSize: 100})
+		if err == nil {
+			for _, line := range lines {
+				if line.IsActive {
+					s.maybePromptFidelityRenewal(ctx, orgID, line.PhoneLineID, "device", input.RenewFidelity)
+				}
+			}
+		}
+	}
 	return s.Store.GetCustomerDeviceLink(ctx, orgID, customerID, id)
 }
 

@@ -9,6 +9,7 @@ import {
   getV1PhoneLinesIdCustomerLinksQueryKey,
   useDeleteV1PhoneLinesIdCustomerLinksActive,
   useGetV1Customers,
+  useGetV1PhoneLines,
   useGetV1PhoneLinesIdCustomerLinks,
   usePostV1PhoneLinesIdCustomerLinks,
   usePostV1PhoneLinesIdCustomerLinksTransfer,
@@ -47,7 +48,6 @@ import { getErrorMessage, isApiHttpError } from '@/lib/api-error';
 import { formatMoney } from '@/lib/financial-api';
 import {
   formatCpfCnpj,
-  formatLineClassification,
   formatPhoneLineStatus,
   formatPhoneNumber,
   formatTransitionSubStatus
@@ -57,9 +57,16 @@ import {
   parseMoneyInput,
   useUpdatePhoneLineMonthlyAmount
 } from '@/lib/phone-line-api';
+import {
+  usePutPhoneLineTransition,
+  useUpdatePhoneLineClassification
+} from '@/lib/phone-line-spec-api';
+import { useUpdatePhoneLineExceedance } from '@/lib/fidelity-api';
 import { cn } from '@/lib/utils';
 
 import { BillingProcessingPanel } from './billing-processing-panel';
+import { FidelityPanel } from './fidelity-panel';
+import { GeneratedContractsPanel } from './generated-contracts-panel';
 
 type PhoneLinesListSearch = {
   page: number;
@@ -132,6 +139,11 @@ export function PhoneLineDetailView({
   const [effectiveDate, setEffectiveDate] = useState('');
   const [assignMonthlyAmount, setAssignMonthlyAmount] = useState('');
   const [editMonthlyAmount, setEditMonthlyAmount] = useState('');
+  const [classification, setClassification] = useState(line.line_classification);
+  const [titularLineId, setTitularLineId] = useState(line.titular_line_id ?? '');
+  const [transitionSub, setTransitionSub] = useState(
+    line.transition_sub_status ?? 'pending_portability'
+  );
 
   const customerLinksQuery = useGetV1PhoneLinesIdCustomerLinks(line.id);
   const customersQuery = useGetV1Customers({
@@ -163,6 +175,19 @@ export function PhoneLineDetailView({
   };
 
   const updateMonthlyMutation = useUpdatePhoneLineMonthlyAmount();
+  const classificationMutation = useUpdatePhoneLineClassification(line.id);
+  const transitionMutation = usePutPhoneLineTransition(line.id);
+  const exceedanceMutation = useUpdatePhoneLineExceedance(line.id);
+  const chargeExceedances =
+    (line as { charge_exceedances?: boolean }).charge_exceedances !== false;
+  const exceedanceType =
+    (line as { exceedance_charge_type?: string }).exceedance_charge_type === 'tabulated'
+      ? 'tabulated'
+      : 'mirrored';
+  const titularCandidatesQuery = useGetV1PhoneLines({
+    page_index: 0,
+    page_size: 200
+  });
 
   const invalidateLinks = async () => {
     await queryClient.invalidateQueries({
@@ -216,11 +241,6 @@ export function PhoneLineDetailView({
     to: backListTo,
     search: listSearch
   };
-
-  const lineDetailRoute =
-    backListTo === '/stock'
-      ? ('/stock/$phoneLineId' as const)
-      : ('/phone-lines/$phoneLineId' as const);
 
   const displayNumber = formatPhoneNumber(line.number) ?? '—';
 
@@ -449,6 +469,73 @@ export function PhoneLineDetailView({
       <Separator />
 
       <DetailSection
+        title="Excedentes"
+        description="Cobrar ultrapassagens detectadas na fatura (padrão: Sim). Espelhado usa o valor da operadora; tabelado usa o valor cadastrado no termo."
+      >
+        <div className="flex flex-wrap items-center gap-4">
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="size-4 rounded border"
+              checked={chargeExceedances}
+              onChange={(e) =>
+                exceedanceMutation.mutate(
+                  { charge_exceedances: e.target.checked },
+                  {
+                    onSuccess: () => toast.success('Flag de excedentes atualizada.'),
+                    onError: (err) =>
+                      toast.error(isApiHttpError(err) ? err.message : getErrorMessage(err))
+                  }
+                )
+              }
+            />
+            Cobrar excedentes
+          </label>
+          <Select
+            value={exceedanceType}
+            onValueChange={(v) =>
+              exceedanceMutation.mutate(
+                { exceedance_charge_type: v ?? 'mirrored' },
+                {
+                  onSuccess: () => toast.success('Regra de excedente atualizada.'),
+                  onError: (err) =>
+                    toast.error(isApiHttpError(err) ? err.message : getErrorMessage(err))
+                }
+              )
+            }
+          >
+            <SelectTrigger className="w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="mirrored">Espelhado</SelectItem>
+              <SelectItem value="tabulated">Tabelado</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </DetailSection>
+
+      <Separator />
+
+      <DetailSection
+        title="Fidelidade contratual"
+        description="Vigência da linha, renovação automática na data de término e histórico de eventos."
+      >
+        <FidelityPanel phoneLineId={line.id} />
+      </DetailSection>
+
+      <Separator />
+
+      <DetailSection
+        title="Contratos gerados"
+        description="Documentos criados automaticamente a partir dos templates ativos."
+      >
+        <GeneratedContractsPanel phoneLineId={line.id} />
+      </DetailSection>
+
+      <Separator />
+
+      <DetailSection
         title="Serviços na linha"
         description="Composição da linha telefônica."
       >
@@ -506,47 +593,47 @@ export function PhoneLineDetailView({
 
       <DetailSection
         title="Hierarquia e status"
-        description="Classificação de cobrança, linha titular e estado da linha."
+        description="Classificação de cobrança (Normal, Titular, Dependente). Dependentes consolidam no boleto do titular."
       >
         <FieldGroup className="gap-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field>
               <FieldLabel>Classificação</FieldLabel>
-              <ReadOnlyField
-                value={formatLineClassification(line.line_classification)}
-              />
+              <Select
+                value={classification}
+                onValueChange={(v) => setClassification(v ?? 'normal')}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="normal">Normal</SelectItem>
+                  <SelectItem value="titular">Titular</SelectItem>
+                  <SelectItem value="dependent">Dependente</SelectItem>
+                </SelectContent>
+              </Select>
             </Field>
             <Field>
               <FieldLabel>Linha titular</FieldLabel>
-              {line.titular_line_id ? (
-                <div className="flex flex-wrap items-end gap-2">
-                  <ReadOnlyField
-                    value={
-                      line.titular_line_number
-                        ? (formatPhoneNumber(line.titular_line_number) ?? '—')
-                        : '—'
-                    }
-                    className="min-w-0 flex-1"
-                  />
-                  <Button
-                    nativeButton={false}
-                    variant="outline"
-                    size="sm"
-                    className="shrink-0"
-                    render={
-                      <Link
-                        to={lineDetailRoute}
-                        params={{ phoneLineId: line.titular_line_id }}
-                        search={listSearch}
-                      />
-                    }
-                  >
-                    Abrir titular
-                  </Button>
-                </div>
-              ) : (
-                <ReadOnlyField value="—" />
-              )}
+              <Select
+                value={titularLineId || '__none'}
+                onValueChange={(v) => setTitularLineId(v === '__none' ? '' : (v ?? ''))}
+                disabled={classification !== 'dependent'}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o titular" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none">—</SelectItem>
+                  {(titularCandidatesQuery.data?.items ?? [])
+                    .filter((l) => l.id !== line.id)
+                    .map((l) => (
+                      <SelectItem key={l.id} value={l.id}>
+                        {formatPhoneNumber(l.number) ?? l.number}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
             </Field>
             <Field>
               <FieldLabel>Status</FieldLabel>
@@ -564,6 +651,28 @@ export function PhoneLineDetailView({
               />
             </Field>
           </div>
+          <Button
+            type="button"
+            size="sm"
+            disabled={classificationMutation.isPending}
+            onClick={() =>
+              classificationMutation.mutate(
+                {
+                  line_classification: classification,
+                  ...(classification === 'dependent' && titularLineId
+                    ? { titular_line_id: titularLineId }
+                    : {})
+                },
+                {
+                  onSuccess: () => toast.success('Hierarquia atualizada.'),
+                  onError: (e) =>
+                    toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+                }
+              )
+            }
+          >
+            Salvar hierarquia
+          </Button>
         </FieldGroup>
       </DetailSection>
 
@@ -593,7 +702,43 @@ export function PhoneLineDetailView({
                 value={line.cancellation_date?.formatAsDate() ?? '—'}
               />
             </Field>
+            <Field>
+              <FieldLabel>Colocar em transição (admin)</FieldLabel>
+              <Select
+                value={transitionSub}
+                onValueChange={(v) => setTransitionSub(v ?? 'pending_portability')}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pending_portability">Aguardando portabilidade</SelectItem>
+                  <SelectItem value="pending_tt">Aguardando TT</SelectItem>
+                  <SelectItem value="pending_pp">Aguardando pré-pago</SelectItem>
+                  <SelectItem value="pending_activation">Aguardando ativação</SelectItem>
+                  <SelectItem value="pending_cancellation">Aguardando cancelamento</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
           </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={transitionMutation.isPending}
+            onClick={() =>
+              transitionMutation.mutate(
+                { transition_sub_status: transitionSub },
+                {
+                  onSuccess: () => toast.success('Linha colocada em transição.'),
+                  onError: (e) =>
+                    toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+                }
+              )
+            }
+          >
+            Registrar transição
+          </Button>
         </FieldGroup>
       </DetailSection>
 

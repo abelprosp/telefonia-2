@@ -22,6 +22,7 @@ import { Route as _appPartnerIndexRouteImport } from './pages/__app/partner/inde
 import { Route as _appLineRequestsIndexRouteImport } from './pages/__app/line-requests/index'
 import { Route as _appInvoicesIndexRouteImport } from './pages/__app/invoices/index'
 import { Route as _appFinanceIndexRouteImport } from './pages/__app/finance/index'
+import { Route as _appExceedanceTermsIndexRouteImport } from './pages/__app/exceedance-terms/index'
 import { Route as _appCustomersIndexRouteImport } from './pages/__app/customers/index'
 import { Route as _appContractTemplatesIndexRouteImport } from './pages/__app/contract-templates/index'
 import { Route as _appBillingCyclesIndexRouteImport } from './pages/__app/billing-cycles/index'
@@ -119,6 +120,12 @@ const _appFinanceIndexRoute = _appFinanceIndexRouteImport.update({
   path: '/finance/',
   getParentRoute: () => _appLayoutRoute,
 } as any)
+const _appExceedanceTermsIndexRoute =
+  _appExceedanceTermsIndexRouteImport.update({
+    id: '/exceedance-terms/',
+    path: '/exceedance-terms/',
+    getParentRoute: () => _appLayoutRoute,
+  } as any)
 const _appCustomersIndexRoute = _appCustomersIndexRouteImport.update({
   id: '/customers/',
   path: '/customers/',
@@ -310,6 +317,7 @@ export interface FileRoutesByFullPath {
   '/billing-cycles/': typeof _appBillingCyclesIndexRoute
   '/contract-templates/': typeof _appContractTemplatesIndexRoute
   '/customers/': typeof _appCustomersIndexRoute
+  '/exceedance-terms/': typeof _appExceedanceTermsIndexRoute
   '/finance/': typeof _appFinanceIndexRoute
   '/invoices/': typeof _appInvoicesIndexRoute
   '/line-requests/': typeof _appLineRequestsIndexRoute
@@ -355,6 +363,7 @@ export interface FileRoutesByTo {
   '/billing-cycles': typeof _appBillingCyclesIndexRoute
   '/contract-templates': typeof _appContractTemplatesIndexRoute
   '/customers': typeof _appCustomersIndexRoute
+  '/exceedance-terms': typeof _appExceedanceTermsIndexRoute
   '/finance': typeof _appFinanceIndexRoute
   '/invoices': typeof _appInvoicesIndexRoute
   '/line-requests': typeof _appLineRequestsIndexRoute
@@ -402,6 +411,7 @@ export interface FileRoutesById {
   '/__app/billing-cycles/': typeof _appBillingCyclesIndexRoute
   '/__app/contract-templates/': typeof _appContractTemplatesIndexRoute
   '/__app/customers/': typeof _appCustomersIndexRoute
+  '/__app/exceedance-terms/': typeof _appExceedanceTermsIndexRoute
   '/__app/finance/': typeof _appFinanceIndexRoute
   '/__app/invoices/': typeof _appInvoicesIndexRoute
   '/__app/line-requests/': typeof _appLineRequestsIndexRoute
@@ -449,6 +459,7 @@ export interface FileRouteTypes {
     | '/billing-cycles/'
     | '/contract-templates/'
     | '/customers/'
+    | '/exceedance-terms/'
     | '/finance/'
     | '/invoices/'
     | '/line-requests/'
@@ -494,6 +505,7 @@ export interface FileRouteTypes {
     | '/billing-cycles'
     | '/contract-templates'
     | '/customers'
+    | '/exceedance-terms'
     | '/finance'
     | '/invoices'
     | '/line-requests'
@@ -540,6 +552,7 @@ export interface FileRouteTypes {
     | '/__app/billing-cycles/'
     | '/__app/contract-templates/'
     | '/__app/customers/'
+    | '/__app/exceedance-terms/'
     | '/__app/finance/'
     | '/__app/invoices/'
     | '/__app/line-requests/'
@@ -668,6 +681,13 @@ declare module '@tanstack/react-router' {
       path: '/finance'
       fullPath: '/finance/'
       preLoaderRoute: typeof _appFinanceIndexRouteImport
+      parentRoute: typeof _appLayoutRoute
+    }
+    '/__app/exceedance-terms/': {
+      id: '/__app/exceedance-terms/'
+      path: '/exceedance-terms'
+      fullPath: '/exceedance-terms/'
+      preLoaderRoute: typeof _appExceedanceTermsIndexRouteImport
       parentRoute: typeof _appLayoutRoute
     }
     '/__app/customers/': {
@@ -903,6 +923,7 @@ interface _appLayoutRouteChildren {
   _appBillingCyclesIndexRoute: typeof _appBillingCyclesIndexRoute
   _appContractTemplatesIndexRoute: typeof _appContractTemplatesIndexRoute
   _appCustomersIndexRoute: typeof _appCustomersIndexRoute
+  _appExceedanceTermsIndexRoute: typeof _appExceedanceTermsIndexRoute
   _appFinanceIndexRoute: typeof _appFinanceIndexRoute
   _appInvoicesIndexRoute: typeof _appInvoicesIndexRoute
   _appLineRequestsIndexRoute: typeof _appLineRequestsIndexRoute
@@ -950,6 +971,7 @@ const _appLayoutRouteChildren: _appLayoutRouteChildren = {
   _appBillingCyclesIndexRoute: _appBillingCyclesIndexRoute,
   _appContractTemplatesIndexRoute: _appContractTemplatesIndexRoute,
   _appCustomersIndexRoute: _appCustomersIndexRoute,
+  _appExceedanceTermsIndexRoute: _appExceedanceTermsIndexRoute,
   _appFinanceIndexRoute: _appFinanceIndexRoute,
   _appInvoicesIndexRoute: _appInvoicesIndexRoute,
   _appLineRequestsIndexRoute: _appLineRequestsIndexRoute,

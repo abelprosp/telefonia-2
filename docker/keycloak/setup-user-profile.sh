@@ -19,7 +19,7 @@ update_org() {
   echo "Updated organization for ${USERNAME} (${USER_ID})"
 }
 
-for USERNAME in dev parceiro funcionario financeiro; do
+for USERNAME in dev parceiro funcionario financeiro arturabel; do
   update_org "$USERNAME"
 done
 

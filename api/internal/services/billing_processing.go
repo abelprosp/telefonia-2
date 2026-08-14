@@ -190,7 +190,7 @@ func (s *Service) UpdateLineBillingProcessing(ctx context.Context, phoneLineID, 
 		return nil, httputil.NotFoundError(notifications.N("BILLING_PROCESSING_NOT_FOUND", "Processamento não encontrado."))
 	}
 	now := time.Now().UTC()
-	if err := s.Store.UpdateBillingProcessing(ctx, processingID, input.Label, input.MirrorFromPrimary, now); err != nil {
+	if err := s.Store.UpdateBillingProcessing(ctx, processingID, input.Label, input.MirrorFromPrimary, input.OrganizationalUnit, input.Department, input.CostCenterLabel, now); err != nil {
 		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
 	if input.MirrorFromPrimary != nil && *input.MirrorFromPrimary {
@@ -232,7 +232,7 @@ func (s *Service) MirrorProcessingFromPrimary(ctx context.Context, phoneLineID, 
 	}
 	mirror := true
 	now := time.Now().UTC()
-	_ = s.Store.UpdateBillingProcessing(ctx, processingID, nil, &mirror, now)
+	_ = s.Store.UpdateBillingProcessing(ctx, processingID, nil, &mirror, nil, nil, nil, now)
 	resp, err := s.Store.ToBillingProcessingResponse(ctx, *target)
 	if err != nil {
 		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
@@ -292,17 +292,25 @@ func (s *Service) CreateLineBillingCompositionItem(ctx context.Context, phoneLin
 	if err := validateCompositionItemInput(input.ItemType, input.Description, input.Amount); err != nil {
 		return nil, err
 	}
+	if err := s.blockRetroactiveIfClosed(ctx, orgID, phoneLineID, time.Now().UTC()); err != nil {
+		return nil, err
+	}
 	qty := 1.0
 	if input.Quantity != nil && *input.Quantity > 0 {
 		qty = *input.Quantity
 	}
 	now := time.Now().UTC()
 	id := uuid.New().String()
+	proportional := true
+	if input.Proportional != nil {
+		proportional = *input.Proportional
+	}
 	row := store.BillingCompositionItemRow{
 		ID: id, ProcessingID: processingID, ItemType: strings.ToLower(strings.TrimSpace(input.ItemType)),
 		Description: strings.TrimSpace(input.Description), Amount: input.Amount, Quantity: qty,
 		InstallmentCount: input.InstallmentCount, InstallmentCurrent: input.InstallmentCurrent,
-		Active: true, CreatedAt: now, UpdatedAt: now,
+		Active: true, CreatedAt: now, UpdatedAt: now, Proportional: proportional,
+		ServiceType: input.ServiceType, ProviderPlanServiceID: input.ProviderPlanServiceID,
 	}
 	if input.StartDate != nil && strings.TrimSpace(*input.StartDate) != "" {
 		t, err := parseFinancialDate(*input.StartDate)
@@ -317,6 +325,15 @@ func (s *Service) CreateLineBillingCompositionItem(ctx context.Context, phoneLin
 			return nil, err
 		}
 		row.EndDate = &t
+	}
+	if row.ItemType == "service" && row.ServiceType != nil && strings.TrimSpace(*row.ServiceType) != "" {
+		dup, err := s.Store.ActiveCompositionServiceTypeExists(ctx, processingID, strings.ToLower(strings.TrimSpace(*row.ServiceType)), "")
+		if err != nil {
+			return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+		}
+		if dup {
+			return nil, httputil.BusinessError(notifications.PhoneLineServiceTypeDuplicated)
+		}
 	}
 	if err := s.Store.CreateBillingCompositionItem(ctx, row); err != nil {
 		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
@@ -360,8 +377,20 @@ func (s *Service) UpdateLineBillingCompositionItem(ctx context.Context, phoneLin
 		}
 		endDate = &t
 	}
+	if err := s.blockRetroactiveIfClosed(ctx, orgID, phoneLineID, now); err != nil {
+		return nil, err
+	}
+	if input.ServiceType != nil && strings.TrimSpace(*input.ServiceType) != "" {
+		dup, err := s.Store.ActiveCompositionServiceTypeExists(ctx, processingID, strings.ToLower(strings.TrimSpace(*input.ServiceType)), itemID)
+		if err != nil {
+			return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+		}
+		if dup {
+			return nil, httputil.BusinessError(notifications.PhoneLineServiceTypeDuplicated)
+		}
+	}
 	if err := s.Store.UpdateBillingCompositionItem(ctx, itemID, input.Description, input.Amount, input.Quantity,
-		input.InstallmentCount, input.InstallmentCurrent, startDate, endDate, now); err != nil {
+		input.InstallmentCount, input.InstallmentCurrent, startDate, endDate, now, input.ServiceType, input.Proportional); err != nil {
 		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
 	s.auditLog(ctx, "Update", "LineBillingCompositionItem", itemID, compositionAuditMap(*before), input)
@@ -465,7 +494,7 @@ func (s *Service) syncLinkMonthlyAmountFromPrimary(ctx context.Context, linkID, 
 func validateCompositionItemInput(itemType, description string, amount float64) error {
 	t := strings.ToLower(strings.TrimSpace(itemType))
 	switch t {
-	case "service", "discount", "extra_charge", "installment":
+	case "service", "discount", "extra_charge", "installment", "exceedance":
 	default:
 		return httputil.ValidationError(notifications.N("BILLING_ITEM_TYPE_INVALID", "Tipo inválido. Use: service, discount, extra_charge, installment."))
 	}

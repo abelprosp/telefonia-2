@@ -12,6 +12,8 @@ func ImportRequestStatusString(status int) string {
 		return "completed"
 	case 3:
 		return "failed"
+	case 4:
+		return "pdf_unparsed"
 	default:
 		return "pending"
 	}

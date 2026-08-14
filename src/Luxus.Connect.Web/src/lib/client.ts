@@ -129,7 +129,13 @@ api.interceptors.response.use(
         onUnauthorized?.();
       }
 
-      throw toApiHttpError(response);
+      const apiErr = toApiHttpError(response);
+      console.warn(
+        `[API ${response.status}] ${response.config.method?.toUpperCase()} ${response.config.url}:`,
+        apiErr.message,
+        response.data
+      );
+      throw apiErr;
     }
 
     if (isAxiosError(error) && error.code === 'ERR_NETWORK') {

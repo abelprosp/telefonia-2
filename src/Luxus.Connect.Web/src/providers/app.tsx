@@ -74,7 +74,16 @@ export const AppProvider = ({
 
   useEffect(() => {
     const unregister = registerUnauthorizedHandler(() => {
-      signinRedirect({ redirect_uri: window.location.href });
+      const now = Date.now();
+      const lastRedirect = Number(
+        sessionStorage.getItem('luxus_last_auth_redirect') || '0'
+      );
+      if (now - lastRedirect < 10000) {
+        // Prevent redirect/refresh storm if 401 persists
+        return;
+      }
+      sessionStorage.setItem('luxus_last_auth_redirect', String(now));
+      void signinRedirect();
     });
     return unregister;
   }, [signinRedirect]);

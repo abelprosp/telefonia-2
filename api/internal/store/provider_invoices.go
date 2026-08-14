@@ -16,7 +16,7 @@ func (s *Store) ListProviderInvoices(ctx context.Context, orgID string, processi
 		JOIN "ProviderAccounts" pa ON pa."Id" = i."ProviderAccountId"
 		JOIN "ContractingCompanies" cc ON cc."Id" = i."ContractingCompanyId"
 		JOIN "Providers" p ON p."Id" = cc."ProviderId"
-		JOIN "BillingCycles" bc ON bc."Id" = i."BillingCycleId"
+		LEFT JOIN "BillingCycles" bc ON bc."Id" = i."BillingCycleId"
 		LEFT JOIN "AccountsPayable" ap ON ap."ProviderInvoiceId" = i."Id" AND ap."OrganizationId" = p."OrganizationId"
 		WHERE p."OrganizationId" = $1`
 	args := []any{orgID}
@@ -34,7 +34,7 @@ func (s *Store) ListProviderInvoices(ctx context.Context, orgID string, processi
 	limitParam := len(args) + 2
 	selectQ := `
 		SELECT i."Id", i."ProviderAccountId", pa."AccountNumber", i."ContractingCompanyId", cc."LegalName",
-			p."Id", p."Name", i."BillingCycleId", bc."Name", i."ProcessingMonthId",
+			p."Id", p."Name", COALESCE(i."BillingCycleId", ''), COALESCE(bc."Name", ''), i."ProcessingMonthId",
 			i."CostCenterId", i."ParentInvoiceId", i."IssueDate", i."DueDate", i."TotalAmount",
 			i."Status"::text, i."SubtotalServices", i."SubtotalUsage", i."SubtotalTaxes",
 			i."SubtotalDiscounts", i."SubtotalInstallments",
@@ -187,6 +187,17 @@ func (s *Store) InvoiceDuplicateExists(ctx context.Context, accountID, companyID
 			WHERE "ProviderAccountId" = $1 AND "ContractingCompanyId" = $2
 				AND "ProcessingMonthId" = $3 AND "DueDate" = $4)`,
 		accountID, companyID, processingMonthID, dueDate).Scan(&exists)
+	return exists, err
+}
+
+func (s *Store) InvoiceExistsInOtherProcessingMonth(ctx context.Context, accountID, companyID, processingMonthID string, dueDate time.Time) (bool, error) {
+	var exists bool
+	err := s.q(ctx).QueryRow(ctx, `
+		SELECT EXISTS(
+			SELECT 1 FROM "ProviderInvoices"
+			WHERE "ProviderAccountId" = $1 AND "ContractingCompanyId" = $2
+				AND "DueDate" = $3 AND "ProcessingMonthId" != $4)`,
+		accountID, companyID, dueDate, processingMonthID).Scan(&exists)
 	return exists, err
 }
 

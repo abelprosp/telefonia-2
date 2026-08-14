@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { format, parseISO } from 'date-fns';
-import { ExternalLink, Lock } from 'lucide-react';
+import { ExternalLink, Lock, Download } from 'lucide-react';
 import { Controller, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -31,6 +31,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { getErrorMessage, isApiHttpError } from '@/lib/api-error';
 import { formatProcessingMonthStatus } from '@/lib/format';
+import { downloadFinancialExport } from '@/lib/fidelity-api';
 
 export type ProcessingMonthListSearch = {
   page: number;
@@ -160,6 +161,34 @@ export function ProcessingMonthDetailView({
               </Link>
             }
           />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              void downloadFinancialExport(month.id, 'csv').then(
+                () => toast.success('CSV baixado.'),
+                (e: unknown) => toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+              );
+            }}
+          >
+            <Download className="size-4" />
+            Exportar CSV
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              void downloadFinancialExport(month.id, 'json').then(
+                () => toast.success('JSON baixado.'),
+                (e: unknown) => toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+              );
+            }}
+          >
+            <Download className="size-4" />
+            Exportar JSON
+          </Button>
           {open ? (
             <>
               <Button

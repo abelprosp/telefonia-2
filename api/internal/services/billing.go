@@ -238,6 +238,8 @@ func (s *Service) createBillingDocumentFromReceivable(ctx context.Context, orgID
 		EmailSubject:         subject,
 		EmailBodyHTML:        body,
 		CreatedAt:            now,
+		PhoneLineID:          rec.PhoneLineID,
+		BillingGroupType:     rec.BillingGroupType,
 	}
 	if err := s.Store.CreateCustomerBillingDocument(ctx, row); err != nil {
 		return "", httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
@@ -444,6 +446,10 @@ func (s *Service) BulkBillingPreview(ctx context.Context, processingMonthID stri
 	if err != nil {
 		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
+	if items == nil {
+		items = []models.BulkBillingPreviewItem{}
+	}
+	s.applyMonthlyBillingRules(ctx, orgID, monthID, pm, items)
 	eligible := 0
 	if providerInvoices == 0 {
 		for i := range items {
@@ -514,9 +520,67 @@ func (s *Service) BulkGenerateBillingDocuments(ctx context.Context, input models
 	if providerInvoices == 0 {
 		return nil, httputil.BusinessError(notifications.N("BILLING_NO_PROVIDER_INVOICE", "Nenhuma fatura da operadora importada para este mês de processamento."))
 	}
+	if pm.Status == "closed" {
+		return nil, httputil.BusinessError(notifications.ProcessingMonthAlreadyClosed)
+	}
+	s.applyMonthlyBillingRules(ctx, orgID, monthID, pm, candidates)
+	if len(input.BillingGroupIDs) > 0 {
+		selected := make(map[string]struct{}, len(input.BillingGroupIDs))
+		for _, id := range input.BillingGroupIDs {
+			if id = strings.TrimSpace(id); id != "" {
+				selected[id] = struct{}{}
+			}
+		}
+		filtered := candidates[:0]
+		for _, c := range candidates {
+			if _, ok := selected[c.BillingGroupID]; ok {
+				filtered = append(filtered, c)
+			}
+		}
+		candidates = filtered
+	}
 
 	procMonthID := monthID
 	return s.generateBillingDocumentsForCandidates(ctx, orgID, candidates, &procMonthID, issueDate, dueDate, descriptionTemplate, templateCode, layoutCode)
+}
+
+func (s *Service) applyMonthlyBillingRules(ctx context.Context, orgID, monthID string, pm *store.ProcessingMonthRow, items []models.BulkBillingPreviewItem) {
+	_ = pm
+	for i := range items {
+		readiness, err := s.Store.GetBillingReadiness(ctx, orgID, items[i].CustomerID, monthID)
+		if err == nil && readiness != nil {
+			items[i].IsReleasedForBilling = readiness.IsReleasedForBilling
+			items[i].BillingReadinessLabel = readiness.StatusDisplayName
+			if !readiness.IsReleasedForBilling && items[i].Eligible {
+				items[i].Eligible = false
+				items[i].SkipReason = "not_billing_ready"
+			}
+		}
+	}
+}
+
+func (s *Service) recomputeCustomerCycleAmount(ctx context.Context, customerID string, cycle *time.Time) (float64, error) {
+	linkIDs, err := s.Store.ListActiveCustomerLinkIDs(ctx, customerID)
+	if err != nil {
+		return 0, err
+	}
+	var total float64
+	for _, linkID := range linkIDs {
+		processings, err := s.Store.ListBillingProcessingsForLink(ctx, linkID)
+		if err != nil {
+			continue
+		}
+		for _, p := range processings {
+			if p.Perspective != perspectiveLuxusCustomer {
+				continue
+			}
+			amt, err := s.Store.SumBillingProcessingTotalForCycle(ctx, p.ID, cycle)
+			if err == nil {
+				total += amt
+			}
+		}
+	}
+	return total, nil
 }
 
 func bulkSkipReasonMessage(reason string) string {
@@ -533,6 +597,8 @@ func bulkSkipReasonMessage(reason string) string {
 		return "Já existe fatura para este mês de processamento."
 	case "no_active_lines":
 		return "Cliente sem linhas ou aparelhos ativos vinculados."
+	case "not_billing_ready":
+		return "Cliente pendente de liberação para faturamento neste mês."
 	default:
 		return reason
 	}

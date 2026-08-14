@@ -4,7 +4,7 @@ import { client } from '@/lib/client';
 
 export type BillingCompositionItem = {
   id: string;
-  item_type: 'service' | 'discount' | 'extra_charge' | 'installment';
+  item_type: 'service' | 'discount' | 'extra_charge' | 'installment' | 'exceedance';
   description: string;
   amount: number;
   quantity: number;
@@ -12,6 +12,8 @@ export type BillingCompositionItem = {
   installment_current?: number | null;
   start_date?: string | null;
   end_date?: string | null;
+  service_type?: string | null;
+  proportional?: boolean;
 };
 
 export type LineBillingProcessing = {
@@ -19,6 +21,9 @@ export type LineBillingProcessing = {
   perspective: 'luxus_customer' | 'customer_end_user';
   label?: string | null;
   mirror_from_primary: boolean;
+  organizational_unit?: string | null;
+  department?: string | null;
+  cost_center_label?: string | null;
   total_amount: number;
   items: BillingCompositionItem[];
 };
@@ -71,6 +76,27 @@ export function useEnableEndUserProcessing(phoneLineId: string) {
   });
 }
 
+export function useUpdateBillingProcessing(phoneLineId: string, processingId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: {
+      label?: string;
+      mirror_from_primary?: boolean;
+      organizational_unit?: string;
+      department?: string;
+      cost_center_label?: string;
+    }) => {
+      const { data } = await client<LineBillingProcessing>({
+        url: `/v1/phone-lines/${phoneLineId}/billing-processings/${processingId}`,
+        method: 'PATCH',
+        data: body
+      });
+      return data;
+    },
+    onSuccess: () => void qc.invalidateQueries({ queryKey: keys.all(phoneLineId) })
+  });
+}
+
 export function useMirrorBillingProcessing(phoneLineId: string, processingId: string) {
   const qc = useQueryClient();
   return useMutation({
@@ -95,6 +121,10 @@ export function useCreateBillingCompositionItem(phoneLineId: string, processingI
       quantity?: number;
       installment_count?: number;
       installment_current?: number;
+      start_date?: string;
+      end_date?: string;
+      service_type?: string;
+      proportional?: boolean;
     }) => {
       const { data } = await client<BillingCompositionItem>({
         url: `/v1/phone-lines/${phoneLineId}/billing-processings/${processingId}/items`,
@@ -136,6 +166,8 @@ export function itemTypeLabel(type: string) {
       return 'Cobrança extra';
     case 'installment':
       return 'Parcelamento';
+    case 'exceedance':
+      return 'Excedente';
     default:
       return 'Serviço';
   }

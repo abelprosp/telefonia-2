@@ -74,6 +74,14 @@ var (
 	PhoneLineOperationAlreadyReviewed  = N("PHONE_LINE_OPERATION_ALREADY_REVIEWED", "This operation request has already been reviewed.")
 	PartnerCustomerAccessDenied        = N("PARTNER_CUSTOMER_ACCESS_DENIED", "You do not have access to this customer.")
 	PartnerPhoneLineAccessDenied       = N("PARTNER_PHONE_LINE_ACCESS_DENIED", "You do not have access to this phone line.")
+	PhoneLineClassificationInvalid     = N("PHONE_LINE_CLASSIFICATION_INVALID", "Classificação inválida. Use normal, titular ou dependent.")
+	PhoneLineTitularRequired           = N("PHONE_LINE_TITULAR_REQUIRED", "Linha dependente deve estar vinculada a um titular.")
+	PhoneLineTitularSelf               = N("PHONE_LINE_TITULAR_SELF", "Uma linha não pode ser titular de si mesma.")
+	PhoneLineTitularNotFound           = N("PHONE_LINE_TITULAR_NOT_FOUND", "Linha titular não encontrada.")
+	PhoneLineServiceRequiredToLink     = N("PHONE_LINE_SERVICE_REQUIRED_TO_LINK", "Não é possível vincular a linha a um cliente sem ao menos um serviço ativo na composição.")
+	PhoneLineServiceTypeDuplicated     = N("PHONE_LINE_SERVICE_TYPE_DUPLICATED", "Já existe serviço do mesmo tipo ativo nesta linha no período informado.")
+	PhoneLineServiceNotFound           = N("PHONE_LINE_SERVICE_NOT_FOUND", "Serviço da linha não encontrado.")
+	PhoneLineTransitionSubStatusInvalid = N("PHONE_LINE_TRANSITION_SUBSTATUS_INVALID", "Substatus de transição inválido.")
 )
 
 // Device stock
@@ -153,6 +161,7 @@ var (
 var (
 	InvoiceNotFound                      = N("INVOICE_NOT_FOUND", "Invoice was not found.")
 	InvoiceDuplicateSameProcessingMonth  = N("INVOICE_DUPLICATE_SAME_PROCESSING_MONTH", "Invoice duplicate for same processing month.")
+	InvoiceDuplicateOtherProcessingMonth = N("INVOICE_DUPLICATE_OTHER_PROCESSING_MONTH", "Esta fatura já foi importada em outro mês de processamento.")
 	InvoiceImportedLineOrphanDestination = N("INVOICE_IMPORTED_LINE_ORPHAN_DESTINATION", "Imported line has incompatible status.")
 )
 
@@ -170,6 +179,17 @@ var (
 	ImportCPFRequiresExistingCustomer  = N("CPF_REQUIRES_EXISTING_CUSTOMER_FOR_IMPORT", "CPF requires existing customer for import.")
 	ImportContractingCompanyNotFound   = N("CONTRACTING_COMPANY_NOT_FOUND_FOR_FILE", "Contracting company not found for file.")
 	CustomerContractingCompanyMismatch = N("CUSTOMER_CONTRACTING_COMPANY_MISMATCH", "Customer contracting company mismatch.")
+	ImportPDFNotParsed                 = N("IMPORT_PDF_NOT_PARSED", "PDF ainda não parseado. Importe o arquivo TXT equivalente da operadora.")
+)
+
+// Exceedances & fidelity
+var (
+	ExceedanceTermRequired      = N("EXCEEDANCE_TERM_REQUIRED", "Informe o termo de excedente.")
+	ExceedanceTermNotFound      = N("EXCEEDANCE_TERM_NOT_FOUND", "Termo de excedente não encontrado.")
+	ExceedanceChargeTypeInvalid = N("EXCEEDANCE_CHARGE_TYPE_INVALID", "Tipo de cobrança inválido. Use mirrored ou tabulated.")
+	LineFidelityNotFound        = N("LINE_FIDELITY_NOT_FOUND", "Fidelidade da linha não encontrada.")
+	LineFidelityMonthsInvalid   = N("LINE_FIDELITY_MONTHS_INVALID", "Prazo de fidelidade deve ser maior que zero.")
+	LineFidelityRenewalInvalid  = N("LINE_FIDELITY_RENEWAL_INVALID", "Período de renovação deve ser maior que zero quando a renovação automática está ativa.")
 )
 
 // ObjectStorage

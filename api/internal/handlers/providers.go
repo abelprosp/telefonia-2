@@ -110,6 +110,42 @@ func (h *Handler) getProviderInvoice(w http.ResponseWriter, r *http.Request) {
 	httputil.WriteJSON(w, http.StatusOK, item)
 }
 
+func (h *Handler) createProviderPlanService(w http.ResponseWriter, r *http.Request) {
+	var input models.CreateProviderPlanServiceInput
+	if err := decodeJSON(r, &input); err != nil {
+		httputil.WriteFail(w, http.StatusBadRequest, notifications.N("REQUEST_VALIDATION", "Invalid request body"))
+		return
+	}
+	item, err := h.Svc.CreateProviderPlanService(r.Context(), chi.URLParam(r, "id"), chi.URLParam(r, "planId"), input)
+	if err != nil {
+		httputil.HandleServiceError(w, err)
+		return
+	}
+	httputil.WriteJSON(w, http.StatusCreated, item)
+}
+
+func (h *Handler) updateProviderPlanService(w http.ResponseWriter, r *http.Request) {
+	var input models.UpdateProviderPlanServiceInput
+	if err := decodeJSON(r, &input); err != nil {
+		httputil.WriteFail(w, http.StatusBadRequest, notifications.N("REQUEST_VALIDATION", "Invalid request body"))
+		return
+	}
+	item, err := h.Svc.UpdateProviderPlanService(r.Context(), chi.URLParam(r, "id"), chi.URLParam(r, "planId"), chi.URLParam(r, "serviceId"), input)
+	if err != nil {
+		httputil.HandleServiceError(w, err)
+		return
+	}
+	httputil.WriteJSON(w, http.StatusOK, item)
+}
+
+func (h *Handler) deleteProviderPlanService(w http.ResponseWriter, r *http.Request) {
+	if err := h.Svc.DeleteProviderPlanService(r.Context(), chi.URLParam(r, "id"), chi.URLParam(r, "planId"), chi.URLParam(r, "serviceId")); err != nil {
+		httputil.HandleServiceError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (h *Handler) requestProviderInvoiceImport(w http.ResponseWriter, r *http.Request) {
 	var input models.ProviderInvoiceImportRequestInput
 	if err := decodeJSON(r, &input); err != nil {
@@ -122,4 +158,13 @@ func (h *Handler) requestProviderInvoiceImport(w http.ResponseWriter, r *http.Re
 		return
 	}
 	httputil.WriteJSON(w, http.StatusCreated, item)
+}
+
+func (h *Handler) getImportRequestStatus(w http.ResponseWriter, r *http.Request) {
+	item, err := h.Svc.GetImportRequestStatus(r.Context(), chi.URLParam(r, "id"))
+	if err != nil {
+		httputil.HandleServiceError(w, err)
+		return
+	}
+	httputil.WriteJSON(w, http.StatusOK, item)
 }

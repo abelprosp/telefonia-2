@@ -113,13 +113,18 @@ export function AssignCustomerDeviceSheet({
       return;
     }
 
+    const renewFidelity = window.confirm(
+      'Aquisição de aparelho pode renovar a fidelidade das linhas deste cliente. Deseja renovar?'
+    );
+
     assignMutation.mutate(
       {
         device_stock_item_id: values.source === 'stock' ? values.deviceStockItemId : null,
         brand: values.source === 'manual' ? values.brand?.trim() : null,
         model: values.source === 'manual' ? values.model?.trim() : null,
         description: values.description?.trim() || null,
-        monthly_amount: monthlyAmount
+        monthly_amount: monthlyAmount,
+        renew_fidelity: renewFidelity
       },
       {
         onSuccess: () => {

@@ -299,7 +299,7 @@ export function useUpdateCommissionSettings() {
   });
 }
 
-export const formatMoney = (value: number) =>
+export const formatMoney = (value?: number | null) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value ?? 0);
 
 export const formatFinancialStatus = (status: string) => {

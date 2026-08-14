@@ -11,6 +11,18 @@ export type ListPhoneLineResponse = {
   /**
    * @type string
    */
+  provider_id?: string;
+  /**
+   * @type string
+   */
+  provider_name?: string;
+  /**
+   * @type null,string
+   */
+  contracted_luxus_cnpj?: string | null;
+  /**
+   * @type string
+   */
   provider_plan_id: string;
   /**
    * @type string

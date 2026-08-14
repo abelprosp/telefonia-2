@@ -189,7 +189,11 @@ export function ProviderDetailView({
                   </button>
                   {isOpen && (
                     <div className="border-border border-t">
-                      <ProviderPlanServices services={plan.services ?? []} />
+                      <ProviderPlanServices
+                        providerId={providerId}
+                        planId={plan.id}
+                        services={plan.services ?? []}
+                      />
                     </div>
                   )}
                 </div>

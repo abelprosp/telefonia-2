@@ -1,4 +1,5 @@
 {
+  "unmanagedAttributePolicy": "ADMIN_EDIT",
   "attributes": [
     {
       "name": "username",

@@ -24,4 +24,20 @@ export type UpdateCustomerInput = {
    * @type null,string
    */
   responsible_salesperson_user_id?: string | null;
+  /**
+   * @type null,string
+   */
+  billing_email?: string | null;
+  /**
+   * @type null,boolean
+   */
+  is_reseller?: boolean | null;
+  /**
+   * @type null,string, date
+   */
+  commercial_activation_date?: string | null;
+  /**
+   * @type null,string
+   */
+  contracted_luxus_cnpj?: string | null;
 };

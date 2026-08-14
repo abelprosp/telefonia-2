@@ -1,7 +1,10 @@
 package importservice
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -11,6 +14,7 @@ import (
 	"github.com/luxus-connect/telefonia/api/internal/httputil"
 	"github.com/luxus-connect/telefonia/api/internal/models"
 	"github.com/luxus-connect/telefonia/api/internal/notifications"
+	"github.com/luxus-connect/telefonia/api/internal/services"
 	"github.com/luxus-connect/telefonia/api/internal/store"
 	"github.com/luxus-connect/telefonia/api/internal/vivo"
 )
@@ -42,7 +46,11 @@ func (p *Processor) ProcessImport(ctx context.Context, importRequestID string) e
 	processErr := p.process(ctx, req)
 	if processErr != nil {
 		msg := processErr.Error()
-		_ = p.Store.UpdateImportRequestStatus(ctx, importRequestID, 3, &msg, &now)
+		status := 3
+		if isPDFUnparsed(processErr) {
+			status = 4
+		}
+		_ = p.Store.UpdateImportRequestStatus(ctx, importRequestID, status, &msg, &now)
 		return processErr
 	}
 	_ = p.Store.UpdateImportRequestStatus(ctx, importRequestID, 2, nil, &now)
@@ -53,6 +61,9 @@ func (p *Processor) process(ctx context.Context, req *store.ImportRequestRow) er
 	raw, err := p.Storage.GetObject(ctx, req.StorageBucket, req.StorageObjectKey)
 	if err != nil {
 		return fmt.Errorf("storage get: %w", err)
+	}
+	if isPDFBytes(raw) {
+		return httputil.BusinessError(notifications.ImportPDFNotParsed)
 	}
 	parsed, err := vivo.ParseLatin1(raw)
 	if err != nil {
@@ -87,6 +98,13 @@ func (p *Processor) process(ctx context.Context, req *store.ImportRequestRow) er
 	if dup {
 		return httputil.BusinessError(notifications.InvoiceDuplicateSameProcessingMonth)
 	}
+	otherMonth, err := p.Store.InvoiceExistsInOtherProcessingMonth(ctx, account.ID, company.ID, month.ID, header.DueDate)
+	if err != nil {
+		return err
+	}
+	if otherMonth {
+		return httputil.BusinessError(notifications.InvoiceDuplicateOtherProcessingMonth)
+	}
 
 	numbersInFile := buildNumbersFrom110D(parsed)
 	importCustomer, err := p.resolveCustomer(ctx, orgID, req.ProviderID, company, taxID, parsed)
@@ -118,6 +136,8 @@ func (p *Processor) process(ctx context.Context, req *store.ImportRequestRow) er
 	if err := p.applyAbsentLines(ctx, account.ID, invoiceID, numbersInFile); err != nil {
 		return err
 	}
+
+	_ = p.applyAutomaticExceedances(ctx, orgID, invoiceID, parsed)
 
 	return nil
 }
@@ -310,6 +330,10 @@ func (p *Processor) processInvoiceServices(ctx context.Context, providerID, invo
 
 func (p *Processor) processLines(ctx context.Context, providerID, accountID, invoiceID string, parsed []any, customerID string, numbers map[string]struct{}, header *vivo.Line010DHeader) error {
 	seen := map[string]struct{}{}
+	activation := header.IssueDate
+	if !header.BillingStartDate.IsZero() {
+		activation = header.BillingStartDate
+	}
 	for _, rec := range parsed {
 		line, ok := rec.(*vivo.Line110DAccountLineDetail)
 		if !ok {
@@ -336,32 +360,56 @@ func (p *Processor) processLines(ctx context.Context, providerID, accountID, inv
 		if pl != nil && pl.ProviderAccountID != accountID {
 			return fmt.Errorf("line %s linked to another account", numberKey)
 		}
+		created := false
 		if pl == nil {
 			id := uuid.New().String()
 			if err := p.Store.CreatePhoneLine(ctx, id, plan.ID, accountID, numberKey); err != nil {
 				return err
 			}
 			pl = &store.PhoneLineRow{ID: id, Number: numberKey, ProviderAccountID: accountID, ProviderPlanID: plan.ID, Status: "in_stock"}
+			created = true
+			p.auditImport(ctx, "Create", pl.ID, map[string]any{
+				"message": fmt.Sprintf("Linha criada em estoque automaticamente a partir da fatura %s / %s.", header.ReferenceMonth, header.DueDate.Format("02/01/2006")),
+				"number":  numberKey,
+			})
 		}
 
-		if customerID != "" {
-			_, activeCustomer, _ := p.Store.GetActivePhoneLineCustomerLink(ctx, pl.ID)
-			if activeCustomer == "" {
-				_ = p.Store.AssignPhoneLineCustomer(ctx, pl.ID, customerID, header.IssueDate, nil)
-				_ = p.Store.AddCustomerProviderLink(ctx, customerID, providerID, header.IssueDate)
-				_ = p.Store.ReactivateCustomer(ctx, customerID)
-			}
-			_ = p.Store.UpdatePhoneLineStatus(ctx, pl.ID, "active")
-		} else {
+		if pl.Status == "cancelled" || pl.Status == "suspended" {
+			return httputil.BusinessError(notifications.InvoiceImportedLineOrphanDestination)
+		}
+
+		_, activeCustomer, _ := p.Store.GetActivePhoneLineCustomerLink(ctx, pl.ID)
+		if customerID != "" && activeCustomer == "" {
+			_ = p.Store.AssignPhoneLineCustomer(ctx, pl.ID, customerID, header.IssueDate, nil)
+			_ = p.Store.AddCustomerProviderLink(ctx, customerID, providerID, header.IssueDate)
+			_ = p.Store.ReactivateCustomer(ctx, customerID)
+			activeCustomer = customerID
+		}
+
+		prevStatus := pl.Status
+		switch {
+		case prevStatus == "in_transition" || prevStatus == "awaiting_invoice":
+			_ = p.Store.ActivatePhoneLineFromInvoice(ctx, pl.ID, activation)
+			p.auditImport(ctx, "Reconcile", pl.ID, map[string]any{
+				"message":         fmt.Sprintf("Linha %s conciliada automaticamente. Status: Ativa desde %s.", numberKey, activation.Format("02/01/2006")),
+				"previous_status": prevStatus,
+				"activation_date": activation.Format("2006-01-02"),
+			})
+		case activeCustomer != "":
+			_ = p.Store.ActivatePhoneLineFromInvoice(ctx, pl.ID, activation)
+		case prevStatus == "inactive":
 			_ = p.Store.UpdatePhoneLineStatus(ctx, pl.ID, "in_stock")
+			p.auditImport(ctx, "ReactivateStock", pl.ID, map[string]any{
+				"message": fmt.Sprintf("Linha %s retornou ao estoque após reaparecer na fatura.", numberKey),
+			})
+		default:
+			if !created {
+				_ = p.Store.UpdatePhoneLineStatus(ctx, pl.ID, "in_stock")
+			}
 		}
 
 		_ = p.Store.UpdatePhoneLineCosts(ctx, pl.ID, line.LineTotal, line.LineTotal, invoiceID)
 		_ = p.Store.LinkInvoicePhoneLine(ctx, invoiceID, pl.ID)
-
-		if pl.Status == "inactive" || pl.Status == "cancelled" || pl.Status == "suspended" {
-			return httputil.BusinessError(notifications.InvoiceImportedLineOrphanDestination)
-		}
 	}
 	return nil
 }
@@ -381,13 +429,37 @@ func (p *Processor) applyAbsentLines(ctx context.Context, accountID, invoiceID s
 		}
 		_, activeCustomer, _ := p.Store.GetActivePhoneLineCustomerLink(ctx, line.ID)
 		if activeCustomer == "" {
-			_ = p.Store.UpdatePhoneLineStatus(ctx, line.ID, "in_stock")
+			if line.Status == "in_stock" || line.Status == "active" {
+				_ = p.Store.UpdatePhoneLineStatus(ctx, line.ID, "inactive")
+				p.auditImport(ctx, "InactivateStock", line.ID, map[string]any{
+					"message":          fmt.Sprintf("Linha %s inativada no estoque por ausência na fatura. Última fatura preservada.", line.Number),
+					"last_invoice_id":  invoiceID,
+					"previous_status":  line.Status,
+				})
+			}
 		} else {
 			_ = p.Store.UpdatePhoneLineStatus(ctx, line.ID, "awaiting_invoice")
+			p.auditImport(ctx, "AwaitingInvoice", line.ID, map[string]any{
+				"message":         fmt.Sprintf("Linha %s ausente na fatura. Status: Aguardando fatura.", line.Number),
+				"previous_status": line.Status,
+				"customer_id":     activeCustomer,
+			})
 		}
-		_ = p.Store.UpdatePhoneLineCosts(ctx, line.ID, 0, 0, invoiceID)
 	}
 	return nil
+}
+
+func (p *Processor) auditImport(ctx context.Context, changeType, phoneLineID string, payload map[string]any) {
+	var newStr *string
+	if b, err := json.Marshal(payload); err == nil {
+		s := string(b)
+		newStr = &s
+	}
+	system := "import"
+	_ = p.Store.InsertAuditLog(ctx, uuid.New().String(), changeType, "PhoneLine", phoneLineID, &system, nil, newStr, time.Now().UTC())
+	if p.Log != nil {
+		p.Log.Info("import matrix", "change", changeType, "phone_line_id", phoneLineID, "payload", payload)
+	}
 }
 
 func (p *Processor) resolvePlan(ctx context.Context, providerID, planCode string) (*store.ProviderPlanRow, error) {
@@ -448,3 +520,100 @@ func resolveLegalName(c *vivo.Line011DCustomer) string {
 	}
 	return "Empresa não identificada"
 }
+
+func isPDFBytes(raw []byte) bool {
+	trimmed := bytes.TrimSpace(raw)
+	return bytes.HasPrefix(trimmed, []byte("%PDF"))
+}
+
+func isPDFUnparsed(err error) bool {
+	var app *httputil.AppError
+	if errors.As(err, &app) {
+		for _, n := range app.Notifications {
+			if n.Code == "IMPORT_PDF_NOT_PARSED" {
+				return true
+			}
+		}
+	}
+	return strings.Contains(strings.ToLower(err.Error()), "pdf ainda não parseado")
+}
+
+type extraHit struct {
+	phoneNumber string
+	description string
+	amount      float64
+}
+
+func collectExtraHits(parsed []any) []extraHit {
+	var hits []extraHit
+	for _, rec := range parsed {
+		switch item := rec.(type) {
+		case *vivo.InvoiceFranchiseLineDetail:
+			hits = append(hits, extraHit{phoneNumber: item.PhoneNumber, description: item.ServiceDescription, amount: item.UsageAmount})
+		case *vivo.Line052DExtraUsageDetail:
+			hits = append(hits, extraHit{description: item.Description, amount: item.Amount})
+		}
+	}
+	return hits
+}
+
+func (p *Processor) applyAutomaticExceedances(ctx context.Context, orgID, invoiceID string, parsed []any) error {
+	terms, err := p.Store.ListExceedanceTerms(ctx, orgID, true)
+	if err != nil || len(terms) == 0 {
+		return err
+	}
+	now := time.Now().UTC()
+	for _, hit := range collectExtraHits(parsed) {
+		term := services.MatchExceedanceTerm(hit.description, terms)
+		if term == nil {
+			continue
+		}
+		var phoneLineID *string
+		if n := httputil.NormalizeDigits(hit.phoneNumber); n != "" {
+			pl, err := p.Store.GetPhoneLineByNumber(ctx, n)
+			if err != nil || pl == nil {
+				continue
+			}
+			phoneLineID = &pl.ID
+			settings, err := p.Store.GetPhoneLineExceedanceSettings(ctx, pl.ID)
+			if err != nil || settings == nil || !settings.ChargeExceedances {
+				continue
+			}
+			charged, chargeType := services.ChargedExceedanceAmount(hit.amount, settings.ExceedanceChargeType, term)
+			inserted, err := p.Store.InsertDetectedExceedance(ctx, store.DetectedExceedanceRow{
+				ID: uuid.New().String(), InvoiceID: invoiceID, PhoneLineID: phoneLineID, TermID: &term.ID,
+				Term: term.Term, Description: hit.description, InvoiceAmount: hit.amount, ChargedAmount: charged,
+				ChargeType: chargeType, Applied: charged > 0, CreatedAt: now,
+			})
+			if err != nil || !inserted || charged <= 0 {
+				continue
+			}
+			procID, err := p.Store.GetPrimaryProcessingIDForLine(ctx, pl.ID)
+			if err != nil || procID == "" {
+				continue
+			}
+			item := store.BillingCompositionItemRow{
+				ID: uuid.New().String(), ProcessingID: procID, ItemType: "exceedance",
+				Description: term.Term + " — " + strings.TrimSpace(hit.description),
+				Amount: charged, Quantity: 1, Active: true, CreatedAt: now, UpdatedAt: now, Proportional: false,
+			}
+			if err := p.Store.CreateBillingCompositionItem(ctx, item); err != nil {
+				continue
+			}
+			if secondary, err := p.Store.GetMirroredSecondaryProcessingID(ctx, pl.ID); err == nil && secondary != "" {
+				copy := item
+				copy.ID = uuid.New().String()
+				copy.ProcessingID = secondary
+				_ = p.Store.CreateBillingCompositionItem(ctx, copy)
+			}
+			continue
+		}
+		_, _ = p.Store.InsertDetectedExceedance(ctx, store.DetectedExceedanceRow{
+			ID: uuid.New().String(), InvoiceID: invoiceID, TermID: &term.ID,
+			Term: term.Term, Description: hit.description, InvoiceAmount: hit.amount, ChargedAmount: 0,
+			ChargeType: term.ChargeType, Applied: false, CreatedAt: now,
+		})
+	}
+	return nil
+}
+

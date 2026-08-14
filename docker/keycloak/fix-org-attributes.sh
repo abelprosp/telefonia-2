@@ -19,3 +19,4 @@ update_org dev
 update_org parceiro
 update_org funcionario
 update_org financeiro
+update_org arturabel

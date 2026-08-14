@@ -54,6 +54,18 @@ function CustomerInvoicesPage() {
     { accessorKey: 'invoice_number', header: 'Número' },
     { accessorKey: 'customer_name', header: 'Cliente' },
     {
+      id: 'group',
+      header: 'Boleto',
+      cell: ({ row }) =>
+        row.original.phone_line_number
+          ? `Linha ${row.original.phone_line_number}`
+          : row.original.billing_group_type === 'titular_group'
+            ? 'Titular + dependentes'
+            : row.original.billing_group_type === 'devices'
+              ? 'Aparelhos'
+              : '—'
+    },
+    {
       accessorKey: 'amount',
       header: 'Valor',
       cell: ({ row }) => formatMoney(row.original.amount)

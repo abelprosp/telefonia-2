@@ -35,11 +35,13 @@ func (s *Store) ListPhoneLines(ctx context.Context, orgID string, status *string
 	offsetParam := len(args) + 1
 	limitParam := len(args) + 2
 	selectQ := `
-		SELECT pl."Id", pl."ProviderPlanId", pp."Name", pl."ProviderAccountId", pa."AccountNumber",
+		SELECT pl."Id", p."Id" AS "ProviderId", p."Name" AS "ProviderName", cc."TaxId" AS "ContractedLuxusCnpj",
+			pl."ProviderPlanId", pp."Name", pl."ProviderAccountId", pa."AccountNumber",
 			pl."CostCenterId", cst."Name", pl."LastInvoiceId", inv."Number",
 			pl."TitularLineId", tit."Number", pl."Number", pl."LineClassification"::text,
 			pl."Status"::text, pl."TransitionSubStatus"::text, pl."TransitionStartedAt",
-			pl."ActivationDate", pl."CancellationDate", pl."BaseCost", pl."CostWithConsumption"
+			pl."ActivationDate", pl."CancellationDate", pl."BaseCost", pl."CostWithConsumption",
+			COALESCE(pl."ChargeExceedances", true), COALESCE(pl."ExceedanceChargeType"::text, 'mirroed')
 		` + base + `
 		ORDER BY pl."Number"
 		OFFSET $` + itoa(offsetParam) + ` LIMIT $` + itoa(limitParam)
@@ -58,14 +60,16 @@ func scanPhoneLineList(rows pgx.Rows, total int64) ([]models.ListPhoneLineRespon
 	for rows.Next() {
 		var item models.ListPhoneLineResponse
 		if err := rows.Scan(
-			&item.ID, &item.ProviderPlanID, &item.ProviderPlanName, &item.ProviderAccountID,
+			&item.ID, &item.ProviderID, &item.ProviderName, &item.ContractedLuxusCnpj,
+			&item.ProviderPlanID, &item.ProviderPlanName, &item.ProviderAccountID,
 			&item.ProviderAccountNumber, &item.CostCenterID, &item.CostCenterName,
 			&item.LastInvoiceID, &item.LastInvoiceNumber, &item.TitularLineID, &item.TitularLineNumber,
 			&item.Number, &item.LineClassification, &item.Status, &item.TransitionSubStatus,
 			&item.TransitionStartedAt, &item.ActivationDate, &item.CancellationDate,
-			&item.BaseCost, &item.CostWithConsumption); err != nil {
+			&item.BaseCost, &item.CostWithConsumption, &item.ChargeExceedances, &item.ExceedanceChargeType); err != nil {
 			return nil, 0, err
 		}
+		item.ExceedanceChargeType = ExceedanceChargeTypeAPI(item.ExceedanceChargeType)
 		items = append(items, item)
 	}
 	return items, total, rows.Err()
@@ -75,11 +79,13 @@ func (s *Store) GetPhoneLine(ctx context.Context, orgID, id string) (*models.Get
 	q := s.q(ctx)
 	var item models.GetPhoneLineResponse
 	err := q.QueryRow(ctx, `
-		SELECT pl."Id", pl."ProviderPlanId", pp."Name", pl."ProviderAccountId", pa."AccountNumber",
+		SELECT pl."Id", p."Id" AS "ProviderId", p."Name" AS "ProviderName", cc."TaxId" AS "ContractedLuxusCnpj",
+			pl."ProviderPlanId", pp."Name", pl."ProviderAccountId", pa."AccountNumber",
 			pl."CostCenterId", cst."Name", pl."LastInvoiceId", inv."Number",
 			pl."TitularLineId", tit."Number", pl."Number", pl."LineClassification"::text,
 			pl."Status"::text, pl."TransitionSubStatus"::text, pl."TransitionStartedAt",
-			pl."ActivationDate", pl."CancellationDate", pl."BaseCost", pl."CostWithConsumption"
+			pl."ActivationDate", pl."CancellationDate", pl."BaseCost", pl."CostWithConsumption",
+			COALESCE(pl."ChargeExceedances", true), COALESCE(pl."ExceedanceChargeType"::text, 'mirroed')
 		FROM "PhoneLines" pl
 		JOIN "ProviderAccounts" pa ON pa."Id" = pl."ProviderAccountId"
 		JOIN "ContractingCompanies" cc ON cc."Id" = pa."ContractingCompanyId"
@@ -90,21 +96,24 @@ func (s *Store) GetPhoneLine(ctx context.Context, orgID, id string) (*models.Get
 		LEFT JOIN "PhoneLines" tit ON tit."Id" = pl."TitularLineId"
 		WHERE p."OrganizationId" = $1 AND pl."Id" = $2`, orgID, id).
 		Scan(
-			&item.ID, &item.ProviderPlanID, &item.ProviderPlanName, &item.ProviderAccountID,
+			&item.ID, &item.ProviderID, &item.ProviderName, &item.ContractedLuxusCnpj,
+			&item.ProviderPlanID, &item.ProviderPlanName, &item.ProviderAccountID,
 			&item.ProviderAccountNumber, &item.CostCenterID, &item.CostCenterName,
 			&item.LastInvoiceID, &item.LastInvoiceNumber, &item.TitularLineID, &item.TitularLineNumber,
 			&item.Number, &item.LineClassification, &item.Status, &item.TransitionSubStatus,
 			&item.TransitionStartedAt, &item.ActivationDate, &item.CancellationDate,
-			&item.BaseCost, &item.CostWithConsumption)
+			&item.BaseCost, &item.CostWithConsumption, &item.ChargeExceedances, &item.ExceedanceChargeType)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
+	item.ExceedanceChargeType = ExceedanceChargeTypeAPI(item.ExceedanceChargeType)
 
 	svcRows, err := q.Query(ctx, `
-		SELECT "Id", "PhoneLineId", "ProviderPlanServiceId", "Name", "Code", "Recurring", "Price", "Active"
+		SELECT "Id", "PhoneLineId", "ProviderPlanServiceId", "Name", "Code", "Recurring", "Price", "Active",
+			"ServiceType"::text, "StartDate", "EndDate"
 		FROM "PhoneLineServices" WHERE "PhoneLineId" = $1`, id)
 	if err != nil {
 		return nil, err
@@ -113,7 +122,8 @@ func (s *Store) GetPhoneLine(ctx context.Context, orgID, id string) (*models.Get
 	for svcRows.Next() {
 		var svc models.GetPhoneLineServiceResponse
 		if err := svcRows.Scan(&svc.ID, &svc.PhoneLineID, &svc.ProviderPlanServiceID,
-			&svc.Name, &svc.Code, &svc.Recurring, &svc.Price, &svc.Active); err != nil {
+			&svc.Name, &svc.Code, &svc.Recurring, &svc.Price, &svc.Active,
+			&svc.ServiceType, &svc.StartDate, &svc.EndDate); err != nil {
 			return nil, err
 		}
 		item.Services = append(item.Services, svc)
@@ -121,8 +131,39 @@ func (s *Store) GetPhoneLine(ctx context.Context, orgID, id string) (*models.Get
 	if item.Services == nil {
 		item.Services = []models.GetPhoneLineServiceResponse{}
 	}
-	item.Children = []models.GetChildPhoneLineResponse{}
+	children, err := s.ListDependentPhoneLines(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	item.Children = children
 	return &item, nil
+}
+
+func (s *Store) ListDependentPhoneLines(ctx context.Context, titularID string) ([]models.GetChildPhoneLineResponse, error) {
+	rows, err := s.q(ctx).Query(ctx, `
+		SELECT pl."Id", pl."Number", pl."LineClassification"::text, pl."Status"::text,
+			pl."ProviderPlanId", pp."Name"
+		FROM "PhoneLines" pl
+		JOIN "ProviderPlans" pp ON pp."Id" = pl."ProviderPlanId"
+		WHERE pl."TitularLineId" = $1
+		ORDER BY pl."Number"`, titularID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []models.GetChildPhoneLineResponse
+	for rows.Next() {
+		var c models.GetChildPhoneLineResponse
+		if err := rows.Scan(&c.ID, &c.Number, &c.LineClassification, &c.Status, &c.ProviderPlanID, &c.ProviderPlanName); err != nil {
+			return nil, err
+		}
+		c.Services = []models.GetPhoneLineServiceResponse{}
+		items = append(items, c)
+	}
+	if items == nil {
+		items = []models.GetChildPhoneLineResponse{}
+	}
+	return items, rows.Err()
 }
 
 func (s *Store) ListPhoneLineCustomerLinks(ctx context.Context, orgID, phoneLineID string) ([]models.PhoneLineCustomerLinkResponse, error) {
@@ -355,6 +396,142 @@ func (s *Store) ListPhoneLinesByAccount(ctx context.Context, accountID string) (
 		items = append(items, pl)
 	}
 	return items, rows.Err()
+}
+
+func (s *Store) UpdatePhoneLineClassification(ctx context.Context, id, classification string, titularLineID *string) error {
+	_, err := s.q(ctx).Exec(ctx, `
+		UPDATE "PhoneLines"
+		SET "LineClassification" = $2::line_classification, "TitularLineId" = $3
+		WHERE "Id" = $1`, id, classification, titularLineID)
+	return err
+}
+
+func (s *Store) GetPhoneLineClassification(ctx context.Context, id string) (classification string, titularID *string, status string, err error) {
+	err = s.q(ctx).QueryRow(ctx, `
+		SELECT "LineClassification"::text, "TitularLineId", "Status"::text
+		FROM "PhoneLines" WHERE "Id" = $1`, id).Scan(&classification, &titularID, &status)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil, "", nil
+	}
+	return classification, titularID, status, err
+}
+
+func (s *Store) ListDependentLineIDs(ctx context.Context, titularID string) ([]string, error) {
+	rows, err := s.q(ctx).Query(ctx, `
+		SELECT "Id" FROM "PhoneLines" WHERE "TitularLineId" = $1`, titularID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+func (s *Store) CountDependents(ctx context.Context, titularID string) (int, error) {
+	var n int
+	err := s.q(ctx).QueryRow(ctx, `SELECT COUNT(*)::int FROM "PhoneLines" WHERE "TitularLineId" = $1`, titularID).Scan(&n)
+	return n, err
+}
+
+func (s *Store) ReclassifyDependentsToNormal(ctx context.Context, titularID string) error {
+	_, err := s.q(ctx).Exec(ctx, `
+		UPDATE "PhoneLines"
+		SET "LineClassification" = 'normal'::line_classification, "TitularLineId" = NULL
+		WHERE "TitularLineId" = $1`, titularID)
+	return err
+}
+
+func (s *Store) ActivatePhoneLineFromInvoice(ctx context.Context, id string, activation time.Time) error {
+	_, err := s.q(ctx).Exec(ctx, `
+		UPDATE "PhoneLines"
+		SET "Status" = 'active'::phone_line_status,
+			"ActivationDate" = $2,
+			"TransitionSubStatus" = NULL,
+			"TransitionStartedAt" = NULL
+		WHERE "Id" = $1`, id, activation)
+	return err
+}
+
+func (s *Store) PhoneLineHasActiveService(ctx context.Context, phoneLineID string) (bool, error) {
+	var exists bool
+	err := s.q(ctx).QueryRow(ctx, `
+		SELECT EXISTS(
+			SELECT 1 FROM "PhoneLineServices" WHERE "PhoneLineId" = $1 AND "Active" = true
+			UNION ALL
+			SELECT 1 FROM "LineBillingProcessings" pr
+			JOIN "LineBillingCompositionItems" ci ON ci."ProcessingId" = pr."Id" AND ci."Active" = true
+			JOIN "PhoneLineCustomerLinks" l ON l."Id" = pr."PhoneLineCustomerLinkId" AND l."EndDate" IS NULL
+			WHERE l."PhoneLineId" = $1 AND ci."ItemType" = 'service'::billing_composition_item_type
+		)`, phoneLineID).Scan(&exists)
+	return exists, err
+}
+
+func (s *Store) CreatePhoneLineService(ctx context.Context, id, phoneLineID, planServiceID, name, code string, recurring bool, price *float64, serviceType *string, start, end *time.Time) error {
+	st := "other"
+	if serviceType != nil && *serviceType != "" {
+		st = *serviceType
+	}
+	_, err := s.q(ctx).Exec(ctx, `
+		INSERT INTO "PhoneLineServices" (
+			"Id", "PhoneLineId", "ProviderPlanServiceId", "Name", "Code", "Recurring", "Price", "Active",
+			"ServiceType", "StartDate", "EndDate"
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, true, $8::service_type, $9, $10)`,
+		id, phoneLineID, planServiceID, name, code, recurring, price, st, start, end)
+	return err
+}
+
+func (s *Store) DeactivatePhoneLineService(ctx context.Context, phoneLineID, serviceID string) error {
+	tag, err := s.q(ctx).Exec(ctx, `
+		UPDATE "PhoneLineServices" SET "Active" = false
+		WHERE "Id" = $1 AND "PhoneLineId" = $2 AND "Active" = true`, serviceID, phoneLineID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+	return nil
+}
+
+func (s *Store) ActiveServiceTypeExists(ctx context.Context, phoneLineID, serviceType string, excludeID *string) (bool, error) {
+	if serviceType == "" {
+		return false, nil
+	}
+	q := `
+		SELECT EXISTS(
+			SELECT 1 FROM "PhoneLineServices"
+			WHERE "PhoneLineId" = $1 AND "Active" = true AND "ServiceType" = $2::service_type`
+	args := []any{phoneLineID, serviceType}
+	if excludeID != nil && *excludeID != "" {
+		q += ` AND "Id" != $3`
+		args = append(args, *excludeID)
+	}
+	q += `)`
+	var exists bool
+	err := s.q(ctx).QueryRow(ctx, q, args...).Scan(&exists)
+	return exists, err
+}
+
+func (s *Store) GetProviderPlanService(ctx context.Context, orgID, serviceID string) (name, code, serviceType string, recurring bool, price *float64, err error) {
+	err = s.q(ctx).QueryRow(ctx, `
+		SELECT pps."Name", COALESCE(pps."Name", ''), COALESCE(pps."ServiceType"::text, 'other'),
+			pps."Recurring", pps."Price"
+		FROM "ProviderPlanServices" pps
+		JOIN "ProviderPlans" pp ON pp."Id" = pps."ProviderPlanId"
+		JOIN "Providers" p ON p."Id" = pp."ProviderId"
+		WHERE pps."Id" = $1 AND p."OrganizationId" = $2`, serviceID, orgID).
+		Scan(&name, &code, &serviceType, &recurring, &price)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", "", "", false, nil, nil
+	}
+	return name, code, serviceType, recurring, price, err
 }
 
 func (s *Store) CountDashboardPhoneLines(ctx context.Context, orgID string) (int32, error) {

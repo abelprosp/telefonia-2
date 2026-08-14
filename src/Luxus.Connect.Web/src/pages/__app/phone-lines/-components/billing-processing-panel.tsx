@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -27,7 +27,8 @@ import {
   useDeleteBillingCompositionItem,
   useEnableEndUserProcessing,
   useLineBillingProcessings,
-  useMirrorBillingProcessing
+  useMirrorBillingProcessing,
+  useUpdateBillingProcessing
 } from '@/lib/billing-processing-api';
 import { formatMoney } from '@/lib/financial-api';
 
@@ -46,12 +47,34 @@ export function BillingProcessingPanel({
   const [itemType, setItemType] = useState('service');
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [serviceType, setServiceType] = useState('subscription');
+  const [proportional, setProportional] = useState(true);
 
   const processingId =
     activeProcessingId || query.data?.processings[0]?.id || '';
   const createItem = useCreateBillingCompositionItem(phoneLineId, processingId);
   const deleteItem = useDeleteBillingCompositionItem(phoneLineId, processingId);
   const mirror = useMirrorBillingProcessing(phoneLineId, processingId);
+  const updateProcessing = useUpdateBillingProcessing(phoneLineId, processingId);
+  const [label, setLabel] = useState('');
+  const [orgUnit, setOrgUnit] = useState('');
+  const [department, setDepartment] = useState('');
+  const [costCenter, setCostCenter] = useState('');
+
+  const processings = query.data?.processings ?? [];
+  const selected =
+    processings.find((p) => p.id === processingId) ?? processings[0];
+  const hasEndUser = processings.some((p) => p.perspective === 'customer_end_user');
+
+  useEffect(() => {
+    if (!selected) return;
+    setLabel(selected.label ?? '');
+    setOrgUnit(selected.organizational_unit ?? '');
+    setDepartment(selected.department ?? '');
+    setCostCenter(selected.cost_center_label ?? '');
+  }, [selected?.id, selected?.label, selected?.organizational_unit, selected?.department, selected?.cost_center_label]);
 
   if (!hasActiveCustomer) {
     return (
@@ -64,11 +87,6 @@ export function BillingProcessingPanel({
   if (query.isLoading) {
     return <p className="text-muted-foreground text-sm">Carregando processamentos…</p>;
   }
-
-  const processings = query.data?.processings ?? [];
-  const selected =
-    processings.find((p) => p.id === processingId) ?? processings[0];
-  const hasEndUser = processings.some((p) => p.perspective === 'customer_end_user');
 
   return (
     <div className="space-y-4">
@@ -108,25 +126,99 @@ export function BillingProcessingPanel({
       {selected && (
         <>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm font-medium">{perspectiveLabel(selected.perspective)}</p>
+            <p className="text-sm font-medium">
+              {perspectiveLabel(selected.perspective)}
+              {selected.label ? ` · ${selected.label}` : ''}
+            </p>
             {selected.perspective === 'customer_end_user' && (
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                disabled={mirror.isPending}
-                onClick={() =>
-                  mirror.mutate(undefined, {
-                    onSuccess: () => toast.success('Composição espelhada do processamento 1.'),
-                    onError: (e) =>
-                      toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
-                  })
-                }
-              >
-                Espelhar do processamento 1
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={selected.mirror_from_primary ? 'default' : 'outline'}
+                  disabled={updateProcessing.isPending}
+                  onClick={() =>
+                    updateProcessing.mutate(
+                      { mirror_from_primary: !selected.mirror_from_primary },
+                      {
+                        onSuccess: () =>
+                          toast.success(
+                            selected.mirror_from_primary
+                              ? 'Espelhamento desativado.'
+                              : 'Espelhamento ativado.'
+                          ),
+                        onError: (e) =>
+                          toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+                      }
+                    )
+                  }
+                >
+                  {selected.mirror_from_primary ? 'Espelhamento ligado' : 'Espelhar valores'}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={mirror.isPending}
+                  onClick={() =>
+                    mirror.mutate(undefined, {
+                      onSuccess: () => toast.success('Composição copiada do processamento 1.'),
+                      onError: (e) =>
+                        toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+                    })
+                  }
+                >
+                  Copiar do processamento 1
+                </Button>
+              </div>
             )}
           </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+            <Field>
+              <FieldLabel>
+                {selected.perspective === 'customer_end_user'
+                  ? 'Rótulo (usuário final)'
+                  : 'Rótulo'}
+              </FieldLabel>
+              <Input value={label} onChange={(e) => setLabel(e.target.value)} />
+            </Field>
+            <Field>
+              <FieldLabel>UA</FieldLabel>
+              <Input value={orgUnit} onChange={(e) => setOrgUnit(e.target.value)} />
+            </Field>
+            <Field>
+              <FieldLabel>Setor</FieldLabel>
+              <Input value={department} onChange={(e) => setDepartment(e.target.value)} />
+            </Field>
+            <Field>
+              <FieldLabel>Centro de custo</FieldLabel>
+              <Input value={costCenter} onChange={(e) => setCostCenter(e.target.value)} />
+            </Field>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={updateProcessing.isPending}
+            onClick={() =>
+              updateProcessing.mutate(
+                {
+                  label,
+                  organizational_unit: orgUnit,
+                  department,
+                  cost_center_label: costCenter
+                },
+                {
+                  onSuccess: () => toast.success('Classificadores salvos.'),
+                  onError: (e) =>
+                    toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+                }
+              )
+            }
+          >
+            Salvar rótulo e classificadores
+          </Button>
 
           <div className="overflow-x-auto rounded-lg border">
             <Table>
@@ -134,6 +226,7 @@ export function BillingProcessingPanel({
                 <TableRow>
                   <TableHead>Tipo</TableHead>
                   <TableHead>Descrição</TableHead>
+                  <TableHead>Vigência</TableHead>
                   <TableHead className="text-right">Valor</TableHead>
                   <TableHead />
                 </TableRow>
@@ -141,7 +234,7 @@ export function BillingProcessingPanel({
               <TableBody>
                 {selected.items.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-muted-foreground text-sm">
+                    <TableCell colSpan={5} className="text-muted-foreground text-sm">
                       Nenhum item na composição.
                     </TableCell>
                   </TableRow>
@@ -149,7 +242,17 @@ export function BillingProcessingPanel({
                   selected.items.map((item) => (
                     <TableRow key={item.id}>
                       <TableCell>{itemTypeLabel(item.item_type)}</TableCell>
-                      <TableCell>{item.description}</TableCell>
+                      <TableCell>
+                        {item.description}
+                        {item.proportional === false ? (
+                          <span className="text-muted-foreground ml-1 text-xs">(sem pró-rata)</span>
+                        ) : null}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-xs">
+                        {(item.start_date ?? '').toString().slice(0, 10) || '—'}
+                        {' → '}
+                        {(item.end_date ?? '').toString().slice(0, 10) || 'aberto'}
+                      </TableCell>
                       <TableCell className="text-right">
                         {item.item_type === 'discount' ? '−' : ''}
                         {formatMoney(item.amount * (item.quantity || 1))}
@@ -187,8 +290,9 @@ export function BillingProcessingPanel({
                 <SelectContent>
                   <SelectItem value="service">Serviço</SelectItem>
                   <SelectItem value="discount">Desconto</SelectItem>
-                  <SelectItem value="extra_charge">Cobrança extra</SelectItem>
-                  <SelectItem value="installment">Parcelamento</SelectItem>
+                  <SelectItem value="extra_charge">Cobrança avulsa</SelectItem>
+                  <SelectItem value="installment">Parcelamento aparelho</SelectItem>
+                  <SelectItem value="exceedance">Excedente (manual)</SelectItem>
                 </SelectContent>
               </Select>
             </Field>
@@ -203,6 +307,42 @@ export function BillingProcessingPanel({
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
               />
+            </Field>
+            {itemType === 'service' ? (
+              <Field>
+                <FieldLabel>Tipo de serviço</FieldLabel>
+                <Select value={serviceType} onValueChange={(v) => setServiceType(v ?? 'subscription')}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="subscription">Assinatura</SelectItem>
+                    <SelectItem value="data">Dados</SelectItem>
+                    <SelectItem value="sms">SMS</SelectItem>
+                    <SelectItem value="roaming">Roaming</SelectItem>
+                    <SelectItem value="other">Outros</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+            ) : null}
+            <Field>
+              <FieldLabel>Início</FieldLabel>
+              <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+            </Field>
+            <Field>
+              <FieldLabel>Fim</FieldLabel>
+              <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+            </Field>
+            <Field>
+              <FieldLabel className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  className="size-4 rounded border"
+                  checked={proportional}
+                  onChange={(e) => setProportional(e.target.checked)}
+                />
+                Aceita proporcionalidade
+              </FieldLabel>
             </Field>
           </div>
           <Button
@@ -219,12 +359,18 @@ export function BillingProcessingPanel({
                 {
                   item_type: itemType,
                   description: description.trim(),
-                  amount: parsed
+                  amount: parsed,
+                  proportional,
+                  ...(itemType === 'service' ? { service_type: serviceType } : {}),
+                  ...(startDate ? { start_date: startDate } : {}),
+                  ...(endDate ? { end_date: endDate } : {})
                 },
                 {
                   onSuccess: () => {
                     setDescription('');
                     setAmount('');
+                    setStartDate('');
+                    setEndDate('');
                     toast.success('Item adicionado.');
                   },
                   onError: (e) =>

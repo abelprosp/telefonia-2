@@ -233,14 +233,16 @@ const invoiceImportRequestStatusWire: Record<string, string> = {
   pending: 'Pendente',
   processing: 'Processando',
   completed: 'Concluída',
-  failed: 'Falhou'
+  failed: 'Falhou',
+  pdf_unparsed: 'PDF ainda não parseado'
 };
 
 const invoiceImportRequestStatusOrdinal: Record<number, string> = {
   0: 'Pendente',
   1: 'Processando',
   2: 'Concluída',
-  3: 'Falhou'
+  3: 'Falhou',
+  4: 'PDF ainda não parseado'
 };
 
 export function formatInvoiceImportRequestStatus(

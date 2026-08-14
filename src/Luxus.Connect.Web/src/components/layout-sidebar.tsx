@@ -65,7 +65,8 @@ const operationalMenuItems: MenuItem[] = [
     items: [
       { title: 'Faturas', url: '/invoices' },
       { title: 'Meses de processamento', url: '/processing-months' },
-      { title: 'Ciclos de faturamento', url: '/billing-cycles' }
+      { title: 'Ciclos de faturamento', url: '/billing-cycles' },
+      { title: 'Termos de excedente', url: '/exceedance-terms' }
     ]
   },
   {
@@ -82,7 +83,7 @@ const operationalMenuItems: MenuItem[] = [
     url: '/reports/transition-pending',
     icon: <TrendingUp />,
     items: [
-      { title: 'Linhas em transição', url: '/reports/transition-pending' },
+      { title: 'Movimentação de linhas', url: '/reports/transition-pending' },
       { title: 'Solicitações de parceiros', url: '/line-requests' }
     ]
   }

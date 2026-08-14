@@ -208,6 +208,65 @@ func (h *Handler) closeProcessingMonthContingency(w http.ResponseWriter, r *http
 	httputil.WriteJSON(w, http.StatusAccepted, item)
 }
 
+func (h *Handler) updatePhoneLineClassification(w http.ResponseWriter, r *http.Request) {
+	var input models.UpdatePhoneLineClassificationInput
+	if err := decodeJSON(r, &input); err != nil {
+		httputil.WriteFail(w, http.StatusBadRequest, notifications.N("REQUEST_VALIDATION", "Invalid request body"))
+		return
+	}
+	item, err := h.Svc.UpdatePhoneLineClassification(r.Context(), chi.URLParam(r, "id"), input)
+	if err != nil {
+		httputil.HandleServiceError(w, err)
+		return
+	}
+	httputil.WriteJSON(w, http.StatusOK, item)
+}
+
+func (h *Handler) putPhoneLineTransition(w http.ResponseWriter, r *http.Request) {
+	var input models.PutPhoneLineTransitionInput
+	if err := decodeJSON(r, &input); err != nil {
+		httputil.WriteFail(w, http.StatusBadRequest, notifications.N("REQUEST_VALIDATION", "Invalid request body"))
+		return
+	}
+	item, err := h.Svc.PutPhoneLineTransition(r.Context(), chi.URLParam(r, "id"), input)
+	if err != nil {
+		httputil.HandleServiceError(w, err)
+		return
+	}
+	httputil.WriteJSON(w, http.StatusOK, item)
+}
+
+func (h *Handler) createPhoneLineService(w http.ResponseWriter, r *http.Request) {
+	var input models.CreatePhoneLineServiceInput
+	if err := decodeJSON(r, &input); err != nil {
+		httputil.WriteFail(w, http.StatusBadRequest, notifications.N("REQUEST_VALIDATION", "Invalid request body"))
+		return
+	}
+	item, err := h.Svc.CreatePhoneLineService(r.Context(), chi.URLParam(r, "id"), input)
+	if err != nil {
+		httputil.HandleServiceError(w, err)
+		return
+	}
+	httputil.WriteJSON(w, http.StatusCreated, item)
+}
+
+func (h *Handler) deletePhoneLineService(w http.ResponseWriter, r *http.Request) {
+	if err := h.Svc.DeletePhoneLineService(r.Context(), chi.URLParam(r, "id"), chi.URLParam(r, "serviceId")); err != nil {
+		httputil.HandleServiceError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) getMovementReports(w http.ResponseWriter, r *http.Request) {
+	item, err := h.Svc.GetMovementReports(r.Context(), r.URL.Query().Get("processing_month_id"))
+	if err != nil {
+		httputil.HandleServiceError(w, err)
+		return
+	}
+	httputil.WriteJSON(w, http.StatusOK, item)
+}
+
 func (h *Handler) listCostCenters(w http.ResponseWriter, r *http.Request) {
 	page := httputil.ParsePagination(r)
 	items, total, err := h.Svc.ListCostCenters(r.Context(), page)

@@ -110,6 +110,12 @@ func (h *Handler) RegisterRoutes(
 
 					r.Patch("/plans/{planId}", h.updateProviderPlan)
 
+					r.Post("/plans/{planId}/services", h.createProviderPlanService)
+
+					r.Patch("/plans/{planId}/services/{serviceId}", h.updateProviderPlanService)
+
+					r.Delete("/plans/{planId}/services/{serviceId}", h.deleteProviderPlanService)
+
 				})
 
 			})
@@ -121,6 +127,8 @@ func (h *Handler) RegisterRoutes(
 				r.Get("/", h.listProviderInvoices)
 
 				r.Post("/", h.requestProviderInvoiceImport)
+
+				r.Get("/import-requests/{id}", h.getImportRequestStatus)
 
 				r.Get("/{id}", h.getProviderInvoice)
 
@@ -165,6 +173,7 @@ func (h *Handler) RegisterRoutes(
 					r.Post("/processing-months/{processingMonthId}/manual-release", h.manualReleaseCustomer)
 
 					r.Post("/generate-billing-document", h.generateCustomerBillingDocument)
+					r.Get("/generated-contracts", h.listCustomerGeneratedContracts)
 
 				})
 
@@ -192,6 +201,15 @@ func (h *Handler) RegisterRoutes(
 
 					r.Delete("/customer-links/active", h.unassignPhoneLineCustomer)
 
+					r.Patch("/classification", h.updatePhoneLineClassification)
+					r.Post("/transition", h.putPhoneLineTransition)
+					r.Post("/services", h.createPhoneLineService)
+					r.Delete("/services/{serviceId}", h.deletePhoneLineService)
+					r.Patch("/exceedance-settings", h.updatePhoneLineExceedanceSettings)
+					r.Get("/fidelity", h.getLineFidelity)
+					r.Put("/fidelity", h.upsertLineFidelity)
+					r.Post("/fidelity/renewal-decision", h.decideLineFidelityRenewal)
+					r.Get("/generated-contracts", h.listPhoneLineGeneratedContracts)
 					r.Get("/billing-processings", h.listLineBillingProcessings)
 					r.Post("/billing-processings/end-user", h.enableEndUserBillingProcessing)
 					r.Route("/billing-processings/{processingId}", func(r chi.Router) {
@@ -258,6 +276,7 @@ func (h *Handler) RegisterRoutes(
 					r.Post("/close", h.closeProcessingMonth)
 
 					r.Post("/close-contingency", h.closeProcessingMonthContingency)
+					r.Get("/financial-export", h.getFinancialExport)
 
 				})
 
@@ -266,6 +285,17 @@ func (h *Handler) RegisterRoutes(
 
 
 			r.Get("/cost-centers", h.listCostCenters)
+
+			r.Get("/reports/line-movements", h.getMovementReports)
+
+			r.Route("/exceedance-terms", func(r chi.Router) {
+				r.Get("/", h.listExceedanceTerms)
+				r.Post("/", h.createExceedanceTerm)
+				r.Patch("/{id}", h.updateExceedanceTerm)
+			})
+
+			r.Get("/fidelity-renewal-triggers", h.listFidelityRenewalTriggers)
+			r.Patch("/fidelity-renewal-triggers/{id}", h.updateFidelityRenewalTrigger)
 
 
 
@@ -440,6 +470,8 @@ func (h *Handler) RegisterRoutes(
 				r.Get("/bulk-preview", h.bulkBillingPreview)
 
 				r.Get("/manual-preview", h.manualBillingPreview)
+
+				r.Get("/financial-export", h.getFinancialExport)
 
 				r.Post("/bulk-generate", h.bulkGenerateBillingDocuments)
 
