@@ -6,6 +6,7 @@ import {
   Search,
   UserCircle
 } from 'lucide-react';
+import { Link } from '@tanstack/react-router';
 import { useAuth } from 'react-oidc-context';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -93,9 +94,9 @@ export const AppTopBar = () => {
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem render={<Link to="/settings" />}>
               <UserCircle />
-              Conta
+              Perfil e Configurações
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={onSignout} className="text-primary">

@@ -30,6 +30,15 @@ services:
 
         VITE_STORAGE_BUCKET_NAME: luxus-connect
 
+  keycloak:
+    environment:
+      - KC_HOSTNAME_URL=https://telefonia.redobrai.online
+      - KC_HOSTNAME_ADMIN_URL=https://telefonia.redobrai.online
+      - KC_HOSTNAME_STRICT=false
+      - KC_HOSTNAME_STRICT_HTTPS=false
+      - KC_PROXY_HEADERS=xforwarded
+      - KC_HTTP_ENABLED=true
+
 
 
   minio:

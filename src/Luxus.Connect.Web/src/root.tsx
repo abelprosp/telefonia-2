@@ -29,7 +29,7 @@ const router = createRouter({
 });
 
 const oidcConfig = {
-  authority: `${env.VITE_AUTH_URL}/realms/luxus`,
+  authority: `${env.VITE_AUTH_URL.replace(/\/auth\/?$/, '')}/realms/luxus`,
   client_id: env.VITE_CLIENT_ID,
   scope: 'openid organization',
   redirect_uri: window.location.origin,
