@@ -20,9 +20,9 @@ services:
 
       args:
 
-        VITE_API_URL: http://localhost:8002
+        VITE_API_URL: ${VITE_API_URL:-https://telefonia.redobrai.online/api}
 
-        VITE_AUTH_URL: http://localhost:8081
+        VITE_AUTH_URL: ${VITE_AUTH_URL:-https://telefonia.redobrai.online/auth}
 
         VITE_CLIENT_ID: connect-cli
 
@@ -150,7 +150,7 @@ services:
 
       - OBJECT_STORAGE_SECRET_ACCESS_KEY=${OBJECT_STORAGE_SECRET_ACCESS_KEY:-minioadmin}
 
-      - CORS_ORIGINS=https://localhost:8002;http://localhost:8002;http://localhost:4200;http://localhost:3000;http://localhost:5173
+      - CORS_ORIGINS=https://telefonia.redobrai.online;https://localhost:8002;http://localhost:8002;http://localhost:4200;http://localhost:3000;http://localhost:3005;http://localhost:5173
 
       # Sicredi API Cobrança (boleto híbrido + PIX) — https://developer.sicredi.com.br
       - SICREDI_ENABLED=${SICREDI_ENABLED:-false}
