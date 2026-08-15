@@ -24,6 +24,8 @@ import {
   useSidebar
 } from '@/components/ui/sidebar';
 
+import { performLogout } from '@/lib/auth-actions';
+
 export const NavUser = ({
   user
 }: {
@@ -34,12 +36,12 @@ export const NavUser = ({
   };
 }) => {
   const { isMobile } = useSidebar();
-  const { removeUser, signoutSilent } = useAuth();
+  const auth = useAuth();
 
   const onSignout = async () => {
-    await signoutSilent();
-    removeUser();
+    await performLogout(auth);
   };
+
 
   return (
     <SidebarMenu>

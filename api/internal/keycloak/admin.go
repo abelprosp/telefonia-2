@@ -245,6 +245,52 @@ func (c *AdminClient) SetUserEnabled(ctx context.Context, userID string, enabled
 	return nil
 }
 
+func (c *AdminClient) UpdateUserProfile(ctx context.Context, userID, firstName, lastName, email string) error {
+	path := fmt.Sprintf("/admin/realms/%s/users/%s", c.realm, userID)
+	payload := map[string]any{
+		"firstName": firstName,
+		"lastName":  lastName,
+	}
+	if strings.TrimSpace(email) != "" {
+		payload["email"] = strings.TrimSpace(email)
+		payload["emailVerified"] = true
+	}
+	resp, err := c.do(ctx, http.MethodPut, path, payload)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("update user profile: %s", string(body))
+	}
+	return nil
+}
+
+func (c *AdminClient) GetUserByID(ctx context.Context, userID string) (*UserRecord, error) {
+	path := fmt.Sprintf("/admin/realms/%s/users/%s", c.realm, userID)
+	resp, err := c.do(ctx, http.MethodGet, path, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("get user %s: %s", userID, string(body))
+	}
+	var u UserRecord
+	if err := json.NewDecoder(resp.Body).Decode(&u); err != nil {
+		return nil, err
+	}
+	roles, err := c.GetUserRealmRoles(ctx, u.ID)
+	if err != nil {
+		return nil, err
+	}
+	u.Roles = roles
+	return &u, nil
+}
+
+
 func (c *AdminClient) ReplaceUserRealmRoles(ctx context.Context, userID string, roleNames []string) error {
 	current, err := c.GetUserRealmRoles(ctx, userID)
 	if err != nil {

@@ -22,15 +22,17 @@ import {
 import { Input } from '@/components/ui/input';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { roleLabel, useAuthRoles } from '@/lib/auth-roles';
+import { performLogout } from '@/lib/auth-actions';
 
 export const AppTopBar = () => {
-  const { user, removeUser, signoutSilent } = useAuth();
+  const auth = useAuth();
+  const { user } = auth;
   const authRoles = useAuthRoles();
 
   const onSignout = async () => {
-    await signoutSilent();
-    removeUser();
+    await performLogout(auth);
   };
+
 
   const displayName = user?.profile.name ?? 'Usuário';
   const email = user?.profile.email ?? '';

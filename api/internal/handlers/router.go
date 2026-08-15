@@ -74,11 +74,20 @@ func (h *Handler) RegisterRoutes(
 
 			r.Use(auth)
 
+			r.Get("/me", h.getCurrentUserProfile)
+			r.Patch("/me", h.updateCurrentUserProfile)
+
+			r.Get("/organization-settings", h.getOrganizationSettings)
+			r.Get("/company-settings", h.getOrganizationSettings)
+			r.Get("/whitelabel-settings", h.getOrganizationSettings)
+			r.Get("/system-settings", h.getOrganizationSettings)
+
 			r.Post("/pre-signed-urls/upload", h.postPresignedUpload)
 
 			r.Post("/pre-signed-urls/download", h.postPresignedDownload)
 
 		})
+
 
 
 
@@ -533,7 +542,12 @@ func (h *Handler) RegisterRoutes(
 
 			r.Use(auth, master)
 
-
+			r.Put("/organization-settings/company", h.updateCompanySettings)
+			r.Put("/company-settings", h.updateCompanySettings)
+			r.Put("/organization-settings/whitelabel", h.updateWhitelabelSettings)
+			r.Put("/whitelabel-settings", h.updateWhitelabelSettings)
+			r.Put("/organization-settings/system", h.updateSystemSettings)
+			r.Put("/system-settings", h.updateSystemSettings)
 
 			r.Route("/users", func(r chi.Router) {
 
@@ -546,6 +560,7 @@ func (h *Handler) RegisterRoutes(
 			})
 
 		})
+
 
 
 

@@ -17,6 +17,7 @@ import {
 } from '@/lib/client';
 import { queryClient } from '@/lib/query-client';
 import { getItem, setItem } from '@/lib/storage';
+import { WhitelabelProvider } from '@/providers/whitelabel-provider';
 import { type Theme } from '@/types/app';
 
 type AppProviderProps = {
@@ -102,14 +103,18 @@ export const AppProvider = ({
   return (
     <AppProviderContext.Provider {...props} value={value}>
       <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          {children}
-          <Toaster />
-        </TooltipProvider>
+        <WhitelabelProvider>
+          <TooltipProvider>
+            {children}
+            <Toaster />
+          </TooltipProvider>
+        </WhitelabelProvider>
       </QueryClientProvider>
     </AppProviderContext.Provider>
   );
 };
+
+
 
 export const useApp = () => {
   const context = useContext(AppProviderContext);

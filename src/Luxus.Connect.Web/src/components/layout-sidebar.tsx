@@ -32,6 +32,8 @@ import {
   SidebarRail
 } from '@/components/ui/sidebar';
 import { useAuthRoles } from '@/lib/auth-roles';
+import { performLogout } from '@/lib/auth-actions';
+import { useWhitelabel } from '@/providers/whitelabel-provider';
 
 type MenuItem = {
   title: string;
@@ -154,7 +156,9 @@ function buildStaffMenu(
 }
 
 export const LayoutSidebar = ({ ...props }: ComponentProps<typeof Sidebar>) => {
-  const { user, removeUser, signoutSilent } = useAuth();
+  const auth = useAuth();
+  const { user } = auth;
+  const { settings: whitelabel } = useWhitelabel();
   const {
     isMaster,
     isPartnerOnly,
@@ -207,8 +211,7 @@ export const LayoutSidebar = ({ ...props }: ComponentProps<typeof Sidebar>) => {
   }
 
   const onSignout = async () => {
-    await signoutSilent();
-    removeUser();
+    await performLogout(auth);
   };
 
   const homeTo = isPartnerOnly
@@ -221,7 +224,9 @@ export const LayoutSidebar = ({ ...props }: ComponentProps<typeof Sidebar>) => {
     ? 'Portal do parceiro'
     : canAccessFinance && !canAccessOperations
       ? 'Financeiro'
-      : 'Gestão de telefonia';
+      : (whitelabel.app_slogan || 'Gestão de telefonia');
+
+  const appDisplayName = whitelabel.app_name || 'Luxus.Connect';
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -233,17 +238,30 @@ export const LayoutSidebar = ({ ...props }: ComponentProps<typeof Sidebar>) => {
               className="hover:bg-transparent"
               render={<Link to={homeTo} />}
             >
-              <div className="bg-primary text-primary-foreground flex aspect-square size-9 items-center justify-center rounded-xl shadow-sm">
-                <Phone className="size-4" />
+              <div className="bg-primary text-primary-foreground flex aspect-square size-9 items-center justify-center rounded-xl shadow-sm overflow-hidden">
+                {whitelabel.logo_url ? (
+                  <img
+                    src={whitelabel.logo_url}
+                    alt={appDisplayName}
+                    className="size-full object-contain p-0.5"
+                    onError={(e) => {
+                      // Fallback se a imagem quebrar
+                      (e.target as HTMLElement).style.display = 'none';
+                    }}
+                  />
+                ) : (
+                  <Phone className="size-4" />
+                )}
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate text-base font-semibold">Luxus.Connect</span>
+                <span className="truncate text-base font-semibold">{appDisplayName}</span>
                 <span className="text-muted-foreground truncate text-xs">{portalLabel}</span>
               </div>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
+
 
       <SidebarContent className="gap-0">
         <NavMain label={isPartnerOnly ? 'Parceiro' : 'Menu'} items={menuItems} />

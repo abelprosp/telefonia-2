@@ -1482,3 +1482,110 @@ type FinancialExportResponse struct {
 	TotalAmount         float64               `json:"total_amount"`
 	ItemCount           int                   `json:"item_count"`
 }
+
+type UserProfileResponse struct {
+	ID        string   `json:"id"`
+	Username  string   `json:"username"`
+	Email     string   `json:"email"`
+	FirstName string   `json:"first_name"`
+	LastName  string   `json:"last_name"`
+	FullName  string   `json:"full_name"`
+	Roles     []string `json:"roles"`
+	Profile   string   `json:"profile"`
+}
+
+type UpdateUserProfileInput struct {
+	FirstName       *string `json:"first_name,omitempty"`
+	LastName        *string `json:"last_name,omitempty"`
+	Email           *string `json:"email,omitempty"`
+	CurrentPassword *string `json:"current_password,omitempty"`
+	NewPassword     *string `json:"new_password,omitempty"`
+}
+
+type CompanySettingsDto struct {
+	CompanyName       string `json:"company_name"`
+	TradingName       string `json:"trading_name"`
+	Cnpj              string `json:"cnpj"`
+	StateRegistration string `json:"state_registration"`
+	Email             string `json:"email"`
+	Phone             string `json:"phone"`
+	Website           string `json:"website"`
+	ZipCode           string `json:"zip_code"`
+	Street            string `json:"street"`
+	Number            string `json:"number"`
+	Complement        string `json:"complement"`
+	Neighborhood      string `json:"neighborhood"`
+	City              string `json:"city"`
+	State             string `json:"state"`
+}
+
+type WhitelabelSettingsDto struct {
+	AppName      string `json:"app_name"`
+	AppSlogan    string `json:"app_slogan"`
+	LogoUrl      string `json:"logo_url"`
+	DarkLogoUrl  string `json:"dark_logo_url"`
+	FaviconUrl   string `json:"favicon_url"`
+	PrimaryColor string `json:"primary_color"`
+	SupportEmail string `json:"support_email"`
+	SupportPhone string `json:"support_phone"`
+	FooterText   string `json:"footer_text"`
+}
+
+type SystemSettingsDto struct {
+	DefaultDueDay              int     `json:"default_due_day"`
+	LateFeePercentage          float64 `json:"late_fee_percentage"`
+	InterestRateMonthly        float64 `json:"interest_rate_monthly"`
+	DaysBeforeDueReminder      int     `json:"days_before_due_reminder"`
+	DaysAfterDueReminder       int     `json:"days_after_due_reminder"`
+	AutoSendInvoiceEmail       bool    `json:"auto_send_invoice_email"`
+	AutoSendCollectionReminder bool    `json:"auto_send_collection_reminder"`
+}
+
+type OrganizationSettingsResponse struct {
+	OrganizationID string                `json:"organization_id"`
+	Company        CompanySettingsDto    `json:"company"`
+	Whitelabel     WhitelabelSettingsDto `json:"whitelabel"`
+	System         SystemSettingsDto     `json:"system"`
+	UpdatedAt      time.Time             `json:"updated_at"`
+	UpdatedBy      *string               `json:"updated_by,omitempty"`
+}
+
+type UpdateCompanySettingsInput struct {
+	CompanyName       *string `json:"company_name,omitempty"`
+	TradingName       *string `json:"trading_name,omitempty"`
+	Cnpj              *string `json:"cnpj,omitempty"`
+	StateRegistration *string `json:"state_registration,omitempty"`
+	Email             *string `json:"email,omitempty"`
+	Phone             *string `json:"phone,omitempty"`
+	Website           *string `json:"website,omitempty"`
+	ZipCode           *string `json:"zip_code,omitempty"`
+	Street            *string `json:"street,omitempty"`
+	Number            *string `json:"number,omitempty"`
+	Complement        *string `json:"complement,omitempty"`
+	Neighborhood      *string `json:"neighborhood,omitempty"`
+	City              *string `json:"city,omitempty"`
+	State             *string `json:"state,omitempty"`
+}
+
+type UpdateWhitelabelSettingsInput struct {
+	AppName      *string `json:"app_name,omitempty"`
+	AppSlogan    *string `json:"app_slogan,omitempty"`
+	LogoUrl      *string `json:"logo_url,omitempty"`
+	DarkLogoUrl  *string `json:"dark_logo_url,omitempty"`
+	FaviconUrl   *string `json:"favicon_url,omitempty"`
+	PrimaryColor *string `json:"primary_color,omitempty"`
+	SupportEmail *string `json:"support_email,omitempty"`
+	SupportPhone *string `json:"support_phone,omitempty"`
+	FooterText   *string `json:"footer_text,omitempty"`
+}
+
+type UpdateSystemSettingsInput struct {
+	DefaultDueDay              *int     `json:"default_due_day,omitempty"`
+	LateFeePercentage          *float64 `json:"late_fee_percentage,omitempty"`
+	InterestRateMonthly        *float64 `json:"interest_rate_monthly,omitempty"`
+	DaysBeforeDueReminder      *int     `json:"days_before_due_reminder,omitempty"`
+	DaysAfterDueReminder       *int     `json:"days_after_due_reminder,omitempty"`
+	AutoSendInvoiceEmail       *bool    `json:"auto_send_invoice_email,omitempty"`
+	AutoSendCollectionReminder *bool    `json:"auto_send_collection_reminder,omitempty"`
+}
+
