@@ -14,11 +14,13 @@ import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
+
 import { Input } from '@/components/ui/input';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { roleLabel, useAuthRoles } from '@/lib/auth-roles';
@@ -89,12 +91,14 @@ export const AppTopBar = () => {
             <ChevronDown className="text-muted-foreground hidden size-4 md:block" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="min-w-56 rounded-xl">
-            <DropdownMenuLabel className="font-normal">
-              <div className="flex flex-col gap-0.5">
-                <span className="font-medium">{displayName}</span>
-                <span className="text-muted-foreground text-xs">{email}</span>
-              </div>
-            </DropdownMenuLabel>
+            <DropdownMenuGroup>
+              <DropdownMenuLabel className="font-normal">
+                <div className="flex flex-col gap-0.5">
+                  <span className="font-medium">{displayName}</span>
+                  <span className="text-muted-foreground text-xs">{email}</span>
+                </div>
+              </DropdownMenuLabel>
+            </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem render={<Link to="/settings" />}>
               <UserCircle />
@@ -106,6 +110,7 @@ export const AppTopBar = () => {
               Sair
             </DropdownMenuItem>
           </DropdownMenuContent>
+
         </DropdownMenu>
       </div>
     </header>
