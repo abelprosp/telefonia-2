@@ -3,7 +3,8 @@ import '@/polyfills';
 
 import { RouterProvider, createRouter } from '@tanstack/react-router';
 import { createRoot } from 'react-dom/client';
-import { AuthProvider } from 'react-oidc-context';
+import { WebStorageStateStore } from 'oidc-client-ts';
+import { AuthProvider, type AuthProviderProps } from 'react-oidc-context';
 
 // Import the generated route tree
 import { env } from '@/env';
@@ -28,15 +29,17 @@ const router = createRouter({
   defaultPreloadStaleTime: 0
 });
 
-const oidcConfig = {
+const oidcConfig: AuthProviderProps = {
   authority: `${env.VITE_AUTH_URL.replace(/\/auth\/?$/, '')}/realms/luxus`,
   client_id: env.VITE_CLIENT_ID,
   scope: 'openid organization',
   redirect_uri: window.location.origin,
+  userStore: new WebStorageStateStore({ store: window.localStorage }),
+  stateStore: new WebStorageStateStore({ store: window.localStorage }),
   onSigninCallback: () => {
     window.history.replaceState({}, document.title, window.location.pathname);
   },
-  automaticSilentRenew: true // Automatically refresh the access token
+  automaticSilentRenew: true
 };
 
 createRoot(document.getElementById('root')!).render(
@@ -46,3 +49,4 @@ createRoot(document.getElementById('root')!).render(
     </AppProvider>
   </AuthProvider>
 );
+
