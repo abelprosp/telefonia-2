@@ -30,7 +30,7 @@ const router = createRouter({
 });
 
 const oidcConfig: AuthProviderProps = {
-  authority: `${env.VITE_AUTH_URL.replace(/\/auth\/?$/, '')}/realms/luxus`,
+  authority: `${env.VITE_AUTH_URL.replace(/\/+$/, '')}/realms/luxus`,
   client_id: env.VITE_CLIENT_ID,
   scope: 'openid organization',
   redirect_uri: window.location.origin,
@@ -41,6 +41,7 @@ const oidcConfig: AuthProviderProps = {
   },
   automaticSilentRenew: true
 };
+
 
 createRoot(document.getElementById('root')!).render(
   <AuthProvider {...oidcConfig}>
