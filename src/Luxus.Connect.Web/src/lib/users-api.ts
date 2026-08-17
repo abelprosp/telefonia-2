@@ -12,6 +12,8 @@ export type OrganizationUser = {
   full_name: string;
   profile: UserProfile;
   enabled: boolean;
+  organization_id?: string;
+  organization_name?: string;
 };
 
 export type CreateOrganizationUserInput = {
@@ -21,7 +23,9 @@ export type CreateOrganizationUserInput = {
   last_name: string;
   password: string;
   profile: UserProfile;
+  organization_name?: string;
 };
+
 
 export type UpdateOrganizationUserInput = {
   profile?: UserProfile;

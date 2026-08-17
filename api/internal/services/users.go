@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/luxus-connect/telefonia/api/internal/auth"
 	"github.com/luxus-connect/telefonia/api/internal/httputil"
 	"github.com/luxus-connect/telefonia/api/internal/keycloak"
@@ -56,15 +57,29 @@ func toListUser(u keycloak.UserRecord) models.ListOrganizationUserResponse {
 	if fullName == "" {
 		fullName = u.Username
 	}
+
+	orgID := ""
+	orgName := ""
+	if u.Attributes != nil {
+		if orgAttr, ok := u.Attributes["organization"]; ok && len(orgAttr) > 0 {
+			if parsed, err := auth.ParseOrganizationClaim(orgAttr[0]); err == nil && parsed != nil {
+				orgID = parsed.ID
+				orgName = parsed.Name
+			}
+		}
+	}
+
 	return models.ListOrganizationUserResponse{
-		ID:        u.ID,
-		Username:  u.Username,
-		Email:     u.Email,
-		FirstName: u.FirstName,
-		LastName:  u.LastName,
-		FullName:  fullName,
-		Profile:   profileFromRoles(u.Roles),
-		Enabled:   u.Enabled,
+		ID:               u.ID,
+		Username:         u.Username,
+		Email:            u.Email,
+		FirstName:        u.FirstName,
+		LastName:         u.LastName,
+		FullName:         fullName,
+		Profile:          profileFromRoles(u.Roles),
+		Enabled:          u.Enabled,
+		OrganizationID:   orgID,
+		OrganizationName: orgName,
 	}
 }
 
@@ -76,9 +91,20 @@ func (s *Service) ListOrganizationUsers(ctx context.Context, search string) ([]m
 	if err != nil {
 		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
+
+	currentOrg := auth.OrganizationFromContext(ctx)
+	isMaster := auth.IsMaster(ctx)
+
 	items := make([]models.ListOrganizationUserResponse, 0, len(users))
 	for _, u := range users {
-		items = append(items, toListUser(u))
+		item := toListUser(u)
+		// Se não for master global, restringe aos usuários da mesma organização
+		if !isMaster && currentOrg != nil && currentOrg.ID != "" && item.OrganizationID != "" {
+			if item.OrganizationID != currentOrg.ID {
+				continue
+			}
+		}
+		items = append(items, item)
 	}
 	return items, nil
 }
@@ -86,10 +112,6 @@ func (s *Service) ListOrganizationUsers(ctx context.Context, search string) ([]m
 func (s *Service) CreateOrganizationUser(ctx context.Context, input models.CreateOrganizationUserInput) (*models.ListOrganizationUserResponse, error) {
 	if s.Keycloak == nil || !s.Keycloak.Enabled() {
 		return nil, httputil.InternalError(notifications.N("KEYCLOAK_ADMIN_UNAVAILABLE", "User management is not configured."))
-	}
-	org := auth.OrganizationFromContext(ctx)
-	if org == nil || org.ID == "" {
-		return nil, httputil.BusinessError(notifications.SharedOrganizationRequired)
 	}
 
 	username := strings.TrimSpace(input.Username)
@@ -107,9 +129,61 @@ func (s *Service) CreateOrganizationUser(ctx context.Context, input models.Creat
 		return nil, httputil.ValidationError(notifications.N("USER_PROFILE_INVALID", "Invalid user profile."))
 	}
 
-	orgName := org.Name
-	if orgName == "" {
-		orgName = "Luxus Connect"
+	isNewUserMaster := strings.EqualFold(strings.TrimSpace(input.Profile), auth.RoleMaster)
+
+	var targetOrgID string
+	var targetOrgName string
+
+	if isNewUserMaster {
+		// Novo perfil Master ganha sua própria organização independente
+		targetOrgID = uuid.NewString()
+		if input.OrganizationName != nil && strings.TrimSpace(*input.OrganizationName) != "" {
+			targetOrgName = strings.TrimSpace(*input.OrganizationName)
+		} else {
+			fullName := strings.TrimSpace(strings.TrimSpace(input.FirstName) + " " + strings.TrimSpace(input.LastName))
+			if fullName != "" {
+				targetOrgName = "Empresa de " + fullName
+			} else {
+				targetOrgName = "Organização " + username
+			}
+		}
+
+		// Inicializa as configurações de empresa e whitelabel para a nova organização
+		defaultSettings := &models.OrganizationSettingsResponse{
+			OrganizationID: targetOrgID,
+			Company: models.CompanySettingsDto{
+				CompanyName: targetOrgName,
+				TradingName: targetOrgName,
+			},
+			Whitelabel: models.WhitelabelSettingsDto{
+				AppName:      targetOrgName,
+				PrimaryColor: "#10b981",
+			},
+			System: models.SystemSettingsDto{
+				DefaultDueDay:              10,
+				LateFeePercentage:          2.0,
+				InterestRateMonthly:        1.0,
+				DaysBeforeDueReminder:      3,
+				DaysAfterDueReminder:       5,
+				AutoSendInvoiceEmail:       true,
+				AutoSendCollectionReminder: true,
+			},
+		}
+		_ = s.Store.UpsertOrganizationSettings(ctx, targetOrgID, nil, defaultSettings)
+
+	} else {
+		// Usuário comum herda a organização do usuário logado (ex: Luxus Telefonia)
+		org := auth.OrganizationFromContext(ctx)
+		if org != nil && org.ID != "" {
+			targetOrgID = org.ID
+			targetOrgName = org.Name
+		}
+		if targetOrgID == "" {
+			targetOrgID = "luxus"
+		}
+		if targetOrgName == "" {
+			targetOrgName = "Luxus Telefonia"
+		}
 	}
 
 	userID, err := s.Keycloak.CreateUser(ctx, keycloak.CreateUserPayload{
@@ -119,7 +193,7 @@ func (s *Service) CreateOrganizationUser(ctx context.Context, input models.Creat
 		LastName:      strings.TrimSpace(input.LastName),
 		Enabled:       true,
 		EmailVerified: true,
-		Attributes:    keycloak.DefaultOrganizationAttribute(org.ID, orgName),
+		Attributes:    keycloak.DefaultOrganizationAttribute(targetOrgID, targetOrgName),
 		Credentials: []keycloak.CredentialPayload{
 			{Type: "password", Value: password, Temporary: false},
 		},
@@ -147,6 +221,7 @@ func (s *Service) CreateOrganizationUser(ctx context.Context, input models.Creat
 	}
 	return nil, httputil.InternalError(notifications.SharedUnexpectedError("created user not found"))
 }
+
 
 func (s *Service) UpdateOrganizationUser(ctx context.Context, userID string, input models.UpdateOrganizationUserInput) (*models.ListOrganizationUserResponse, error) {
 	if s.Keycloak == nil || !s.Keycloak.Enabled() {

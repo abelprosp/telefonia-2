@@ -966,24 +966,28 @@ type UpdateSaleInput struct {
 // --- Organization users (Keycloak) ---
 
 type ListOrganizationUserResponse struct {
-	ID        string `json:"id"`
-	Username  string `json:"username"`
-	Email     string `json:"email"`
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name"`
-	FullName  string `json:"full_name"`
-	Profile   string `json:"profile"`
-	Enabled   bool   `json:"enabled"`
+	ID               string `json:"id"`
+	Username         string `json:"username"`
+	Email            string `json:"email"`
+	FirstName        string `json:"first_name"`
+	LastName         string `json:"last_name"`
+	FullName         string `json:"full_name"`
+	Profile          string `json:"profile"`
+	Enabled          bool   `json:"enabled"`
+	OrganizationID   string `json:"organization_id,omitempty"`
+	OrganizationName string `json:"organization_name,omitempty"`
 }
 
 type CreateOrganizationUserInput struct {
-	Username  string `json:"username"`
-	Email     string `json:"email"`
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name"`
-	Password  string `json:"password"`
-	Profile   string `json:"profile"`
+	Username         string  `json:"username"`
+	Email            string  `json:"email"`
+	FirstName        string  `json:"first_name"`
+	LastName         string  `json:"last_name"`
+	Password         string  `json:"password"`
+	Profile          string  `json:"profile"`
+	OrganizationName *string `json:"organization_name,omitempty"`
 }
+
 
 type UpdateOrganizationUserInput struct {
 	FirstName *string `json:"first_name"`

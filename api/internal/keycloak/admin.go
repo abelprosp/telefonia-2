@@ -46,14 +46,16 @@ func (c *AdminClient) Enabled() bool {
 }
 
 type UserRecord struct {
-	ID        string   `json:"id"`
-	Username  string   `json:"username"`
-	Email     string   `json:"email"`
-	FirstName string   `json:"firstName"`
-	LastName  string   `json:"lastName"`
-	Enabled   bool     `json:"enabled"`
-	Roles     []string `json:"-"`
+	ID         string              `json:"id"`
+	Username   string              `json:"username"`
+	Email      string              `json:"email"`
+	FirstName  string              `json:"firstName"`
+	LastName   string              `json:"lastName"`
+	Enabled    bool                `json:"enabled"`
+	Attributes map[string][]string `json:"attributes,omitempty"`
+	Roles      []string            `json:"-"`
 }
+
 
 type CreateUserPayload struct {
 	Username      string              `json:"username"`
