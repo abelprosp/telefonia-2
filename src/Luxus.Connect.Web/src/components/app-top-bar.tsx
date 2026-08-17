@@ -6,7 +6,8 @@ import {
   Search,
   UserCircle
 } from 'lucide-react';
-import { Link } from '@tanstack/react-router';
+import { useNavigate } from '@tanstack/react-router';
+
 import { useAuth } from 'react-oidc-context';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -20,7 +21,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
-
 import { Input } from '@/components/ui/input';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { roleLabel, useAuthRoles } from '@/lib/auth-roles';
@@ -30,11 +30,11 @@ export const AppTopBar = () => {
   const auth = useAuth();
   const { user } = auth;
   const authRoles = useAuthRoles();
+  const navigate = useNavigate();
 
   const onSignout = async () => {
     await performLogout(auth);
   };
-
 
   const displayName = user?.profile.name ?? 'Usuário';
   const email = user?.profile.email ?? '';
@@ -72,9 +72,9 @@ export const AppTopBar = () => {
         <DropdownMenu>
           <DropdownMenuTrigger
             render={
-              <Button
-                variant="ghost"
-                className="h-10 gap-2 rounded-full px-2 hover:bg-muted"
+              <button
+                type="button"
+                className="flex items-center gap-2 rounded-full px-2 py-1 hover:bg-muted cursor-pointer transition-colors outline-hidden"
               />
             }
           >
@@ -100,7 +100,7 @@ export const AppTopBar = () => {
               </DropdownMenuLabel>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem render={<Link to="/settings" />}>
+            <DropdownMenuItem onClick={() => void navigate({ to: '/settings' })}>
               <UserCircle />
               Perfil e Configurações
             </DropdownMenuItem>
@@ -110,9 +110,9 @@ export const AppTopBar = () => {
               Sair
             </DropdownMenuItem>
           </DropdownMenuContent>
-
         </DropdownMenu>
       </div>
     </header>
   );
 };
+
