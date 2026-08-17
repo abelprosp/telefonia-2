@@ -28,10 +28,14 @@ export type CreateOrganizationUserInput = {
 
 
 export type UpdateOrganizationUserInput = {
+  first_name?: string;
+  last_name?: string;
+  email?: string;
   profile?: UserProfile;
   enabled?: boolean;
   password?: string;
 };
+
 
 export const usersKeys = {
   all: ['organization-users'] as const,

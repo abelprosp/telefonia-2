@@ -232,6 +232,28 @@ func (s *Service) UpdateOrganizationUser(ctx context.Context, userID string, inp
 		return nil, httputil.ValidationError(notifications.N("USER_NOT_FOUND", "User was not found."))
 	}
 
+	if input.FirstName != nil || input.LastName != nil || input.Email != nil {
+		currentUser, err := s.Keycloak.GetUserByID(ctx, userID)
+		if err != nil {
+			return nil, httputil.NotFoundError(notifications.N("USER_NOT_FOUND", "User was not found."))
+		}
+		firstName := currentUser.FirstName
+		lastName := currentUser.LastName
+		email := currentUser.Email
+		if input.FirstName != nil {
+			firstName = strings.TrimSpace(*input.FirstName)
+		}
+		if input.LastName != nil {
+			lastName = strings.TrimSpace(*input.LastName)
+		}
+		if input.Email != nil {
+			email = strings.TrimSpace(*input.Email)
+		}
+		if err := s.Keycloak.UpdateUserProfile(ctx, userID, firstName, lastName, email); err != nil {
+			return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+		}
+	}
+
 	if input.Enabled != nil {
 		if err := s.Keycloak.SetUserEnabled(ctx, userID, *input.Enabled); err != nil {
 			return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
@@ -249,10 +271,11 @@ func (s *Service) UpdateOrganizationUser(ctx context.Context, userID string, inp
 	}
 
 	if input.Password != nil && strings.TrimSpace(*input.Password) != "" {
-		if len(strings.TrimSpace(*input.Password)) < 6 {
+		newPass := strings.TrimSpace(*input.Password)
+		if len(newPass) < 6 {
 			return nil, httputil.ValidationError(notifications.N("USER_PASSWORD_TOO_SHORT", "Password must be at least 6 characters."))
 		}
-		if err := s.Keycloak.ResetPassword(ctx, userID, strings.TrimSpace(*input.Password), false); err != nil {
+		if err := s.Keycloak.ResetPassword(ctx, userID, newPass, false); err != nil {
 			return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 		}
 	}
@@ -269,3 +292,4 @@ func (s *Service) UpdateOrganizationUser(ctx context.Context, userID string, inp
 	}
 	return nil, httputil.NotFoundError(notifications.N("USER_NOT_FOUND", "User was not found."))
 }
+
