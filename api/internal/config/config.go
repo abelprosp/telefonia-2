@@ -47,6 +47,9 @@ type Config struct {
 	FinancialSFTPUser        string
 	FinancialSFTPPassword    string
 	FinancialSFTPPath        string
+	ZapSignAPIToken          string
+	ZapSignBaseURL           string
+	ZapSignSandbox           bool
 }
 
 func Load() Config {
@@ -122,6 +125,9 @@ func Load() Config {
 		FinancialSFTPUser:        strings.TrimSpace(os.Getenv("FINANCIAL_SFTP_USER")),
 		FinancialSFTPPassword:    os.Getenv("FINANCIAL_SFTP_PASSWORD"),
 		FinancialSFTPPath:        strings.TrimSpace(firstNonEmpty(os.Getenv("FINANCIAL_SFTP_PATH"), "/inbound")),
+		ZapSignAPIToken:          strings.TrimSpace(os.Getenv("ZAPSIGN_API_TOKEN")),
+		ZapSignBaseURL:           strings.TrimSpace(os.Getenv("ZAPSIGN_BASE_URL")),
+		ZapSignSandbox:           strings.EqualFold(os.Getenv("ZAPSIGN_SANDBOX"), "true"),
 	}
 }
 

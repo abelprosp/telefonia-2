@@ -242,3 +242,59 @@ func (h *Handler) partnerListContractTemplates(w http.ResponseWriter, r *http.Re
 	}
 	httputil.WritePaged(w, items, total)
 }
+
+func (h *Handler) generateCustomerContract(w http.ResponseWriter, r *http.Request) {
+	var input models.GenerateContractForCustomerInput
+	if err := decodeJSON(r, &input); err != nil {
+		httputil.WriteFail(w, http.StatusBadRequest, notifications.N("REQUEST_VALIDATION", "Corpo da requisição inválido."))
+		return
+	}
+	customerID := chi.URLParam(r, "id")
+	item, err := h.Svc.GenerateContractForCustomer(r.Context(), customerID, input)
+	if err != nil {
+		httputil.HandleServiceError(w, err)
+		return
+	}
+	httputil.WriteJSON(w, http.StatusCreated, item)
+}
+
+func (h *Handler) uploadSignedCustomerContract(w http.ResponseWriter, r *http.Request) {
+	var input models.UploadSignedContractInput
+	if err := decodeJSON(r, &input); err != nil {
+		httputil.WriteFail(w, http.StatusBadRequest, notifications.N("REQUEST_VALIDATION", "Corpo da requisição inválido."))
+		return
+	}
+	customerID := chi.URLParam(r, "id")
+	contractID := chi.URLParam(r, "contractId")
+	item, err := h.Svc.UploadSignedContractForCustomer(r.Context(), customerID, contractID, input)
+	if err != nil {
+		httputil.HandleServiceError(w, err)
+		return
+	}
+	httputil.WriteJSON(w, http.StatusOK, item)
+}
+
+func (h *Handler) syncZapSignContract(w http.ResponseWriter, r *http.Request) {
+	contractID := chi.URLParam(r, "contractId")
+	item, err := h.Svc.SyncZapSignContractStatus(r.Context(), contractID)
+	if err != nil {
+		httputil.HandleServiceError(w, err)
+		return
+	}
+	httputil.WriteJSON(w, http.StatusOK, item)
+}
+
+func (h *Handler) zapsignWebhook(w http.ResponseWriter, r *http.Request) {
+	var payload struct {
+		Event      string  `json:"event_type"`
+		Token      string  `json:"token"`
+		Status     string  `json:"status"`
+		SignedFile *string `json:"signed_file"`
+		ExternalID string  `json:"external_id"`
+	}
+	_ = decodeJSON(r, &payload)
+	if payload.ExternalID != "" {
+		_, _ = h.Svc.SyncZapSignContractStatus(r.Context(), payload.ExternalID)
+	}
+	w.WriteHeader(http.StatusOK)
+}

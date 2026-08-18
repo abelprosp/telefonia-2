@@ -16,7 +16,9 @@ import {
   SelectValue
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { Layers } from 'lucide-react';
 import { SalePhoneLinePicker, buildPhoneLineSaleDescription } from '@/components/sale-phone-line-picker';
+import { BatchSalePhoneLineDialog } from '@/components/batch-sale-phone-line-dialog';
 import { SaleDevicePicker, buildDeviceSaleDescription } from '@/components/sale-device-picker';
 import { useGetV1Customers } from '@/api';
 import { getErrorMessage, isApiHttpError } from '@/lib/api-error';
@@ -58,10 +60,40 @@ function NewSalePage() {
   const createMutation = useCreateSale();
   const confirmMutation = useConfirmSale();
 
+  const [batchLinesOpen, setBatchLinesOpen] = useState(false);
+
   const total = items.reduce((sum, i) => sum + i.quantity * i.unit_price, 0);
 
   const updateItem = (key: string, patch: Partial<DraftItem>) => {
     setItems((prev) => prev.map((i) => (i.key === key ? { ...i, ...patch } : i)));
+  };
+
+  const handleAddBatchLines = (
+    newLines: Array<{
+      line: { id: string; number: string; provider_plan_name: string; base_cost: number | null };
+      price: number;
+    }>
+  ) => {
+    const formattedDrafts: DraftItem[] = newLines.map(({ line, price }) => ({
+      key: crypto.randomUUID(),
+      line_item_type: 'phone_line',
+      phone_line_id: line.id,
+      description: buildPhoneLineSaleDescription(line as any),
+      quantity: 1,
+      unit_price: price
+    }));
+
+    setItems((prev) => {
+      // Se houver apenas 1 item inicial e ele estiver vazio, substitui
+      const isFirstEmpty =
+        prev.length === 1 &&
+        !prev[0]?.description &&
+        !prev[0]?.phone_line_id &&
+        !prev[0]?.device_sku;
+      return isFirstEmpty ? formattedDrafts : [...prev, ...formattedDrafts];
+    });
+
+    toast.success(`${newLines.length} ${newLines.length === 1 ? 'linha adicionada' : 'linhas adicionadas'} à venda!`);
   };
 
   const usedPhoneLineIds = (excludeKey: string) =>
@@ -185,11 +217,24 @@ function NewSalePage() {
 
         {step === 2 && (
           <Card>
-            <CardHeader>
-              <CardTitle>Itens da venda</CardTitle>
-              <CardDescription>Linhas telefônicas, aparelhos ou outros produtos/serviços.</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <div>
+                <CardTitle>Itens da venda</CardTitle>
+                <CardDescription>Linhas telefônicas, aparelhos ou outros produtos/serviços.</CardDescription>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setBatchLinesOpen(true)}
+                className="gap-1.5 border-primary/40 text-primary hover:bg-primary/5 font-semibold text-xs"
+              >
+                <Layers className="size-3.5" />
+                Adicionar Linhas em Lote
+              </Button>
             </CardHeader>
             <CardContent className="space-y-4">
+
               {items.map((item) => (
                 <div key={item.key} className="grid gap-3 rounded-lg border p-4 md:grid-cols-2">
                   <div className="space-y-2 md:col-span-2">
@@ -225,12 +270,17 @@ function NewSalePage() {
                         excludeLineIds={usedPhoneLineIds(item.key)}
                         onChange={(line) => {
                           if (!line) {
-                            updateItem(item.key, { phone_line_id: undefined, description: '' });
+                            updateItem(item.key, { phone_line_id: undefined, description: '', unit_price: 0 });
                             return;
                           }
+                          const suggestedPrice =
+                            line.base_cost != null && Number(line.base_cost) > 0
+                              ? Number(line.base_cost)
+                              : item.unit_price;
                           updateItem(item.key, {
                             phone_line_id: line.id,
                             description: buildPhoneLineSaleDescription(line),
+                            unit_price: suggestedPrice,
                             quantity: 1
                           });
                         }}
@@ -363,6 +413,13 @@ function NewSalePage() {
           </Card>
         )}
       </div>
+
+      <BatchSalePhoneLineDialog
+        open={batchLinesOpen}
+        onOpenChange={setBatchLinesOpen}
+        excludeLineIds={usedPhoneLineIds('')}
+        onAddLines={handleAddBatchLines}
+      />
     </PageWrapper>
   );
 }

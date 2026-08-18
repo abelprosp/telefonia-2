@@ -26,6 +26,7 @@ import (
 	"github.com/luxus-connect/telefonia/api/internal/statemachine"
 	"github.com/luxus-connect/telefonia/api/internal/storage"
 	"github.com/luxus-connect/telefonia/api/internal/store"
+	"github.com/luxus-connect/telefonia/api/internal/zapsign"
 )
 
 func main() {
@@ -74,13 +75,25 @@ func main() {
 		}
 	}
 
+	zapClient := zapsign.NewClient(zapsign.Config{
+		APIToken: cfg.ZapSignAPIToken,
+		BaseURL:  cfg.ZapSignBaseURL,
+		Sandbox:  cfg.ZapSignSandbox,
+	})
+
 	svc := &services.Service{
 		Store:        st,
 		Publisher:    publisher,
 		Keycloak:     kcAdmin,
 		Mailer:       email.NewSender(cfg),
 		Sicredi:      sicredi.NewClient(sicredi.ConfigFrom(cfg)),
+		ZapSign:      zapClient,
 		StateMachine: statemachine.NewEngine(st),
+	}
+	if zapClient.Enabled() {
+		logger.Info("zapsign integration enabled")
+	} else {
+		logger.Info("zapsign integration ready (configure ZAPSIGN_API_TOKEN to enable electronic signing)")
 	}
 	if svc.Mailer.Enabled() {
 		logger.Info("smtp mailer enabled", "host", cfg.SMTPHost)

@@ -9,7 +9,42 @@ import (
 	"github.com/luxus-connect/telefonia/api/internal/models"
 )
 
+func (s *Store) resolveOrgID(ctx context.Context, orgID string) string {
+	q := s.q(ctx)
+	if orgID != "" && orgID != "default" {
+		var exists bool
+		_ = q.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM "OrganizationSettings" WHERE "OrganizationId" = $1)`, orgID).Scan(&exists)
+		if exists {
+			return orgID
+		}
+		var orgExists bool
+		_ = q.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM "Organizations" WHERE "Id" = $1)`, orgID).Scan(&orgExists)
+		if orgExists {
+			return orgID
+		}
+	}
+
+	// Busca a primeira organização configurada
+	var existingOrgID string
+	err := q.QueryRow(ctx, `SELECT "OrganizationId" FROM "OrganizationSettings" ORDER BY "UpdatedAt" DESC LIMIT 1`).Scan(&existingOrgID)
+	if err == nil && existingOrgID != "" {
+		return existingOrgID
+	}
+
+	// Busca a primeira organização cadastrada no sistema
+	err = q.QueryRow(ctx, `SELECT "Id" FROM "Organizations" ORDER BY "CreatedAt" ASC LIMIT 1`).Scan(&existingOrgID)
+	if err == nil && existingOrgID != "" {
+		return existingOrgID
+	}
+
+	if orgID != "" && orgID != "default" {
+		return orgID
+	}
+	return "00000000-0000-0000-0000-000000000001"
+}
+
 func (s *Store) GetOrganizationSettings(ctx context.Context, orgID string) (*models.OrganizationSettingsResponse, error) {
+	effectiveOrgID := s.resolveOrgID(ctx, orgID)
 	q := s.q(ctx)
 	query := `
 		SELECT "OrganizationId",
@@ -31,7 +66,7 @@ func (s *Store) GetOrganizationSettings(ctx context.Context, orgID string) (*mod
 		sys models.SystemSettingsDto
 	)
 
-	err := q.QueryRow(ctx, query, orgID).Scan(
+	err := q.QueryRow(ctx, query, effectiveOrgID).Scan(
 		&res.OrganizationID,
 		&comp.CompanyName, &comp.TradingName, &comp.Cnpj, &comp.StateRegistration, &comp.Email, &comp.Phone, &comp.Website,
 		&comp.ZipCode, &comp.Street, &comp.Number, &comp.Complement, &comp.Neighborhood, &comp.City, &comp.State,
@@ -46,7 +81,7 @@ func (s *Store) GetOrganizationSettings(ctx context.Context, orgID string) (*mod
 	if errors.Is(err, pgx.ErrNoRows) {
 		// Retorna defaults se ainda não houver registro
 		return &models.OrganizationSettingsResponse{
-			OrganizationID: orgID,
+			OrganizationID: effectiveOrgID,
 			Company: models.CompanySettingsDto{
 				CompanyName:       "Luxus Telefonia Ltda",
 				TradingName:       "Luxus Connect",
@@ -101,9 +136,10 @@ func (s *Store) GetOrganizationSettings(ctx context.Context, orgID string) (*mod
 }
 
 func (s *Store) GetProrataDivisor(ctx context.Context, orgID string) (int, error) {
+	effectiveOrgID := s.resolveOrgID(ctx, orgID)
 	var n int
 	err := s.q(ctx).QueryRow(ctx, `
-		SELECT COALESCE("ProrataDivisor", 30) FROM "OrganizationSettings" WHERE "OrganizationId" = $1`, orgID).Scan(&n)
+		SELECT COALESCE("ProrataDivisor", 30) FROM "OrganizationSettings" WHERE "OrganizationId" = $1`, effectiveOrgID).Scan(&n)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return 30, nil
 	}
@@ -117,6 +153,7 @@ func (s *Store) GetProrataDivisor(ctx context.Context, orgID string) (int, error
 }
 
 func (s *Store) UpsertOrganizationSettings(ctx context.Context, orgID string, updatedBy *string, current *models.OrganizationSettingsResponse) error {
+	effectiveOrgID := s.resolveOrgID(ctx, orgID)
 	q := s.q(ctx)
 	query := `
 		INSERT INTO "OrganizationSettings" (
@@ -175,7 +212,7 @@ func (s *Store) UpsertOrganizationSettings(ctx context.Context, orgID string, up
 			"UpdatedBy" = EXCLUDED."UpdatedBy"
 	`
 	_, err := q.Exec(ctx, query,
-		orgID,
+		effectiveOrgID,
 		current.Company.CompanyName, current.Company.TradingName, current.Company.Cnpj, current.Company.StateRegistration,
 		current.Company.Email, current.Company.Phone, current.Company.Website, current.Company.ZipCode, current.Company.Street,
 		current.Company.Number, current.Company.Complement, current.Company.Neighborhood, current.Company.City, current.Company.State,

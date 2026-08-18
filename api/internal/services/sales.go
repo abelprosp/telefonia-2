@@ -13,6 +13,7 @@ import (
 	"github.com/luxus-connect/telefonia/api/internal/models"
 	"github.com/luxus-connect/telefonia/api/internal/notifications"
 	"github.com/luxus-connect/telefonia/api/internal/store"
+	"github.com/luxus-connect/telefonia/api/internal/zapsign"
 )
 
 var validSaleLineItemTypes = map[string]struct{}{
@@ -66,7 +67,7 @@ func (s *Service) CreateContractTemplate(ctx context.Context, input models.Creat
 	if code == "" {
 		return nil, httputil.ValidationError(notifications.ContractTemplateCodeRequired)
 	}
-	if body == "" {
+	if body == "" && input.PdfBaseURL == nil {
 		return nil, httputil.ValidationError(notifications.ContractTemplateBodyRequired)
 	}
 	exists, err := s.Store.ContractTemplateCodeExists(ctx, orgID, code, nil)
@@ -82,7 +83,11 @@ func (s *Service) CreateContractTemplate(ctx context.Context, input models.Creat
 	}
 	id := uuid.New().String()
 	now := time.Now().UTC()
-	if err := s.Store.CreateContractTemplate(ctx, id, orgID, name, code, body, active, now); err != nil {
+	signers := input.SignersConfig
+	if signers == nil {
+		signers = []models.SignerConfig{}
+	}
+	if err := s.Store.CreateContractTemplate(ctx, id, orgID, name, code, body, input.PdfBaseURL, input.PdfStorageKey, signers, active, now); err != nil {
 		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
 	return s.GetContractTemplate(ctx, id)
@@ -124,13 +129,10 @@ func (s *Service) UpdateContractTemplate(ctx context.Context, id string, input m
 	}
 	if input.BodyTemplate != nil {
 		b := strings.TrimSpace(*input.BodyTemplate)
-		if b == "" {
-			return nil, httputil.ValidationError(notifications.ContractTemplateBodyRequired)
-		}
 		body = &b
 	}
 	now := time.Now().UTC()
-	if err := s.Store.UpdateContractTemplate(ctx, orgID, id, name, code, body, input.Active, now); err != nil {
+	if err := s.Store.UpdateContractTemplate(ctx, orgID, id, name, code, body, input.PdfBaseURL, input.PdfStorageKey, input.SignersConfig, input.Active, now); err != nil {
 		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
 	return s.GetContractTemplate(ctx, id)
@@ -646,4 +648,163 @@ func salespersonDisplayName(u *auth.User) string {
 		return u.ID[:8] + "…"
 	}
 	return u.ID
+}
+
+func (s *Service) GenerateContractForCustomer(ctx context.Context, customerID string, input models.GenerateContractForCustomerInput) (*models.GeneratedContractResponse, error) {
+	orgID, err := orgFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	cust, err := s.Store.GetCustomer(ctx, customerID)
+	if err != nil {
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+	if cust == nil {
+		return nil, httputil.NotFoundError(notifications.CustomerNotFound)
+	}
+
+	template, err := s.Store.GetContractTemplate(ctx, orgID, input.ContractTemplateID)
+	if err != nil {
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+	if template == nil {
+		return nil, httputil.NotFoundError(notifications.ContractTemplateNotFound)
+	}
+
+	contractID := uuid.New().String()
+	now := time.Now().UTC()
+	sigMethod := strings.ToLower(strings.TrimSpace(input.SignatureMethod))
+	if sigMethod == "" {
+		sigMethod = "manual"
+	}
+
+	// Renderizar HTML substituindo placeholders
+	custContractData, _ := s.Store.GetCustomerContractData(ctx, orgID, customerID)
+	renderedHTML := template.BodyTemplate
+	if custContractData != nil {
+		renderedHTML = strings.ReplaceAll(renderedHTML, "{{customer.name}}", htmlEscape(custContractData.Name))
+		renderedHTML = strings.ReplaceAll(renderedHTML, "{{customer.document}}", htmlEscape(custContractData.Document))
+		renderedHTML = strings.ReplaceAll(renderedHTML, "{{customer.address}}", htmlEscape(fmt.Sprintf("%s, %s, %s - %s", custContractData.Street, custContractData.Number, custContractData.City, custContractData.State)))
+	}
+
+	var pdfURL *string = template.PdfBaseURL
+	var pdfKey *string = template.PdfStorageKey
+
+	if err := s.Store.SaveCustomerGeneratedContract(ctx, contractID, orgID, customerID, template.ID, sigMethod, pdfURL, pdfKey, &renderedHTML, now); err != nil {
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+
+	// Integração ZapSign se selecionada
+	if sigMethod == "zapsign" && s.ZapSign != nil && s.ZapSign.Enabled() {
+		var signers []zapsign.CreateSignerRequest
+
+		if len(input.Signers) > 0 {
+			for idx, sgn := range input.Signers {
+				var positions []zapsign.SignerPosition
+				if len(template.SignersConfig) > idx {
+					cfg := template.SignersConfig[idx]
+					positions = append(positions, zapsign.SignerPosition{
+						X:    cfg.X,
+						Y:    cfg.Y,
+						Page: cfg.Page,
+					})
+				}
+				signers = append(signers, zapsign.CreateSignerRequest{
+					Name:                  sgn.Name,
+					Email:                 sgn.Email,
+					PhoneNumber:           sgn.Phone,
+					AuthMode:              sgn.AuthMode,
+					SendAutomaticEmail:    sgn.Email != "",
+					SendAutomaticWhatsApp: sgn.Phone != "" && sgn.AuthMode == "whatsapp",
+					Positions:             positions,
+				})
+			}
+		} else {
+			// Signatário padrão com dados do cliente
+			var positions []zapsign.SignerPosition
+			if len(template.SignersConfig) > 0 {
+				cfg := template.SignersConfig[0]
+				positions = append(positions, zapsign.SignerPosition{
+					X:    cfg.X,
+					Y:    cfg.Y,
+					Page: cfg.Page,
+				})
+			}
+			signers = append(signers, zapsign.CreateSignerRequest{
+				Name:               cust.Name,
+				Email:              "",
+				SendAutomaticEmail: false,
+				Positions:          positions,
+			})
+		}
+
+		docURL := ""
+		if pdfURL != nil {
+			docURL = *pdfURL
+		}
+
+		zapResp, zapErr := s.ZapSign.CreateDocument(ctx, zapsign.CreateDocRequest{
+			Name:       fmt.Sprintf("Contrato %s - %s", template.Name, cust.Name),
+			URLPdf:     docURL,
+			Signers:    signers,
+			Lang:       "pt-br",
+			BrandName:  "Luxus Connect",
+			ExternalID: contractID,
+		})
+
+		if zapErr == nil && zapResp != nil {
+			signURL := ""
+			if len(zapResp.Signers) > 0 {
+				signURL = zapResp.Signers[0].SignURL
+			}
+			_ = s.Store.UpdateGeneratedContractZapSign(ctx, contractID, zapResp.Token, signURL, zapResp.Status, zapResp.OpenID)
+		}
+	}
+
+	return s.Store.GetGeneratedContract(ctx, orgID, contractID)
+}
+
+func (s *Service) UploadSignedContractForCustomer(ctx context.Context, customerID, contractID string, input models.UploadSignedContractInput) (*models.GeneratedContractResponse, error) {
+	orgID, err := orgFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now().UTC()
+	if err := s.Store.UpdateGeneratedContractSigned(ctx, contractID, input.SignedPdfURL, input.SignedPdfStorageKey, input.SignedBy, now); err != nil {
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+
+	return s.Store.GetGeneratedContract(ctx, orgID, contractID)
+}
+
+func (s *Service) SyncZapSignContractStatus(ctx context.Context, contractID string) (*models.GeneratedContractResponse, error) {
+	orgID, err := orgFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	contract, err := s.Store.GetGeneratedContract(ctx, orgID, contractID)
+	if err != nil || contract == nil {
+		return nil, httputil.NotFoundError(notifications.ContractTemplateNotFound)
+	}
+
+	if contract.ZapSignDocToken != nil && *contract.ZapSignDocToken != "" && s.ZapSign != nil && s.ZapSign.Enabled() {
+		zapDoc, err := s.ZapSign.GetDocument(ctx, *contract.ZapSignDocToken)
+		if err == nil && zapDoc != nil {
+			if zapDoc.Status == "signed" && zapDoc.SignedFile != nil && *zapDoc.SignedFile != "" {
+				now := time.Now().UTC()
+				_ = s.Store.UpdateGeneratedContractSigned(ctx, contractID, *zapDoc.SignedFile, "", "ZapSign Eletrônico", now)
+			} else {
+				signURL := ""
+				if len(zapDoc.Signers) > 0 {
+					signURL = zapDoc.Signers[0].SignURL
+				}
+				_ = s.Store.UpdateGeneratedContractZapSign(ctx, contractID, zapDoc.Token, signURL, zapDoc.Status, zapDoc.OpenID)
+			}
+		}
+	}
+
+	return s.Store.GetGeneratedContract(ctx, orgID, contractID)
 }

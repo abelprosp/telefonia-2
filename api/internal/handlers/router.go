@@ -55,6 +55,7 @@ func (h *Handler) RegisterRoutes(
 	r.Route("/v1", func(r chi.Router) {
 
 		r.Post("/webhooks/sicredi", h.sicrediWebhook)
+		r.Post("/webhooks/zapsign", h.zapsignWebhook)
 
 		// Configurações visuais e de marca com leitura pública para login/whitelabel
 		r.Get("/organization-settings", h.getOrganizationSettings)
@@ -182,6 +183,8 @@ func (h *Handler) RegisterRoutes(
 
 					r.Post("/generate-billing-document", h.generateCustomerBillingDocument)
 					r.Get("/generated-contracts", h.listCustomerGeneratedContracts)
+					r.Post("/contracts", h.generateCustomerContract)
+					r.Post("/contracts/{contractId}/signed", h.uploadSignedCustomerContract)
 					r.Post("/anonymize", h.anonymizeCustomer)
 					r.Get("/personal-data", h.exportCustomerPersonalData)
 					r.Get("/full-360", h.getCustomer360)
@@ -189,6 +192,8 @@ func (h *Handler) RegisterRoutes(
 				})
 
 			})
+
+			r.Post("/contracts/{contractId}/sync-zapsign", h.syncZapSignContract)
 
 			r.Route("/phone-lines", func(r chi.Router) {
 

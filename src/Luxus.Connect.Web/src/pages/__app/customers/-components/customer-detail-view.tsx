@@ -63,6 +63,7 @@ import { client } from '@/lib/client';
 import { cn } from '@/lib/utils';
 
 import { CustomerAttachmentsView } from './customer-attachments-view';
+import { CustomerContractsSection } from './customer-contracts-section';
 import { AssignCustomerDeviceSheet } from './assign-customer-device-sheet';
 import { GenerateCustomerInvoiceSheet } from './generate-customer-invoice-sheet';
 import { LinkCustomerLineSheet } from '@/components/link-customer-line-sheet';
@@ -837,6 +838,19 @@ export function CustomerDetailView({
           <div className="border-input rounded-md border border-dashed p-6 text-center text-sm">
             <p className="text-muted-foreground">Nenhum endereço encontrado.</p>
           </div>
+        </DetailSection>
+
+        <Separator />
+
+        <DetailSection
+          title="Contratos e Assinaturas"
+          description="Emissão de contratos com assinatura eletrônica via ZapSign ou impressão manual e anexo de vias assinadas."
+        >
+          <CustomerContractsSection
+            customerId={customer.id}
+            customerName={customer.name}
+            isActive={isActive}
+          />
         </DetailSection>
 
         <Separator />

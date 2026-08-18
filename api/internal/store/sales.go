@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -39,7 +40,7 @@ func (s *Store) ListContractTemplates(ctx context.Context, orgID string, activeO
 	}
 
 	selectQ := `
-		SELECT "Id", "Name", "Code", "Active", "CreatedAt", "UpdatedAt"
+		SELECT "Id", "Name", "Code", "PdfBaseUrl", "PdfStorageKey", COALESCE("SignersConfig", '[]'::jsonb), "Active", "CreatedAt", "UpdatedAt"
 		` + base + `
 		ORDER BY "Name" ASC
 		OFFSET $` + itoa(len(args)+1) + ` LIMIT $` + itoa(len(args)+2)
@@ -54,8 +55,15 @@ func (s *Store) ListContractTemplates(ctx context.Context, orgID string, activeO
 	var items []models.ListContractTemplateResponse
 	for rows.Next() {
 		var item models.ListContractTemplateResponse
-		if err := rows.Scan(&item.ID, &item.Name, &item.Code, &item.Active, &item.CreatedAt, &item.UpdatedAt); err != nil {
+		var signersJSON []byte
+		if err := rows.Scan(&item.ID, &item.Name, &item.Code, &item.PdfBaseURL, &item.PdfStorageKey, &signersJSON, &item.Active, &item.CreatedAt, &item.UpdatedAt); err != nil {
 			return nil, 0, err
+		}
+		if len(signersJSON) > 0 {
+			_ = json.Unmarshal(signersJSON, &item.SignersConfig)
+		}
+		if item.SignersConfig == nil {
+			item.SignersConfig = []models.SignerConfig{}
 		}
 		items = append(items, item)
 	}
@@ -64,11 +72,12 @@ func (s *Store) ListContractTemplates(ctx context.Context, orgID string, activeO
 
 func (s *Store) GetContractTemplate(ctx context.Context, orgID, id string) (*models.GetContractTemplateResponse, error) {
 	var item models.GetContractTemplateResponse
+	var signersJSON []byte
 	err := s.q(ctx).QueryRow(ctx, `
-		SELECT "Id", "Name", "Code", "Active", "CreatedAt", "UpdatedAt", "BodyTemplate"
+		SELECT "Id", "Name", "Code", "PdfBaseUrl", "PdfStorageKey", COALESCE("SignersConfig", '[]'::jsonb), "Active", "CreatedAt", "UpdatedAt", "BodyTemplate"
 		FROM "ContractTemplates"
 		WHERE "OrganizationId" = $1 AND "Id" = $2`, orgID, id).Scan(
-		&item.ID, &item.Name, &item.Code, &item.Active, &item.CreatedAt, &item.UpdatedAt, &item.BodyTemplate,
+		&item.ID, &item.Name, &item.Code, &item.PdfBaseURL, &item.PdfStorageKey, &signersJSON, &item.Active, &item.CreatedAt, &item.UpdatedAt, &item.BodyTemplate,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -76,18 +85,25 @@ func (s *Store) GetContractTemplate(ctx context.Context, orgID, id string) (*mod
 	if err != nil {
 		return nil, err
 	}
+	if len(signersJSON) > 0 {
+		_ = json.Unmarshal(signersJSON, &item.SignersConfig)
+	}
+	if item.SignersConfig == nil {
+		item.SignersConfig = []models.SignerConfig{}
+	}
 	return &item, nil
 }
 
-func (s *Store) CreateContractTemplate(ctx context.Context, id, orgID, name, code, body string, active bool, now time.Time) error {
+func (s *Store) CreateContractTemplate(ctx context.Context, id, orgID, name, code, body string, pdfBaseURL, pdfStorageKey *string, signers []models.SignerConfig, active bool, now time.Time) error {
+	signersJSON, _ := json.Marshal(signers)
 	_, err := s.q(ctx).Exec(ctx, `
-		INSERT INTO "ContractTemplates" ("Id", "OrganizationId", "Name", "Code", "BodyTemplate", "Active", "CreatedAt", "UpdatedAt")
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $7)`,
-		id, orgID, name, code, body, active, now)
+		INSERT INTO "ContractTemplates" ("Id", "OrganizationId", "Name", "Code", "BodyTemplate", "PdfBaseUrl", "PdfStorageKey", "SignersConfig", "Active", "CreatedAt", "UpdatedAt")
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)`,
+		id, orgID, name, code, body, pdfBaseURL, pdfStorageKey, signersJSON, active, now)
 	return err
 }
 
-func (s *Store) UpdateContractTemplate(ctx context.Context, orgID, id string, name, code, body *string, active *bool, now time.Time) error {
+func (s *Store) UpdateContractTemplate(ctx context.Context, orgID, id string, name, code, body, pdfBaseURL, pdfStorageKey *string, signers []models.SignerConfig, active *bool, now time.Time) error {
 	q := s.q(ctx)
 	if name != nil {
 		if _, err := q.Exec(ctx, `UPDATE "ContractTemplates" SET "Name" = $1, "UpdatedAt" = $2 WHERE "OrganizationId" = $3 AND "Id" = $4`,
@@ -104,6 +120,25 @@ func (s *Store) UpdateContractTemplate(ctx context.Context, orgID, id string, na
 	if body != nil {
 		if _, err := q.Exec(ctx, `UPDATE "ContractTemplates" SET "BodyTemplate" = $1, "UpdatedAt" = $2 WHERE "OrganizationId" = $3 AND "Id" = $4`,
 			*body, now, orgID, id); err != nil {
+			return err
+		}
+	}
+	if pdfBaseURL != nil {
+		if _, err := q.Exec(ctx, `UPDATE "ContractTemplates" SET "PdfBaseUrl" = $1, "UpdatedAt" = $2 WHERE "OrganizationId" = $3 AND "Id" = $4`,
+			*pdfBaseURL, now, orgID, id); err != nil {
+			return err
+		}
+	}
+	if pdfStorageKey != nil {
+		if _, err := q.Exec(ctx, `UPDATE "ContractTemplates" SET "PdfStorageKey" = $1, "UpdatedAt" = $2 WHERE "OrganizationId" = $3 AND "Id" = $4`,
+			*pdfStorageKey, now, orgID, id); err != nil {
+			return err
+		}
+	}
+	if signers != nil {
+		signersJSON, _ := json.Marshal(signers)
+		if _, err := q.Exec(ctx, `UPDATE "ContractTemplates" SET "SignersConfig" = $1, "UpdatedAt" = $2 WHERE "OrganizationId" = $3 AND "Id" = $4`,
+			signersJSON, now, orgID, id); err != nil {
 			return err
 		}
 	}

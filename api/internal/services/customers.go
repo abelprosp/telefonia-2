@@ -18,6 +18,7 @@ import (
 	"github.com/luxus-connect/telefonia/api/internal/sicredi"
 	"github.com/luxus-connect/telefonia/api/internal/statemachine"
 	"github.com/luxus-connect/telefonia/api/internal/store"
+	"github.com/luxus-connect/telefonia/api/internal/zapsign"
 )
 
 type ImportProcessor interface {
@@ -31,6 +32,7 @@ type Service struct {
 	Keycloak     *keycloak.AdminClient
 	Mailer       *email.Sender
 	Sicredi      SicrediBoletoIssuer
+	ZapSign      *zapsign.Client
 	StateMachine *statemachine.Engine
 }
 

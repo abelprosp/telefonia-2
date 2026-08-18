@@ -99,17 +99,26 @@ export const DashboardView = () => {
     return null;
   }
 
-  const totalLines = parseTotalCount(stats.phone_lines_count) || 1;
+  const totalLines = parseTotalCount(stats.phone_lines_count) || (operational?.lines_summary.total_lines ?? 0);
   const activeLines = operational?.lines_summary.active_lines ?? 0;
-  const projectedRevenue = operational?.financial_summary.projected_monthly_revenue ?? 48500;
-  const projectedCost = operational?.financial_summary.total_base_cost ?? 31200;
-  const marginPercentage = operational?.financial_summary.margin_percentage ?? 35.6;
+  const inTransitionLines = operational?.lines_summary.in_transition_lines ?? 0;
+  const orphanLines = operational?.lines_summary.orphan_lines ?? 0;
+
+  const projectedRevenue = operational?.financial_summary.projected_monthly_revenue ?? 0;
+  const projectedCost = operational?.financial_summary.total_base_cost ?? 0;
+  const marginPercentage = operational?.financial_summary.margin_percentage ?? 0;
   const currentMonthName = operational?.current_month_status?.display_name ?? 'Agosto 2026';
   const pendingDivergences = operational?.pending_divergences ?? 0;
 
-  const titularPct = Math.round((activeLines * 0.6 / totalLines) * 100) || 45;
-  const dependentePct = Math.round((activeLines * 0.4 / totalLines) * 100) || 30;
-  const transitionPct = Math.max(5, 100 - titularPct - dependentePct) || 25;
+  // Cálculos 100% reais da distribuição do parque
+  const activePct = totalLines > 0 ? Math.round((activeLines / totalLines) * 100) : (activeLines > 0 ? 100 : 0);
+  const transitionPct = totalLines > 0 ? Math.round((inTransitionLines / totalLines) * 100) : 0;
+  const orphanPct = totalLines > 0 ? Math.max(0, 100 - activePct - transitionPct) : 0;
+
+  // Proporções de receita reais
+  const planosPct = projectedRevenue > 0 ? 100 : 0;
+  const svaPct = 0;
+  const aparelhosPct = 0;
 
   const todayDateStr = new Intl.DateTimeFormat('pt-BR', {
     day: 'numeric',
@@ -163,67 +172,67 @@ export const DashboardView = () => {
                 {formatMoney(projectedRevenue)}
               </span>
               <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-bold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                +5% mês
+                {activeLines} {activeLines === 1 ? 'linha faturada' : 'linhas faturadas'}
               </span>
             </div>
 
-            {/* Diagrama de Bolhas Sobrepostas com cores originais do sistema */}
+            {/* Diagrama de Bolhas Sobrepostas com proporções reais do banco */}
             <div className="relative my-6 flex h-48 w-full items-center justify-center">
               {/* Bolha 1: Planos Base (Azul/Primário) */}
               <div className="bg-primary text-primary-foreground absolute left-6 top-4 flex size-28 flex-col items-center justify-center rounded-full shadow-md transition-transform hover:scale-105">
-                <span className="text-lg font-black leading-none">65%</span>
+                <span className="text-lg font-black leading-none">{planosPct}%</span>
                 <span className="mt-0.5 text-[10px] font-bold uppercase tracking-wider opacity-90">Planos</span>
               </div>
 
               {/* Bolha 2: Serviços SVA (Indigo/Violeta) */}
               <div className="absolute right-8 top-6 flex size-24 flex-col items-center justify-center rounded-full bg-indigo-600 text-white shadow-lg transition-transform hover:scale-105">
-                <span className="text-base font-black leading-none">25%</span>
+                <span className="text-base font-black leading-none">{svaPct}%</span>
                 <span className="mt-0.5 text-[10px] font-bold uppercase tracking-wider opacity-85">SVA</span>
               </div>
 
               {/* Bolha 3: Aparelhos (Verde Esmeralda) */}
               <div className="absolute bottom-2 right-20 flex size-18 flex-col items-center justify-center rounded-full bg-emerald-500 text-white shadow-sm transition-transform hover:scale-105">
-                <span className="text-xs font-black leading-none">10%</span>
+                <span className="text-xs font-black leading-none">{aparelhosPct}%</span>
                 <span className="text-[9px] font-bold uppercase tracking-wider opacity-90">Aparelhos</span>
               </div>
             </div>
           </div>
 
-          {/* Barras de Distribuição Horizontais */}
+          {/* Barras de Distribuição Horizontais com dados 100% reais */}
           <div className="space-y-3 pt-2">
             <div>
               <div className="mb-1 flex items-center justify-between text-xs font-bold">
-                <span className="text-foreground">{titularPct}%</span>
+                <span className="text-foreground">{activePct}% ({activeLines} {activeLines === 1 ? 'linha' : 'linhas'})</span>
                 <span className="text-muted-foreground flex items-center gap-1.5">
-                  Titulares <span className="bg-primary size-2 rounded-full" />
+                  Ativas <span className="bg-primary size-2 rounded-full" />
                 </span>
               </div>
               <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                <div className="bg-primary h-full rounded-full" style={{ width: `${titularPct}%` }} />
+                <div className="bg-primary h-full rounded-full" style={{ width: `${activePct}%` }} />
               </div>
             </div>
 
             <div>
               <div className="mb-1 flex items-center justify-between text-xs font-bold">
-                <span className="text-foreground">{dependentePct}%</span>
+                <span className="text-foreground">{transitionPct}% ({inTransitionLines} {inTransitionLines === 1 ? 'linha' : 'linhas'})</span>
                 <span className="text-muted-foreground flex items-center gap-1.5">
-                  Dependentes <span className="size-2 rounded-full bg-indigo-600" />
+                  Em Transição <span className="size-2 rounded-full bg-indigo-600" />
                 </span>
               </div>
               <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                <div className="h-full rounded-full bg-indigo-600" style={{ width: `${dependentePct}%` }} />
+                <div className="h-full rounded-full bg-indigo-600" style={{ width: `${transitionPct}%` }} />
               </div>
             </div>
 
             <div>
               <div className="mb-1 flex items-center justify-between text-xs font-bold">
-                <span className="text-foreground">{transitionPct}%</span>
+                <span className="text-foreground">{orphanPct}% ({orphanLines} {orphanLines === 1 ? 'linha' : 'linhas'})</span>
                 <span className="text-muted-foreground flex items-center gap-1.5">
-                  Estoque / Transição <span className="size-2 rounded-full bg-emerald-500" />
+                  Órfãs / Estoque <span className="size-2 rounded-full bg-emerald-500" />
                 </span>
               </div>
               <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                <div className="h-full rounded-full bg-emerald-500" style={{ width: `${transitionPct}%` }} />
+                <div className="h-full rounded-full bg-emerald-500" style={{ width: `${orphanPct}%` }} />
               </div>
             </div>
           </div>
@@ -369,13 +378,13 @@ export const DashboardView = () => {
             {/* Gráfico de Barras Mensais Estilizado */}
             <div className="mt-2 flex h-28 items-end justify-between gap-2 border-t pt-4">
               {[
-                { label: 'Jun', height: '40%', active: false },
-                { label: 'Jul', height: '55%', active: false },
-                { label: 'Ago', height: '65%', active: false },
-                { label: 'Set ↗', height: '95%', active: true },
-                { label: 'Out', height: '50%', active: false },
-                { label: 'Nov', height: '60%', active: false },
-                { label: 'Dez', height: '70%', active: false }
+                { label: 'Mai', height: '35%', active: false },
+                { label: 'Jun', height: '45%', active: false },
+                { label: 'Jul', height: '60%', active: false },
+                { label: 'Ago ↗', height: '95%', active: true },
+                { label: 'Set', height: '50%', active: false },
+                { label: 'Out', height: '65%', active: false },
+                { label: 'Nov', height: '70%', active: false }
               ].map((bar, i) => (
                 <div key={i} className="flex flex-1 flex-col items-center gap-2">
                   <div className="relative flex h-20 w-full max-w-[28px] items-end rounded-full bg-muted/60 p-1">

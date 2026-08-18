@@ -3,10 +3,23 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import client from '@/lib/client';
 import { parseTotalCount } from '@/lib/query-utils';
 
+export type SignerConfig = {
+  role: string;
+  label: string;
+  page: number;
+  x: number;
+  y: number;
+  require_email?: boolean;
+  require_phone?: boolean;
+};
+
 export type ContractTemplate = {
   id: string;
   name: string;
   code: string;
+  pdf_base_url?: string | null;
+  pdf_storage_key?: string | null;
+  signers_config?: SignerConfig[];
   active: boolean;
   created_at: string;
   updated_at: string;
@@ -30,10 +43,27 @@ export type SaleLineItem = {
 
 export type GeneratedContract = {
   id: string;
+  customer_id?: string | null;
+  phone_line_id?: string | null;
+  sale_id?: string | null;
   contract_template_id: string;
+  contract_template_name?: string | null;
+  trigger?: string | null;
   status: string;
   rendered_html?: string | null;
+  pdf_url?: string | null;
+  pdf_storage_key?: string | null;
+  signature_method: string;
+  zapsign_doc_token?: string | null;
+  zapsign_open_id?: number | null;
+  zapsign_sign_url?: string | null;
+  zapsign_status?: string | null;
+  signed_pdf_url?: string | null;
+  signed_at?: string | null;
+  signed_by?: string | null;
+  attached_at?: string | null;
   generated_at?: string | null;
+  created_at: string;
 };
 
 export type Sale = {
@@ -217,7 +247,10 @@ export function useCreateContractTemplate() {
     mutationFn: async (input: {
       name: string;
       code: string;
-      body_template: string;
+      body_template?: string;
+      pdf_base_url?: string | null;
+      pdf_storage_key?: string | null;
+      signers_config?: SignerConfig[];
       active?: boolean;
     }) => {
       const { data } = await client<ContractTemplateDetail>({
@@ -244,6 +277,9 @@ export function useUpdateContractTemplate() {
       name?: string;
       code?: string;
       body_template?: string;
+      pdf_base_url?: string | null;
+      pdf_storage_key?: string | null;
+      signers_config?: SignerConfig[];
       active?: boolean;
     }) => {
       const { data } = await client<ContractTemplateDetail>({
@@ -256,6 +292,109 @@ export function useUpdateContractTemplate() {
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: salesKeys.templates });
       void qc.invalidateQueries({ queryKey: salesKeys.template(vars.id) });
+    }
+  });
+}
+
+export type ContractSignerInput = {
+  name: string;
+  email: string;
+  phone: string;
+  auth_mode: 'email' | 'whatsapp';
+};
+
+export type GenerateContractForCustomerInput = {
+  contract_template_id: string;
+  signature_method: 'zapsign' | 'manual';
+  signers?: ContractSignerInput[];
+  custom_notes?: string;
+};
+
+export type UploadSignedContractInput = {
+  signed_pdf_url: string;
+  signed_pdf_storage_key?: string;
+  signed_by: string;
+};
+
+export function useCustomerGeneratedContracts(customerId: string) {
+  return useQuery({
+    queryKey: ['customer-contracts', customerId],
+    queryFn: async () => {
+      const { data } = await client<GeneratedContract[]>({
+        url: `/v1/customers/${customerId}/generated-contracts`,
+        method: 'GET'
+      });
+      return data ?? [];
+    },
+    enabled: Boolean(customerId)
+  });
+}
+
+export function useGenerateCustomerContract() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      customerId,
+      ...input
+    }: {
+      customerId: string;
+    } & GenerateContractForCustomerInput) => {
+      const { data } = await client<GeneratedContract>({
+        url: `/v1/customers/${customerId}/contracts`,
+        method: 'POST',
+        data: input
+      });
+      return data;
+    },
+    onSuccess: (_data, vars) => {
+      void qc.invalidateQueries({ queryKey: ['customer-contracts', vars.customerId] });
+    }
+  });
+}
+
+export function useUploadSignedContract() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      customerId,
+      contractId,
+      ...input
+    }: {
+      customerId: string;
+      contractId: string;
+    } & UploadSignedContractInput) => {
+      const { data } = await client<GeneratedContract>({
+        url: `/v1/customers/${customerId}/contracts/${contractId}/signed`,
+        method: 'POST',
+        data: input
+      });
+      return data;
+    },
+    onSuccess: (_data, vars) => {
+      void qc.invalidateQueries({ queryKey: ['customer-contracts', vars.customerId] });
+    }
+  });
+}
+
+export function useSyncZapSignContract() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      contractId
+    }: {
+      contractId: string;
+      customerId?: string;
+    }) => {
+      const { data } = await client<GeneratedContract>({
+        url: `/v1/contracts/${contractId}/sync-zapsign`,
+        method: 'POST'
+      });
+      return data;
+    },
+    onSuccess: (_data, vars) => {
+      if (vars.customerId) {
+        void qc.invalidateQueries({ queryKey: ['customer-contracts', vars.customerId] });
+      }
     }
   });
 }

@@ -11,6 +11,8 @@ import {
 } from '@/components/ui/select';
 import { formatPhoneNumber } from '@/lib/format';
 
+import { formatMoney } from '@/lib/sales-api';
+
 const ALL_PLANS = '__all__';
 
 type SalePhoneLinePickerProps = {
@@ -21,7 +23,8 @@ type SalePhoneLinePickerProps = {
 
 function lineLabel(line: ListPhoneLineResponse) {
   const number = formatPhoneNumber(line.number) ?? line.number;
-  return `${number} · ${line.provider_plan_name}`;
+  const price = line.base_cost != null && line.base_cost > 0 ? ` — ${formatMoney(Number(line.base_cost))}` : '';
+  return `${number} · ${line.provider_plan_name}${price}`;
 }
 
 export function SalePhoneLinePicker({ value, excludeLineIds = [], onChange }: SalePhoneLinePickerProps) {

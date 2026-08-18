@@ -232,7 +232,10 @@ func (s *Store) SaveGeneratedContractWithTrigger(ctx context.Context, id, orgID 
 func (s *Store) ListGeneratedContractsForCustomer(ctx context.Context, orgID, customerID string) ([]models.GeneratedContractResponse, error) {
 	rows, err := s.q(ctx).Query(ctx, `
 		SELECT g."Id", g."CustomerId", g."PhoneLineId", g."SaleId", g."ContractTemplateId", t."Name",
-			g."Trigger", g."Status"::text, g."RenderedHtml", g."GeneratedAt", g."CreatedAt"
+			g."Trigger", g."Status"::text, g."RenderedHtml", g."PdfUrl", g."PdfStorageKey",
+			COALESCE(g."SignatureMethod", 'manual'), g."ZapSignDocToken", g."ZapSignOpenID",
+			g."ZapSignSignURL", g."ZapSignStatus", g."SignedPdfUrl", g."SignedAt", g."SignedBy",
+			g."AttachedAt", g."GeneratedAt", g."CreatedAt"
 		FROM "GeneratedContracts" g
 		JOIN "ContractTemplates" t ON t."Id" = g."ContractTemplateId"
 		WHERE g."OrganizationId" = $1 AND (
@@ -250,7 +253,10 @@ func (s *Store) ListGeneratedContractsForCustomer(ctx context.Context, orgID, cu
 func (s *Store) ListGeneratedContractsForPhoneLine(ctx context.Context, orgID, phoneLineID string) ([]models.GeneratedContractResponse, error) {
 	rows, err := s.q(ctx).Query(ctx, `
 		SELECT g."Id", g."CustomerId", g."PhoneLineId", g."SaleId", g."ContractTemplateId", t."Name",
-			g."Trigger", g."Status"::text, g."RenderedHtml", g."GeneratedAt", g."CreatedAt"
+			g."Trigger", g."Status"::text, g."RenderedHtml", g."PdfUrl", g."PdfStorageKey",
+			COALESCE(g."SignatureMethod", 'manual'), g."ZapSignDocToken", g."ZapSignOpenID",
+			g."ZapSignSignURL", g."ZapSignStatus", g."SignedPdfUrl", g."SignedAt", g."SignedBy",
+			g."AttachedAt", g."GeneratedAt", g."CreatedAt"
 		FROM "GeneratedContracts" g
 		JOIN "ContractTemplates" t ON t."Id" = g."ContractTemplateId"
 		WHERE g."OrganizationId" = $1 AND g."PhoneLineId" = $2
@@ -266,8 +272,13 @@ func scanGeneratedContracts(rows pgx.Rows) ([]models.GeneratedContractResponse, 
 	var items []models.GeneratedContractResponse
 	for rows.Next() {
 		var item models.GeneratedContractResponse
-		if err := rows.Scan(&item.ID, &item.CustomerID, &item.PhoneLineID, &item.SaleID, &item.ContractTemplateID,
-			&item.ContractTemplateName, &item.Trigger, &item.Status, &item.RenderedHTML, &item.GeneratedAt, &item.CreatedAt); err != nil {
+		if err := rows.Scan(
+			&item.ID, &item.CustomerID, &item.PhoneLineID, &item.SaleID, &item.ContractTemplateID,
+			&item.ContractTemplateName, &item.Trigger, &item.Status, &item.RenderedHTML,
+			&item.PdfURL, &item.PdfStorageKey, &item.SignatureMethod, &item.ZapSignDocToken,
+			&item.ZapSignOpenID, &item.ZapSignSignURL, &item.ZapSignStatus, &item.SignedPdfURL,
+			&item.SignedAt, &item.SignedBy, &item.AttachedAt, &item.GeneratedAt, &item.CreatedAt,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, item)
@@ -276,6 +287,59 @@ func scanGeneratedContracts(rows pgx.Rows) ([]models.GeneratedContractResponse, 
 		items = []models.GeneratedContractResponse{}
 	}
 	return items, rows.Err()
+}
+
+func (s *Store) GetGeneratedContract(ctx context.Context, orgID, contractID string) (*models.GeneratedContractResponse, error) {
+	var item models.GeneratedContractResponse
+	err := s.q(ctx).QueryRow(ctx, `
+		SELECT g."Id", g."CustomerId", g."PhoneLineId", g."SaleId", g."ContractTemplateId", t."Name",
+			g."Trigger", g."Status"::text, g."RenderedHtml", g."PdfUrl", g."PdfStorageKey",
+			COALESCE(g."SignatureMethod", 'manual'), g."ZapSignDocToken", g."ZapSignOpenID",
+			g."ZapSignSignURL", g."ZapSignStatus", g."SignedPdfUrl", g."SignedAt", g."SignedBy",
+			g."AttachedAt", g."GeneratedAt", g."CreatedAt"
+		FROM "GeneratedContracts" g
+		JOIN "ContractTemplates" t ON t."Id" = g."ContractTemplateId"
+		WHERE g."OrganizationId" = $1 AND g."Id" = $2`, orgID, contractID).Scan(
+		&item.ID, &item.CustomerID, &item.PhoneLineID, &item.SaleID, &item.ContractTemplateID,
+		&item.ContractTemplateName, &item.Trigger, &item.Status, &item.RenderedHTML,
+		&item.PdfURL, &item.PdfStorageKey, &item.SignatureMethod, &item.ZapSignDocToken,
+		&item.ZapSignOpenID, &item.ZapSignSignURL, &item.ZapSignStatus, &item.SignedPdfURL,
+		&item.SignedAt, &item.SignedBy, &item.AttachedAt, &item.GeneratedAt, &item.CreatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &item, nil
+}
+
+func (s *Store) SaveCustomerGeneratedContract(ctx context.Context, id, orgID, customerID, templateID, signatureMethod string, pdfURL, pdfStorageKey, renderedHTML *string, now time.Time) error {
+	_, err := s.q(ctx).Exec(ctx, `
+		INSERT INTO "GeneratedContracts" (
+			"Id", "OrganizationId", "CustomerId", "ContractTemplateId", "SignatureMethod",
+			"Status", "PdfUrl", "PdfStorageKey", "RenderedHtml", "GeneratedAt", "CreatedAt"
+		) VALUES ($1, $2, $3, $4, $5, 'generated'::generated_contract_status, $6, $7, $8, $9, $9)`,
+		id, orgID, customerID, templateID, signatureMethod, pdfURL, pdfStorageKey, renderedHTML, now)
+	return err
+}
+
+func (s *Store) UpdateGeneratedContractZapSign(ctx context.Context, id, docToken, signURL, status string, openID int64) error {
+	_, err := s.q(ctx).Exec(ctx, `
+		UPDATE "GeneratedContracts"
+		SET "ZapSignDocToken" = $1, "ZapSignSignURL" = $2, "ZapSignStatus" = $3, "ZapSignOpenID" = $4
+		WHERE "Id" = $5`, docToken, signURL, status, openID, id)
+	return err
+}
+
+func (s *Store) UpdateGeneratedContractSigned(ctx context.Context, id, signedPdfURL, signedPdfStorageKey, signedBy string, now time.Time) error {
+	_, err := s.q(ctx).Exec(ctx, `
+		UPDATE "GeneratedContracts"
+		SET "SignedPdfUrl" = $1, "SignedPdfStorageKey" = $2, "SignedBy" = $3, "SignedAt" = $4,
+			"AttachedAt" = $4, "Status" = 'generated'::generated_contract_status, "ZapSignStatus" = 'signed'
+		WHERE "Id" = $5`, signedPdfURL, signedPdfStorageKey, signedBy, now, id)
+	return err
 }
 
 func (s *Store) ListExpiringContracts(ctx context.Context, orgID string, daysAhead int) ([]models.ExpiringContractResponse, error) {

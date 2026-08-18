@@ -911,15 +911,28 @@ type CreateAccountPayableFromInvoiceResponse struct {
 	ID string `json:"id"`
 }
 
+type SignerConfig struct {
+	Role         string  `json:"role"`
+	Label        string  `json:"label"`
+	Page         int     `json:"page"`
+	X            float64 `json:"x"`
+	Y            float64 `json:"y"`
+	RequireEmail bool    `json:"require_email"`
+	RequirePhone bool    `json:"require_phone"`
+}
+
 // --- Commercial sales & contracts ---
 
 type ListContractTemplateResponse struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	Code      string    `json:"code"`
-	Active    bool      `json:"active"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID            string         `json:"id"`
+	Name          string         `json:"name"`
+	Code          string         `json:"code"`
+	PdfBaseURL    *string        `json:"pdf_base_url,omitempty"`
+	PdfStorageKey *string        `json:"pdf_storage_key,omitempty"`
+	SignersConfig []SignerConfig `json:"signers_config,omitempty"`
+	Active        bool           `json:"active"`
+	CreatedAt     time.Time      `json:"created_at"`
+	UpdatedAt     time.Time      `json:"updated_at"`
 }
 
 type GetContractTemplateResponse struct {
@@ -928,17 +941,43 @@ type GetContractTemplateResponse struct {
 }
 
 type CreateContractTemplateInput struct {
-	Name         string `json:"name"`
-	Code         string `json:"code"`
-	BodyTemplate string `json:"body_template"`
-	Active       *bool  `json:"active"`
+	Name          string         `json:"name"`
+	Code          string         `json:"code"`
+	BodyTemplate  string         `json:"body_template"`
+	PdfBaseURL    *string        `json:"pdf_base_url,omitempty"`
+	PdfStorageKey *string        `json:"pdf_storage_key,omitempty"`
+	SignersConfig []SignerConfig `json:"signers_config,omitempty"`
+	Active        *bool          `json:"active"`
 }
 
 type UpdateContractTemplateInput struct {
-	Name         *string `json:"name"`
-	Code         *string `json:"code"`
-	BodyTemplate *string `json:"body_template"`
-	Active       *bool   `json:"active"`
+	Name          *string        `json:"name"`
+	Code          *string        `json:"code"`
+	BodyTemplate  *string        `json:"body_template"`
+	PdfBaseURL    *string        `json:"pdf_base_url"`
+	PdfStorageKey *string        `json:"pdf_storage_key"`
+	SignersConfig []SignerConfig `json:"signers_config"`
+	Active        *bool          `json:"active"`
+}
+
+type ContractSignerInput struct {
+	Name     string `json:"name"`
+	Email    string `json:"email"`
+	Phone    string `json:"phone"`
+	AuthMode string `json:"auth_mode"` // "email" ou "whatsapp"
+}
+
+type GenerateContractForCustomerInput struct {
+	ContractTemplateID string                `json:"contract_template_id"`
+	SignatureMethod    string                `json:"signature_method"` // "zapsign" ou "manual"
+	Signers            []ContractSignerInput `json:"signers,omitempty"`
+	CustomNotes        *string               `json:"custom_notes,omitempty"`
+}
+
+type UploadSignedContractInput struct {
+	SignedPdfURL        string `json:"signed_pdf_url"`
+	SignedPdfStorageKey string `json:"signed_pdf_storage_key"`
+	SignedBy            string `json:"signed_by"`
 }
 
 type SaleLineItemResponse struct {
@@ -963,8 +1002,19 @@ type GeneratedContractResponse struct {
 	Trigger              *string    `json:"trigger,omitempty"`
 	Status               string     `json:"status"`
 	RenderedHTML         *string    `json:"rendered_html,omitempty"`
+	PdfURL               *string    `json:"pdf_url,omitempty"`
+	PdfStorageKey        *string    `json:"pdf_storage_key,omitempty"`
+	SignatureMethod      string     `json:"signature_method"`
+	ZapSignDocToken      *string    `json:"zapsign_doc_token,omitempty"`
+	ZapSignOpenID        *int64     `json:"zapsign_open_id,omitempty"`
+	ZapSignSignURL       *string    `json:"zapsign_sign_url,omitempty"`
+	ZapSignStatus        *string    `json:"zapsign_status,omitempty"`
+	SignedPdfURL         *string    `json:"signed_pdf_url,omitempty"`
+	SignedAt             *time.Time `json:"signed_at,omitempty"`
+	SignedBy             *string    `json:"signed_by,omitempty"`
+	AttachedAt           *time.Time `json:"attached_at,omitempty"`
 	GeneratedAt          *time.Time `json:"generated_at,omitempty"`
-	CreatedAt            time.Time  `json:"created_at,omitempty"`
+	CreatedAt            time.Time  `json:"created_at"`
 }
 
 type ListSaleResponse struct {
