@@ -25,7 +25,12 @@ const formSchema = z.object({
   sku: z.string().max(64, 'SKU muito longo').optional(),
   brand: z.string().min(1, 'Informe a marca').max(128, 'Marca muito longa'),
   model: z.string().min(1, 'Informe o modelo').max(256, 'Modelo muito longo'),
-  imei: z.string().optional(),
+  imei: z
+    .string()
+    .optional()
+    .refine((v) => !v || /^[0-9]{15}$/.test(v.replace(/\D/g, '')), {
+      message: 'IMEI deve ter 15 dígitos'
+    }),
   color: z.string().optional(),
   storage_capacity: z.string().optional(),
   unit_cost: z.string().optional(),

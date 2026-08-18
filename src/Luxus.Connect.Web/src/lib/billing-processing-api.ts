@@ -137,6 +137,23 @@ export function useCreateBillingCompositionItem(phoneLineId: string, processingI
   });
 }
 
+export function usePayoffBillingCompositionItem(
+  phoneLineId: string,
+  processingId: string
+) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (itemId: string) => {
+      const { data } = await client<BillingCompositionItem>({
+        url: `/v1/phone-lines/${phoneLineId}/billing-processings/${processingId}/items/${itemId}/payoff`,
+        method: 'POST'
+      });
+      return data;
+    },
+    onSuccess: () => void qc.invalidateQueries({ queryKey: keys.all(phoneLineId) })
+  });
+}
+
 export function useDeleteBillingCompositionItem(
   phoneLineId: string,
   processingId: string

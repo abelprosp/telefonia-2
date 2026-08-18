@@ -10,6 +10,12 @@ export type UserProfile = {
   full_name: string;
   roles: string[];
   profile: string;
+  mfa_enrolled?: boolean;
+  mfa_verified?: boolean;
+  mfa_account_url?: string;
+  acr?: string;
+  amr?: string[];
+  privileged_access?: boolean;
 };
 
 export type UpdateUserProfileInput = {
@@ -57,6 +63,7 @@ export type SystemSettings = {
   days_after_due_reminder: number;
   auto_send_invoice_email: boolean;
   auto_send_collection_reminder: boolean;
+  prorata_divisor: number;
 };
 
 export type OrganizationSettings = {
@@ -86,11 +93,55 @@ export async function updateUserProfile(data: UpdateUserProfileInput): Promise<U
 }
 
 export async function fetchOrganizationSettings(): Promise<OrganizationSettings> {
-  const res = await client<OrganizationSettings>({
-    url: '/v1/organization-settings',
-    method: 'GET'
-  });
-  return res.data;
+  try {
+    const res = await client<OrganizationSettings>({
+      url: '/v1/organization-settings',
+      method: 'GET'
+    });
+    return res.data;
+  } catch {
+    return {
+      organization_id: 'default',
+      company: {
+        company_name: 'Luxus Connect',
+        trading_name: 'Luxus Connect Telecom',
+        cnpj: '',
+        state_registration: '',
+        email: '',
+        phone: '',
+        website: '',
+        zip_code: '',
+        street: '',
+        number: '',
+        complement: '',
+        neighborhood: '',
+        city: '',
+        state: ''
+      },
+      whitelabel: {
+        app_name: 'Luxus Connect',
+        app_slogan: 'Gestão de Telefonia Inteligente',
+        logo_url: '',
+        dark_logo_url: '',
+        favicon_url: '',
+        primary_color: '#0f766e',
+        support_email: 'suporte@luxusconnect.com.br',
+        support_phone: '(11) 99999-9999',
+        footer_text: '© 2026 Luxus Connect. Todos os direitos reservados.'
+      },
+      system: {
+        default_due_day: 10,
+        late_fee_percentage: 2,
+        interest_rate_monthly: 1,
+        days_before_due_reminder: 3,
+        days_after_due_reminder: 1,
+        auto_send_invoice_email: false,
+        auto_send_collection_reminder: false,
+        prorata_divisor: 30
+      },
+      updated_at: new Date().toISOString()
+    };
+  }
 }
 
 export async function updateCompanySettings(data: Partial<CompanySettings>): Promise<OrganizationSettings> {

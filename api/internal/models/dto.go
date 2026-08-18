@@ -113,17 +113,17 @@ type CreateCustomerAddressInput struct {
 }
 
 type CreateCustomerInput struct {
-	ProviderID                      string                       `json:"provider_id"`
-	Type                            string                       `json:"type"`
-	Name                            string                       `json:"name"`
-	Document                        string                       `json:"document"`
-	LegalName                       *string                      `json:"legal_name"`
-	StateRegistration               *string                      `json:"state_registration"`
-	BirthOrOpeningDate              *string                      `json:"birth_or_opening_date"`
-	ResponsibleSalespersonUserID    *string                      `json:"responsible_salesperson_user_id"`
-	CommercialActivationDate        *string                      `json:"commercial_activation_date"`
-	ContractedLuxusCnpj             *string                      `json:"contracted_luxus_cnpj"`
-	Addresses                       []CreateCustomerAddressInput `json:"addresses"`
+	ProviderID                   string                       `json:"provider_id,omitempty"`
+	Type                         string                       `json:"type"`
+	Name                         string                       `json:"name"`
+	Document                     string                       `json:"document"`
+	LegalName                    *string                      `json:"legal_name"`
+	StateRegistration            *string                      `json:"state_registration"`
+	BirthOrOpeningDate           *string                      `json:"birth_or_opening_date"`
+	ResponsibleSalespersonUserID *string                      `json:"responsible_salesperson_user_id"`
+	CommercialActivationDate     *string                      `json:"commercial_activation_date"`
+	ContractedLuxusCnpj          *string                      `json:"contracted_luxus_cnpj"`
+	Addresses                    []CreateCustomerAddressInput `json:"addresses"`
 }
 
 type UpdateCustomerInput struct {
@@ -155,6 +155,7 @@ type ListCustomerResponse struct {
 }
 
 type CreateCustomerResponse = ListCustomerResponse
+type GetCustomerResponse = ListCustomerResponse
 
 type CustomerProviderLinkResponse struct {
 	CustomerID   string     `json:"customer_id"`
@@ -166,17 +167,17 @@ type CustomerProviderLinkResponse struct {
 }
 
 type CustomerPhoneLineLinkResponse struct {
-	CustomerID         string     `json:"customer_id"`
-	PhoneLineID        string     `json:"phone_line_id"`
-	PhoneLineNumber    string     `json:"phone_line_number"`
-	PhoneLineStatus    string     `json:"phone_line_status"`
-	LineClassification string     `json:"line_classification"`
-	StartDate          time.Time  `json:"start_date"`
-	EndDate            *time.Time `json:"end_date"`
-	IsActive           bool       `json:"is_active"`
-	MonthlyAmount      *float64   `json:"monthly_amount"`
-	BaseCost           *float64   `json:"base_cost"`
-	CostWithConsumption *float64  `json:"cost_with_consumption"`
+	CustomerID          string     `json:"customer_id"`
+	PhoneLineID         string     `json:"phone_line_id"`
+	PhoneLineNumber     string     `json:"phone_line_number"`
+	PhoneLineStatus     string     `json:"phone_line_status"`
+	LineClassification  string     `json:"line_classification"`
+	StartDate           time.Time  `json:"start_date"`
+	EndDate             *time.Time `json:"end_date"`
+	IsActive            bool       `json:"is_active"`
+	MonthlyAmount       *float64   `json:"monthly_amount"`
+	BaseCost            *float64   `json:"base_cost"`
+	CostWithConsumption *float64   `json:"cost_with_consumption"`
 }
 
 type CustomerDeviceLinkResponse struct {
@@ -193,13 +194,13 @@ type CustomerDeviceLinkResponse struct {
 }
 
 type AssignCustomerDeviceInput struct {
-	DeviceStockItemID *string  `json:"device_stock_item_id"`
-	Description       *string  `json:"description"`
-	Brand             *string  `json:"brand"`
-	Model             *string  `json:"model"`
-	MonthlyAmount     float64  `json:"monthly_amount"`
-	StartDate         *string  `json:"start_date"`
-	RenewFidelity     *bool    `json:"renew_fidelity"`
+	DeviceStockItemID *string `json:"device_stock_item_id"`
+	Description       *string `json:"description"`
+	Brand             *string `json:"brand"`
+	Model             *string `json:"model"`
+	MonthlyAmount     float64 `json:"monthly_amount"`
+	StartDate         *string `json:"start_date"`
+	RenewFidelity     *bool   `json:"renew_fidelity"`
 }
 
 type UpdateCustomerDeviceInput struct {
@@ -212,14 +213,14 @@ type UnassignCustomerDeviceInput struct {
 }
 
 type CustomerAttachmentResponse struct {
-	ID               string     `json:"id"`
-	Title            *string    `json:"title"`
-	OriginalFileName string     `json:"original_file_name"`
-	StorageBucket    string     `json:"storage_bucket"`
-	StorageObjectKey string     `json:"storage_object_key"`
-	ContentType      *string    `json:"content_type"`
-	SizeBytes        *int64     `json:"size_bytes"`
-	UploadedAtUTC    time.Time  `json:"uploaded_at_utc"`
+	ID               string    `json:"id"`
+	Title            *string   `json:"title"`
+	OriginalFileName string    `json:"original_file_name"`
+	StorageBucket    string    `json:"storage_bucket"`
+	StorageObjectKey string    `json:"storage_object_key"`
+	ContentType      *string   `json:"content_type"`
+	SizeBytes        *int64    `json:"size_bytes"`
+	UploadedAtUTC    time.Time `json:"uploaded_at_utc"`
 }
 
 type RegisterCustomerAttachmentInput struct {
@@ -236,22 +237,22 @@ type ManuallyReleaseCustomerInput struct {
 }
 
 type BillingReadinessManualReleaseDto struct {
-	Justification     string    `json:"justification"`
-	ReleasedAt        time.Time `json:"released_at"`
-	ReleasedByUserID  string    `json:"released_by_user_id"`
+	Justification    string    `json:"justification"`
+	ReleasedAt       time.Time `json:"released_at"`
+	ReleasedByUserID string    `json:"released_by_user_id"`
 }
 
 type GetCustomerBillingReadinessResponse struct {
-	CustomerID                                  string                            `json:"customer_id"`
-	ProcessingMonthID                           string                            `json:"processing_month_id"`
-	StatusDisplayName                           string                            `json:"status_display_name"`
-	IsReleasedForBilling                        bool                              `json:"is_released_for_billing"`
-	IsAutomaticallyComplete                     bool                              `json:"is_automatically_complete"`
-	IsManuallyReleased                          bool                              `json:"is_manually_released"`
-	AutomaticEvaluationUsesCnpjContractingCompanies bool                          `json:"automatic_evaluation_uses_cnpj_contracting_companies"`
-	AccountsExpectedForAutomaticRule            int                               `json:"accounts_expected_for_automatic_rule"`
-	AccountsWithInvoiceInProcessingMonth        int                               `json:"accounts_with_invoice_in_processing_month"`
-	ManualRelease                               *BillingReadinessManualReleaseDto `json:"manual_release"`
+	CustomerID                                      string                            `json:"customer_id"`
+	ProcessingMonthID                               string                            `json:"processing_month_id"`
+	StatusDisplayName                               string                            `json:"status_display_name"`
+	IsReleasedForBilling                            bool                              `json:"is_released_for_billing"`
+	IsAutomaticallyComplete                         bool                              `json:"is_automatically_complete"`
+	IsManuallyReleased                              bool                              `json:"is_manually_released"`
+	AutomaticEvaluationUsesCnpjContractingCompanies bool                              `json:"automatic_evaluation_uses_cnpj_contracting_companies"`
+	AccountsExpectedForAutomaticRule                int                               `json:"accounts_expected_for_automatic_rule"`
+	AccountsWithInvoiceInProcessingMonth            int                               `json:"accounts_with_invoice_in_processing_month"`
+	ManualRelease                                   *BillingReadinessManualReleaseDto `json:"manual_release"`
 }
 
 // --- Phone Lines ---
@@ -300,10 +301,10 @@ type GetPhoneLineServiceResponse struct {
 	Recurring             bool       `json:"recurring"`
 	Price                 *float64   `json:"price"`
 	Active                bool       `json:"active"`
-	ServiceType            *string    `json:"service_type,omitempty"`
-	StartDate              *time.Time `json:"start_date,omitempty"`
-	EndDate                *time.Time `json:"end_date,omitempty"`
-	FidelityRenewalPrompt  bool       `json:"fidelity_renewal_prompt,omitempty"`
+	ServiceType           *string    `json:"service_type,omitempty"`
+	StartDate             *time.Time `json:"start_date,omitempty"`
+	EndDate               *time.Time `json:"end_date,omitempty"`
+	FidelityRenewalPrompt bool       `json:"fidelity_renewal_prompt,omitempty"`
 }
 
 type CreatePhoneLineServiceInput struct {
@@ -327,19 +328,19 @@ type PutPhoneLineTransitionInput struct {
 }
 
 type GetChildPhoneLineResponse struct {
-	ID                   string                      `json:"id"`
-	Number               string                      `json:"number"`
-	LineClassification   string                      `json:"line_classification"`
-	Status               string                      `json:"status"`
-	ProviderPlanID       string                      `json:"provider_plan_id"`
-	ProviderPlanName     string                      `json:"provider_plan_name"`
-	Plan                 *GetProviderPlanResponse    `json:"plan"`
-	Services             []GetPhoneLineServiceResponse `json:"services"`
+	ID                 string                        `json:"id"`
+	Number             string                        `json:"number"`
+	LineClassification string                        `json:"line_classification"`
+	Status             string                        `json:"status"`
+	ProviderPlanID     string                        `json:"provider_plan_id"`
+	ProviderPlanName   string                        `json:"provider_plan_name"`
+	Plan               *GetProviderPlanResponse      `json:"plan"`
+	Services           []GetPhoneLineServiceResponse `json:"services"`
 }
 
 type GetPhoneLineResponse struct {
 	ListPhoneLineResponse
-	Children []GetChildPhoneLineResponse `json:"children"`
+	Children []GetChildPhoneLineResponse   `json:"children"`
 	Services []GetPhoneLineServiceResponse `json:"services"`
 }
 
@@ -391,15 +392,15 @@ type LineBillingCompositionItemResponse struct {
 }
 
 type LineBillingProcessingResponse struct {
-	ID                  string                               `json:"id"`
-	Perspective         string                               `json:"perspective"`
-	Label               *string                              `json:"label,omitempty"`
-	MirrorFromPrimary   bool                                 `json:"mirror_from_primary"`
-	OrganizationalUnit  *string                              `json:"organizational_unit,omitempty"`
-	Department          *string                              `json:"department,omitempty"`
-	CostCenterLabel     *string                              `json:"cost_center_label,omitempty"`
-	TotalAmount         float64                              `json:"total_amount"`
-	Items               []LineBillingCompositionItemResponse `json:"items"`
+	ID                 string                               `json:"id"`
+	Perspective        string                               `json:"perspective"`
+	Label              *string                              `json:"label,omitempty"`
+	MirrorFromPrimary  bool                                 `json:"mirror_from_primary"`
+	OrganizationalUnit *string                              `json:"organizational_unit,omitempty"`
+	Department         *string                              `json:"department,omitempty"`
+	CostCenterLabel    *string                              `json:"cost_center_label,omitempty"`
+	TotalAmount        float64                              `json:"total_amount"`
+	Items              []LineBillingCompositionItemResponse `json:"items"`
 }
 
 type ListLineBillingProcessingsResponse struct {
@@ -408,11 +409,11 @@ type ListLineBillingProcessingsResponse struct {
 }
 
 type UpdateLineBillingProcessingInput struct {
-	Label               *string `json:"label"`
-	MirrorFromPrimary   *bool   `json:"mirror_from_primary"`
-	OrganizationalUnit  *string `json:"organizational_unit"`
-	Department          *string `json:"department"`
-	CostCenterLabel     *string `json:"cost_center_label"`
+	Label              *string `json:"label"`
+	MirrorFromPrimary  *bool   `json:"mirror_from_primary"`
+	OrganizationalUnit *string `json:"organizational_unit"`
+	Department         *string `json:"department"`
+	CostCenterLabel    *string `json:"cost_center_label"`
 }
 
 type CreateLineBillingCompositionItemInput struct {
@@ -442,16 +443,16 @@ type UpdateLineBillingCompositionItemInput struct {
 }
 
 type MovementReportItem struct {
-	PhoneLineID        string     `json:"phone_line_id"`
-	Number             string     `json:"number"`
-	Status             string     `json:"status"`
-	LineClassification string     `json:"line_classification"`
-	CustomerID         *string    `json:"customer_id,omitempty"`
-	CustomerName       *string    `json:"customer_name,omitempty"`
-	LastInvoiceID      *string    `json:"last_invoice_id,omitempty"`
-	LastInvoiceNumber  *string    `json:"last_invoice_number,omitempty"`
-	PendingCycles      int        `json:"pending_cycles,omitempty"`
-	TransitionSubStatus *string   `json:"transition_sub_status,omitempty"`
+	PhoneLineID         string     `json:"phone_line_id"`
+	Number              string     `json:"number"`
+	Status              string     `json:"status"`
+	LineClassification  string     `json:"line_classification"`
+	CustomerID          *string    `json:"customer_id,omitempty"`
+	CustomerName        *string    `json:"customer_name,omitempty"`
+	LastInvoiceID       *string    `json:"last_invoice_id,omitempty"`
+	LastInvoiceNumber   *string    `json:"last_invoice_number,omitempty"`
+	PendingCycles       int        `json:"pending_cycles,omitempty"`
+	TransitionSubStatus *string    `json:"transition_sub_status,omitempty"`
 	TransitionStartedAt *time.Time `json:"transition_started_at,omitempty"`
 }
 
@@ -472,6 +473,20 @@ type AuditLogResponse struct {
 	OldValues  *string   `json:"old_values,omitempty"`
 	NewValues  *string   `json:"new_values,omitempty"`
 	Timestamp  time.Time `json:"timestamp"`
+}
+
+type StateTransitionLogResponse struct {
+	ID             string    `json:"id"`
+	OrganizationID string    `json:"organization_id"`
+	EntityType     string    `json:"entity_type"`
+	EntityID       string    `json:"entity_id"`
+	FromState      string    `json:"from_state"`
+	ToState        string    `json:"to_state"`
+	TriggerEvent   string    `json:"trigger_event"`
+	Justification  *string   `json:"justification,omitempty"`
+	ActorUserID    *string   `json:"actor_user_id,omitempty"`
+	MetadataJSON   *string   `json:"metadata_json,omitempty"`
+	CreatedAt      time.Time `json:"created_at"`
 }
 
 // --- Billing Cycles ---
@@ -515,20 +530,21 @@ type CloseProcessingMonthContingencyInput struct {
 }
 
 type ListProcessingMonthResponse struct {
-	ID                   string     `json:"id"`
-	ProviderID           string     `json:"provider_id"`
-	Year                 int        `json:"year"`
-	Month                int        `json:"month"`
-	DisplayName          string     `json:"display_name"`
-	Status               string     `json:"status"`
-	ClosedAt             *time.Time `json:"closed_at"`
-	ClosedBy             *string    `json:"closed_by"`
-	ClosedInContingency  bool       `json:"closed_in_contingency"`
+	ID                  string     `json:"id"`
+	ProviderID          string     `json:"provider_id"`
+	Year                int        `json:"year"`
+	Month               int        `json:"month"`
+	DisplayName         string     `json:"display_name"`
+	Status              string     `json:"status"`
+	ClosedAt            *time.Time `json:"closed_at"`
+	ClosedBy            *string    `json:"closed_by"`
+	ClosedInContingency bool       `json:"closed_in_contingency"`
 }
 
 type GetProcessingMonthResponse struct {
 	ListProcessingMonthResponse
 	ContingencyJustification *string `json:"contingency_justification"`
+	ConsolidationHash        *string `json:"consolidation_hash,omitempty"`
 }
 
 // --- Provider Invoices ---
@@ -539,6 +555,7 @@ type ProviderInvoiceImportRequestInput struct {
 	StorageBucket     string  `json:"storage_bucket"`
 	StorageObjectKey  string  `json:"storage_object_key"`
 	OriginalFileName  *string `json:"original_file_name"`
+	AllowSubstitute   bool    `json:"allow_substitute"`
 }
 
 type RequestProviderInvoiceImportResponse struct {
@@ -550,29 +567,69 @@ type RequestProviderInvoiceImportResponse struct {
 }
 
 type ListProviderInvoiceResponse struct {
-	ID                      string    `json:"id"`
-	ProviderAccountID       string    `json:"provider_account_id"`
-	ProviderAccountNumber   string    `json:"provider_account_number"`
-	ContractingCompanyID    string    `json:"contracting_company_id"`
-	ContractingCompanyName  string    `json:"contracting_company_name"`
-	ProviderID              string    `json:"provider_id"`
-	ProviderName            string    `json:"provider_name"`
-	BillingCycleID          string    `json:"billing_cycle_id"`
-	BillingCycleName        string    `json:"billing_cycle_name"`
-	ProcessingMonthID       *string   `json:"processing_month_id"`
-	CostCenterID            *string   `json:"cost_center_id"`
-	ParentInvoiceID         *string   `json:"parent_invoice_id"`
-	IssueDate               time.Time `json:"issue_date"`
-	DueDate                 time.Time `json:"due_date"`
-	TotalAmount             float64   `json:"total_amount"`
-	Status                  string    `json:"status"`
-	SubtotalServices        float64   `json:"subtotal_services"`
-	SubtotalUsage           float64   `json:"subtotal_usage"`
-	SubtotalTaxes           float64   `json:"subtotal_taxes"`
-	SubtotalDiscounts       float64   `json:"subtotal_discounts"`
-	SubtotalInstallments    float64   `json:"subtotal_installments"`
-	AccountPayableID        *string   `json:"account_payable_id"`
-	AccountPayableStatus    *string   `json:"account_payable_status"`
+	ID                     string    `json:"id"`
+	ProviderAccountID      string    `json:"provider_account_id"`
+	ProviderAccountNumber  string    `json:"provider_account_number"`
+	ContractingCompanyID   string    `json:"contracting_company_id"`
+	ContractingCompanyName string    `json:"contracting_company_name"`
+	ProviderID             string    `json:"provider_id"`
+	ProviderName           string    `json:"provider_name"`
+	BillingCycleID         string    `json:"billing_cycle_id"`
+	BillingCycleName       string    `json:"billing_cycle_name"`
+	ProcessingMonthID      *string   `json:"processing_month_id"`
+	CostCenterID           *string   `json:"cost_center_id"`
+	ParentInvoiceID        *string   `json:"parent_invoice_id"`
+	IssueDate              time.Time `json:"issue_date"`
+	DueDate                time.Time `json:"due_date"`
+	TotalAmount            float64   `json:"total_amount"`
+	Status                 string    `json:"status"`
+	SubtotalServices       float64   `json:"subtotal_services"`
+	SubtotalUsage          float64   `json:"subtotal_usage"`
+	SubtotalTaxes          float64   `json:"subtotal_taxes"`
+	SubtotalDiscounts      float64   `json:"subtotal_discounts"`
+	SubtotalInstallments   float64   `json:"subtotal_installments"`
+	AccountPayableID       *string   `json:"account_payable_id"`
+	AccountPayableStatus   *string   `json:"account_payable_status"`
+}
+
+type ApportionGlobalDiscountInput struct {
+	GlobalDiscountAmount float64 `json:"global_discount_amount"`
+	Description          string  `json:"description,omitempty"`
+}
+
+type ApportionedLineItem struct {
+	PhoneLineID       string  `json:"phone_line_id"`
+	PhoneNumber       string  `json:"phone_number"`
+	OriginalAmount    float64 `json:"original_amount"`
+	AllocatedDiscount float64 `json:"allocated_discount"`
+	FinalAmount       float64 `json:"final_amount"`
+}
+
+type ApportionGlobalDiscountResponse struct {
+	InvoiceID            string                `json:"invoice_id"`
+	GlobalDiscountAmount float64               `json:"global_discount_amount"`
+	LinesCount           int                   `json:"lines_count"`
+	Items                []ApportionedLineItem `json:"items"`
+}
+
+type FidelityPenaltyEstimateResponse struct {
+	PhoneLineID       string    `json:"phone_line_id"`
+	FidelityStartDate time.Time `json:"fidelity_start_date"`
+	PredictedEndDate  time.Time `json:"predicted_end_date"`
+	CancelDate        time.Time `json:"cancel_date"`
+	TotalMonths       int       `json:"total_months"`
+	MonthsServed      int       `json:"months_served"`
+	MonthsRemaining   int       `json:"months_remaining"`
+	MonthlyAmount     float64   `json:"monthly_amount"`
+	PenaltyPercentage float64   `json:"penalty_percentage"`
+	PenaltyAmount     float64   `json:"penalty_amount"`
+	IsExempt          bool      `json:"is_exempt"`
+}
+
+type ApplyFidelityPenaltyInput struct {
+	CancelDate        *string  `json:"cancel_date,omitempty"`
+	PenaltyPercentage *float64 `json:"penalty_percentage,omitempty"`
+	Justification     string   `json:"justification,omitempty"`
 }
 
 type GetProviderInvoiceItemResponse struct {
@@ -630,12 +687,12 @@ type GetProviderPhoneLineResponse struct {
 
 type GetProviderInvoiceResponse struct {
 	ListProviderInvoiceResponse
-	Number                   string                                  `json:"number"`
-	ProcessingMonthName      *string                                 `json:"processing_month_name"`
-	CostCenterName           *string                                 `json:"cost_center_name"`
-	PhoneLines               []GetProviderPhoneLineResponse          `json:"phone_lines"`
-	ProviderInvoiceItems     []GetProviderInvoiceItemResponse        `json:"provider_invoice_items"`
-	ProviderInvoiceServices  []GetProviderInvoiceServiceResponse     `json:"provider_invoice_services"`
+	Number                      string                                   `json:"number"`
+	ProcessingMonthName         *string                                  `json:"processing_month_name"`
+	CostCenterName              *string                                  `json:"cost_center_name"`
+	PhoneLines                  []GetProviderPhoneLineResponse           `json:"phone_lines"`
+	ProviderInvoiceItems        []GetProviderInvoiceItemResponse         `json:"provider_invoice_items"`
+	ProviderInvoiceServices     []GetProviderInvoiceServiceResponse      `json:"provider_invoice_services"`
 	ProviderInvoiceQuotaSharing []GetProviderInvoiceQuotaSharingResponse `json:"provider_invoice_quota_sharing"`
 }
 
@@ -660,11 +717,11 @@ type DashboardStatsResponse struct {
 // --- Partner ---
 
 type PartnerDashboardStatsResponse struct {
-	CustomersCount              int32   `json:"customers_count"`
-	PhoneLinesCount             int32   `json:"phone_lines_count"`
-	PendingOperationRequests    int32   `json:"pending_operation_requests_count"`
-	TotalBaseCost               float64 `json:"total_base_cost"`
-	TotalCostWithConsumption    float64 `json:"total_cost_with_consumption"`
+	CustomersCount           int32   `json:"customers_count"`
+	PhoneLinesCount          int32   `json:"phone_lines_count"`
+	PendingOperationRequests int32   `json:"pending_operation_requests_count"`
+	TotalBaseCost            float64 `json:"total_base_cost"`
+	TotalCostWithConsumption float64 `json:"total_cost_with_consumption"`
 }
 
 type CreatePhoneLineOperationRequestInput struct {
@@ -696,15 +753,15 @@ type PhoneLineOperationRequestResponse struct {
 }
 
 type PartnerPhoneLineResponse struct {
-	ID                   string   `json:"id"`
-	Number               string   `json:"number"`
-	Status               string   `json:"status"`
-	TransitionSubStatus  *string  `json:"transition_sub_status"`
-	CustomerID           *string  `json:"customer_id"`
-	CustomerName         *string  `json:"customer_name"`
-	ProviderPlanName     string   `json:"provider_plan_name"`
-	BaseCost             *float64 `json:"base_cost"`
-	CostWithConsumption  *float64 `json:"cost_with_consumption"`
+	ID                  string   `json:"id"`
+	Number              string   `json:"number"`
+	Status              string   `json:"status"`
+	TransitionSubStatus *string  `json:"transition_sub_status"`
+	CustomerID          *string  `json:"customer_id"`
+	CustomerName        *string  `json:"customer_name"`
+	ProviderPlanName    string   `json:"provider_plan_name"`
+	BaseCost            *float64 `json:"base_cost"`
+	CostWithConsumption *float64 `json:"cost_with_consumption"`
 }
 
 // --- Pre-signed URLs ---
@@ -718,29 +775,29 @@ type FinancialSummaryResponse struct {
 	PayableOverdueCount    int32   `json:"payable_overdue_count"`
 	ReceivableOverdueCount int32   `json:"receivable_overdue_count"`
 	// Faturamento operadora (refaturamento)
-	ProviderInvoicesCount              int32   `json:"provider_invoices_count"`
-	ProviderInvoicesTotalAmount        float64 `json:"provider_invoices_total_amount"`
-	ProviderInvoicesWithoutPayableCount int32  `json:"provider_invoices_without_payable_count"`
-	OpenProcessingMonthsCount          int32   `json:"open_processing_months_count"`
-	BillingDocumentsDraftCount         int32   `json:"billing_documents_draft_count"`
-	BillingDocumentsReadyCount         int32   `json:"billing_documents_ready_count"`
-	BillingDocumentsSentCount          int32   `json:"billing_documents_sent_count"`
+	ProviderInvoicesCount               int32   `json:"provider_invoices_count"`
+	ProviderInvoicesTotalAmount         float64 `json:"provider_invoices_total_amount"`
+	ProviderInvoicesWithoutPayableCount int32   `json:"provider_invoices_without_payable_count"`
+	OpenProcessingMonthsCount           int32   `json:"open_processing_months_count"`
+	BillingDocumentsDraftCount          int32   `json:"billing_documents_draft_count"`
+	BillingDocumentsReadyCount          int32   `json:"billing_documents_ready_count"`
+	BillingDocumentsSentCount           int32   `json:"billing_documents_sent_count"`
 }
 
 type ListAccountPayableResponse struct {
-	ID                       string     `json:"id"`
-	Description              string     `json:"description"`
-	VendorName               string     `json:"vendor_name"`
-	ProviderInvoiceID        *string    `json:"provider_invoice_id"`
-	PartnerSalespersonUserID *string    `json:"partner_salesperson_user_id"`
-	IssueDate                time.Time  `json:"issue_date"`
-	DueDate                  time.Time  `json:"due_date"`
-	Amount                   float64    `json:"amount"`
-	PaidAmount               float64    `json:"paid_amount"`
-	Balance                  float64    `json:"balance"`
-	Status                   string     `json:"status"`
-	Notes                    *string    `json:"notes"`
-	CreatedAt                time.Time  `json:"created_at"`
+	ID                       string    `json:"id"`
+	Description              string    `json:"description"`
+	VendorName               string    `json:"vendor_name"`
+	ProviderInvoiceID        *string   `json:"provider_invoice_id"`
+	PartnerSalespersonUserID *string   `json:"partner_salesperson_user_id"`
+	IssueDate                time.Time `json:"issue_date"`
+	DueDate                  time.Time `json:"due_date"`
+	Amount                   float64   `json:"amount"`
+	PaidAmount               float64   `json:"paid_amount"`
+	Balance                  float64   `json:"balance"`
+	Status                   string    `json:"status"`
+	Notes                    *string   `json:"notes"`
+	CreatedAt                time.Time `json:"created_at"`
 }
 
 type CreateAccountPayableInput struct {
@@ -988,7 +1045,6 @@ type CreateOrganizationUserInput struct {
 	OrganizationName *string `json:"organization_name,omitempty"`
 }
 
-
 type UpdateOrganizationUserInput struct {
 	FirstName *string `json:"first_name"`
 	LastName  *string `json:"last_name"`
@@ -1033,33 +1089,33 @@ type UpdateInvoiceEmailTemplateInput struct {
 }
 
 type ListCustomerBillingDocumentResponse struct {
-	ID                   string     `json:"id"`
-	CustomerID           string     `json:"customer_id"`
-	CustomerName         string     `json:"customer_name"`
-	AccountsReceivableID *string    `json:"accounts_receivable_id"`
-	ProcessingMonthID    *string    `json:"processing_month_id"`
-	InvoiceNumber        string     `json:"invoice_number"`
-	IssueDate            time.Time  `json:"issue_date"`
-	DueDate              time.Time  `json:"due_date"`
-	Amount               float64    `json:"amount"`
-	Status               string     `json:"status"`
-	RecipientEmail       string     `json:"recipient_email"`
-	EmailSubject         string     `json:"email_subject"`
-	SendCount            int32      `json:"send_count"`
-	SentAt               *time.Time `json:"sent_at"`
-	LastSentAt           *time.Time `json:"last_sent_at"`
-	CreatedAt            time.Time  `json:"created_at"`
-	SicrediNossoNumero   *string    `json:"sicredi_nosso_numero,omitempty"`
-	SicrediLinhaDigitavel *string   `json:"sicredi_linha_digitavel,omitempty"`
-	SicrediCodigoBarras  *string    `json:"sicredi_codigo_barras,omitempty"`
-	SicrediPixQrCode     *string    `json:"sicredi_pix_qr_code,omitempty"`
-	SicrediPixTxID       *string    `json:"sicredi_pix_tx_id,omitempty"`
-	SicrediBoletoStatus  *string    `json:"sicredi_boleto_status,omitempty"`
-	SicrediBoletoError   *string    `json:"sicredi_boleto_error,omitempty"`
-	SicrediPaidAt        *time.Time `json:"sicredi_paid_at,omitempty"`
-	PhoneLineID          *string    `json:"phone_line_id,omitempty"`
-	PhoneLineNumber      *string    `json:"phone_line_number,omitempty"`
-	BillingGroupType     *string    `json:"billing_group_type,omitempty"`
+	ID                    string     `json:"id"`
+	CustomerID            string     `json:"customer_id"`
+	CustomerName          string     `json:"customer_name"`
+	AccountsReceivableID  *string    `json:"accounts_receivable_id"`
+	ProcessingMonthID     *string    `json:"processing_month_id"`
+	InvoiceNumber         string     `json:"invoice_number"`
+	IssueDate             time.Time  `json:"issue_date"`
+	DueDate               time.Time  `json:"due_date"`
+	Amount                float64    `json:"amount"`
+	Status                string     `json:"status"`
+	RecipientEmail        string     `json:"recipient_email"`
+	EmailSubject          string     `json:"email_subject"`
+	SendCount             int32      `json:"send_count"`
+	SentAt                *time.Time `json:"sent_at"`
+	LastSentAt            *time.Time `json:"last_sent_at"`
+	CreatedAt             time.Time  `json:"created_at"`
+	SicrediNossoNumero    *string    `json:"sicredi_nosso_numero,omitempty"`
+	SicrediLinhaDigitavel *string    `json:"sicredi_linha_digitavel,omitempty"`
+	SicrediCodigoBarras   *string    `json:"sicredi_codigo_barras,omitempty"`
+	SicrediPixQrCode      *string    `json:"sicredi_pix_qr_code,omitempty"`
+	SicrediPixTxID        *string    `json:"sicredi_pix_tx_id,omitempty"`
+	SicrediBoletoStatus   *string    `json:"sicredi_boleto_status,omitempty"`
+	SicrediBoletoError    *string    `json:"sicredi_boleto_error,omitempty"`
+	SicrediPaidAt         *time.Time `json:"sicredi_paid_at,omitempty"`
+	PhoneLineID           *string    `json:"phone_line_id,omitempty"`
+	PhoneLineNumber       *string    `json:"phone_line_number,omitempty"`
+	BillingGroupType      *string    `json:"billing_group_type,omitempty"`
 }
 
 type GetCustomerBillingDocumentResponse struct {
@@ -1080,9 +1136,9 @@ type CreateCustomerBillingDocumentFromReceivableResponse struct {
 }
 
 type IssueSicrediBoletoResponse struct {
-	Success          bool    `json:"success"`
-	Message          string  `json:"message"`
-	SicrediNossoNumero *string `json:"sicredi_nosso_numero,omitempty"`
+	Success               bool    `json:"success"`
+	Message               string  `json:"message"`
+	SicrediNossoNumero    *string `json:"sicredi_nosso_numero,omitempty"`
 	SicrediLinhaDigitavel *string `json:"sicredi_linha_digitavel,omitempty"`
 }
 
@@ -1110,8 +1166,8 @@ type SicrediSetupStep struct {
 }
 
 type SicrediProductionSetupResponse struct {
-	Success bool             `json:"success"`
-	Message string           `json:"message"`
+	Success bool               `json:"success"`
+	Message string             `json:"message"`
 	Steps   []SicrediSetupStep `json:"steps"`
 }
 
@@ -1126,19 +1182,19 @@ type RegisterSicrediWebhookInput struct {
 }
 
 type SyncSicrediPaymentsResponse struct {
-	Checked int                         `json:"checked"`
-	Paid    int                         `json:"paid"`
+	Checked int                            `json:"checked"`
+	Paid    int                            `json:"paid"`
 	Items   []SyncSicrediPaymentItemResult `json:"items"`
 }
 
 type SyncSicrediPaymentItemResult struct {
-	DocumentID   string     `json:"document_id"`
-	InvoiceNumber string    `json:"invoice_number"`
-	CustomerName string     `json:"customer_name"`
-	Status       string     `json:"status"`
-	Message      string     `json:"message,omitempty"`
-	PaidAt       *time.Time `json:"paid_at,omitempty"`
-	Amount       float64    `json:"amount,omitempty"`
+	DocumentID    string     `json:"document_id"`
+	InvoiceNumber string     `json:"invoice_number"`
+	CustomerName  string     `json:"customer_name"`
+	Status        string     `json:"status"`
+	Message       string     `json:"message,omitempty"`
+	PaidAt        *time.Time `json:"paid_at,omitempty"`
+	Amount        float64    `json:"amount,omitempty"`
 }
 
 type SendCustomerBillingDocumentResponse struct {
@@ -1157,14 +1213,14 @@ type CustomerBillingSendLogResponse struct {
 }
 
 type OverdueReceivableResponse struct {
-	ID           string    `json:"id"`
-	CustomerID   string    `json:"customer_id"`
-	CustomerName string    `json:"customer_name"`
-	BillingEmail string    `json:"billing_email"`
-	Description  string    `json:"description"`
-	DueDate      time.Time `json:"due_date"`
-	Balance      float64   `json:"balance"`
-	RemindersSent int32    `json:"reminders_sent"`
+	ID            string    `json:"id"`
+	CustomerID    string    `json:"customer_id"`
+	CustomerName  string    `json:"customer_name"`
+	BillingEmail  string    `json:"billing_email"`
+	Description   string    `json:"description"`
+	DueDate       time.Time `json:"due_date"`
+	Balance       float64   `json:"balance"`
+	RemindersSent int32     `json:"reminders_sent"`
 }
 
 type SendCollectionReminderInput struct {
@@ -1243,14 +1299,14 @@ type BulkBillingPreviewResponse struct {
 }
 
 type BulkGenerateBillingDocumentsInput struct {
-	ProcessingMonthID    string   `json:"processing_month_id"`
-	IssueDate            string   `json:"issue_date"`
-	DueDate              string   `json:"due_date"`
-	Description          string   `json:"description"`
-	TemplateCode         string   `json:"template_code"`
-	LayoutTemplateCode   string   `json:"layout_template_code"`
-	CustomerIDs          []string `json:"customer_ids"`
-	BillingGroupIDs      []string `json:"billing_group_ids"`
+	ProcessingMonthID  string   `json:"processing_month_id"`
+	IssueDate          string   `json:"issue_date"`
+	DueDate            string   `json:"due_date"`
+	Description        string   `json:"description"`
+	TemplateCode       string   `json:"template_code"`
+	LayoutTemplateCode string   `json:"layout_template_code"`
+	CustomerIDs        []string `json:"customer_ids"`
+	BillingGroupIDs    []string `json:"billing_group_ids"`
 }
 
 type ManualGenerateBillingDocumentsInput struct {
@@ -1329,10 +1385,10 @@ type CustomerBillingDocumentRow struct {
 // --- Pre-signed URLs (continued) ---
 
 type CreatePresignedUploadURLInput struct {
-	BucketName        string  `json:"bucket_name"`
-	ObjectKey         string  `json:"object_key"`
-	ContentType       *string `json:"content_type"`
-	ExpiresInSeconds  *int    `json:"expires_in_seconds"`
+	BucketName       string  `json:"bucket_name"`
+	ObjectKey        string  `json:"object_key"`
+	ContentType      *string `json:"content_type"`
+	ExpiresInSeconds *int    `json:"expires_in_seconds"`
 }
 
 type CreatePresignedDownloadURLInput struct {
@@ -1344,19 +1400,19 @@ type CreatePresignedDownloadURLInput struct {
 // --- Device stock ---
 
 type ListDeviceStockItemResponse struct {
-	ID              string     `json:"id"`
-	Sku             string     `json:"sku"`
-	Brand           string     `json:"brand"`
-	Model           string     `json:"model"`
-	Imei            *string    `json:"imei"`
-	Color           *string    `json:"color"`
-	StorageCapacity *string    `json:"storage_capacity"`
-	UnitCost        *float64   `json:"unit_cost"`
-	SalePrice       *float64   `json:"sale_price"`
-	Status          string     `json:"status"`
-	Notes           *string    `json:"notes"`
-	CreatedAt       time.Time  `json:"created_at"`
-	UpdatedAt       time.Time  `json:"updated_at"`
+	ID              string    `json:"id"`
+	Sku             string    `json:"sku"`
+	Brand           string    `json:"brand"`
+	Model           string    `json:"model"`
+	Imei            *string   `json:"imei"`
+	Color           *string   `json:"color"`
+	StorageCapacity *string   `json:"storage_capacity"`
+	UnitCost        *float64  `json:"unit_cost"`
+	SalePrice       *float64  `json:"sale_price"`
+	Status          string    `json:"status"`
+	Notes           *string   `json:"notes"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
 }
 
 type GetDeviceStockItemResponse = ListDeviceStockItemResponse
@@ -1488,14 +1544,20 @@ type FinancialExportResponse struct {
 }
 
 type UserProfileResponse struct {
-	ID        string   `json:"id"`
-	Username  string   `json:"username"`
-	Email     string   `json:"email"`
-	FirstName string   `json:"first_name"`
-	LastName  string   `json:"last_name"`
-	FullName  string   `json:"full_name"`
-	Roles     []string `json:"roles"`
-	Profile   string   `json:"profile"`
+	ID               string   `json:"id"`
+	Username         string   `json:"username"`
+	Email            string   `json:"email"`
+	FirstName        string   `json:"first_name"`
+	LastName         string   `json:"last_name"`
+	FullName         string   `json:"full_name"`
+	Roles            []string `json:"roles"`
+	Profile          string   `json:"profile"`
+	MFAEnrolled      bool     `json:"mfa_enrolled"`
+	MFAVerified      bool     `json:"mfa_verified"`
+	MFAAccountURL    string   `json:"mfa_account_url,omitempty"`
+	Acr              string   `json:"acr,omitempty"`
+	Amr              []string `json:"amr,omitempty"`
+	PrivilegedAccess bool     `json:"privileged_access"`
 }
 
 type UpdateUserProfileInput struct {
@@ -1543,6 +1605,7 @@ type SystemSettingsDto struct {
 	DaysAfterDueReminder       int     `json:"days_after_due_reminder"`
 	AutoSendInvoiceEmail       bool    `json:"auto_send_invoice_email"`
 	AutoSendCollectionReminder bool    `json:"auto_send_collection_reminder"`
+	ProrataDivisor             int     `json:"prorata_divisor"`
 }
 
 type OrganizationSettingsResponse struct {
@@ -1591,5 +1654,547 @@ type UpdateSystemSettingsInput struct {
 	DaysAfterDueReminder       *int     `json:"days_after_due_reminder,omitempty"`
 	AutoSendInvoiceEmail       *bool    `json:"auto_send_invoice_email,omitempty"`
 	AutoSendCollectionReminder *bool    `json:"auto_send_collection_reminder,omitempty"`
+	ProrataDivisor             *int     `json:"prorata_divisor,omitempty"`
 }
 
+type ExpiringContractResponse struct {
+	ContractID       string    `json:"contract_id"`
+	PhoneLineID      *string   `json:"phone_line_id,omitempty"`
+	PhoneNumber      *string   `json:"phone_number,omitempty"`
+	CustomerID       *string   `json:"customer_id,omitempty"`
+	CustomerName     *string   `json:"customer_name,omitempty"`
+	ContractType     string    `json:"contract_type"`
+	StartDate        time.Time `json:"start_date"`
+	PredictedEndDate time.Time `json:"predicted_end_date"`
+	DaysRemaining    int       `json:"days_remaining"`
+	Status           string    `json:"status"`
+}
+
+type PreClosingAlert struct {
+	Code        string `json:"code"`
+	Severity    string `json:"severity"` // "CRITICAL", "WARNING", "INFO"
+	Category    string `json:"category"` // "LINES", "INVOICES", "COMPOSITION", "FIDELITY"
+	Message     string `json:"message"`
+	EntityID    string `json:"entity_id,omitempty"`
+	EntityLabel string `json:"entity_label,omitempty"`
+}
+
+type PreClosingAlertsResponse struct {
+	ProcessingMonthID string            `json:"processing_month_id"`
+	CanClose          bool              `json:"can_close"`
+	CriticalCount     int               `json:"critical_count"`
+	WarningCount      int               `json:"warning_count"`
+	Alerts            []PreClosingAlert `json:"alerts"`
+}
+
+type PhoneLineTimelineEvent struct {
+	EventID     string         `json:"event_id"`
+	EventType   string         `json:"event_type"` // "STATE_TRANSITION", "CUSTOMER_LINK", "FIDELITY", "AUDIT"
+	Title       string         `json:"title"`
+	Description string         `json:"description"`
+	ActorUserID *string        `json:"actor_user_id,omitempty"`
+	Timestamp   time.Time      `json:"timestamp"`
+	Details     map[string]any `json:"details,omitempty"`
+}
+
+type PhoneLineTimelineResponse struct {
+	PhoneLineID string                   `json:"phone_line_id"`
+	PhoneNumber string                   `json:"phone_number"`
+	Events      []PhoneLineTimelineEvent `json:"events"`
+}
+
+type CustomerPersonalDataExportResponse struct {
+	Customer           GetCustomerResponse             `json:"customer"`
+	PhoneLines         []CustomerPhoneLineLinkResponse `json:"phone_lines"`
+	GeneratedContracts []GeneratedContractResponse     `json:"generated_contracts"`
+	ExportedAt         time.Time                       `json:"exported_at"`
+	ExportedBy         string                          `json:"exported_by"`
+}
+
+type ImportPreviewInvoiceSummary struct {
+	InvoiceNumber string    `json:"invoice_number"`
+	AccountNumber string    `json:"account_number"`
+	IssueDate     time.Time `json:"issue_date"`
+	DueDate       time.Time `json:"due_date"`
+	TotalAmount   float64   `json:"total_amount"`
+	LinesCount    int       `json:"lines_count"`
+	KnownLines    int       `json:"known_lines"`
+	UnknownLines  int       `json:"unknown_lines"`
+}
+
+type ImportPreviewResponse struct {
+	Summary    ImportPreviewInvoiceSummary `json:"summary"`
+	LineItems  []string                    `json:"line_numbers"`
+	Warnings   []string                    `json:"warnings"`
+	IsValid    bool                        `json:"is_valid"`
+	FileSHA256 string                      `json:"file_sha256,omitempty"`
+}
+
+type BillingImpactSimulationResponse struct {
+	ProcessingMonthID string  `json:"processing_month_id"`
+	DisplayName       string  `json:"display_name"`
+	ProjectedRevenue  float64 `json:"projected_revenue"`
+	ProjectedCost     float64 `json:"projected_cost"`
+	ProjectedMargin   float64 `json:"projected_margin"`
+	MarginPercentage  float64 `json:"margin_percentage"`
+	PreviousRevenue   float64 `json:"previous_revenue"`
+	RevenueDelta      float64 `json:"revenue_delta"`
+	RevenueDeltaPct   float64 `json:"revenue_delta_percentage"`
+	TotalActiveLines  int     `json:"total_active_lines"`
+}
+
+type LineProcessingReadinessItem struct {
+	PhoneLineID   string   `json:"phone_line_id"`
+	PhoneNumber   string   `json:"phone_number"`
+	CustomerID    *string  `json:"customer_id,omitempty"`
+	CustomerName  *string  `json:"customer_name,omitempty"`
+	MonthlyAmount float64  `json:"monthly_amount"`
+	IsReady       bool     `json:"is_ready"`
+	BlockingRules []string `json:"blocking_rules"`
+}
+
+type ProcessingMonthLineReadinessResponse struct {
+	ProcessingMonthID string                        `json:"processing_month_id"`
+	TotalLines        int                           `json:"total_lines"`
+	ReadyLines        int                           `json:"ready_lines"`
+	BlockedLines      int                           `json:"blocked_lines"`
+	Items             []LineProcessingReadinessItem `json:"items"`
+}
+
+type BillingExplanationComponent struct {
+	Type        string  `json:"type"` // "base_plan", "service", "device", "exceedance", "discount", "prorata"
+	Description string  `json:"description"`
+	Amount      float64 `json:"amount"`
+	Details     string  `json:"details,omitempty"`
+}
+
+type BillingExplanationResponse struct {
+	PhoneLineID       string                        `json:"phone_line_id"`
+	PhoneNumber       string                        `json:"phone_number"`
+	CustomerID        string                        `json:"customer_id"`
+	CustomerName      string                        `json:"customer_name"`
+	ProcessingMonthID string                        `json:"processing_month_id"`
+	TotalAmount       float64                       `json:"total_amount"`
+	FormulaText       string                        `json:"formula_text"`
+	Components        []BillingExplanationComponent `json:"components"`
+}
+
+type CloseMonthWithHashResponse struct {
+	ProcessingMonthID string    `json:"processing_month_id"`
+	Status            string    `json:"status"`
+	ClosedAt          time.Time `json:"closed_at"`
+	ClosedBy          string    `json:"closed_by"`
+	ConsolidationHash string    `json:"consolidation_hash"`
+	TotalRevenue      float64   `json:"total_revenue"`
+}
+
+// --- Fase 5: UX Operacional ---
+
+type OperationalDashboardLinesSummary struct {
+	TotalLines        int32 `json:"total_lines"`
+	ActiveLines       int32 `json:"active_lines"`
+	InTransitionLines int32 `json:"in_transition_lines"`
+	CanceledLines     int32 `json:"canceled_lines"`
+	OrphanLines       int32 `json:"orphan_lines"`
+}
+
+type OperationalDashboardCustomersSummary struct {
+	TotalCustomers  int32 `json:"total_customers"`
+	ActiveCustomers int32 `json:"active_customers"`
+}
+
+type OperationalDashboardFinancialSummary struct {
+	ProjectedMonthlyRevenue float64 `json:"projected_monthly_revenue"`
+	TotalBaseCost           float64 `json:"total_base_cost"`
+	ProjectedMargin         float64 `json:"projected_margin"`
+	MarginPercentage        float64 `json:"margin_percentage"`
+}
+
+type OperationalDashboardMonthStatus struct {
+	ProcessingMonthID string `json:"processing_month_id"`
+	DisplayName       string `json:"display_name"`
+	Status            string `json:"status"`
+	CriticalAlerts    int    `json:"critical_alerts"`
+	WarningAlerts     int    `json:"warning_alerts"`
+}
+
+type OperationalDashboardResponse struct {
+	LinesSummary       OperationalDashboardLinesSummary     `json:"lines_summary"`
+	CustomersSummary   OperationalDashboardCustomersSummary `json:"customers_summary"`
+	FinancialSummary   OperationalDashboardFinancialSummary `json:"financial_summary"`
+	CurrentMonthStatus *OperationalDashboardMonthStatus     `json:"current_month_status,omitempty"`
+	PendingDivergences int                                  `json:"pending_divergences"`
+}
+
+type PhoneLine360Response struct {
+	Line               GetPhoneLineResponse             `json:"line"`
+	ActiveCustomerLink *PhoneLineCustomerLinkResponse   `json:"active_customer_link,omitempty"`
+	ActiveFidelity     *LineFidelityResponse            `json:"active_fidelity,omitempty"`
+	PenaltyEstimate    *FidelityPenaltyEstimateResponse `json:"penalty_estimate,omitempty"`
+	BillingExplanation *BillingExplanationResponse      `json:"billing_explanation,omitempty"`
+	RecentTimeline     []PhoneLineTimelineEvent         `json:"recent_timeline"`
+}
+
+type Customer360Response struct {
+	Customer           GetCustomerResponse         `json:"customer"`
+	TotalLinesCount    int                         `json:"total_lines_count"`
+	ActiveLinesCount   int                         `json:"active_lines_count"`
+	TotalMonthlyAmount float64                     `json:"total_monthly_amount"`
+	PhoneLines         []ListPhoneLineResponse     `json:"phone_lines"`
+	GeneratedContracts []GeneratedContractResponse `json:"generated_contracts"`
+	AttachmentsCount   int                         `json:"attachments_count"`
+}
+
+type DivergenceItemResponse struct {
+	ID                string         `json:"id"`
+	ProcessingMonthID string         `json:"processing_month_id"`
+	DivergenceType    string         `json:"divergence_type"` // "LINE_NOT_IN_SYSTEM", "LINE_NOT_IN_INVOICE", "COST_DIVERGENCE", "UNMAPPED_EXCEEDANCE"
+	Severity          string         `json:"severity"`        // "HIGH", "MEDIUM", "LOW"
+	PhoneNumber       *string        `json:"phone_number,omitempty"`
+	Description       string         `json:"description"`
+	ExpectedValue     *float64       `json:"expected_value,omitempty"`
+	InvoiceValue      *float64       `json:"invoice_value,omitempty"`
+	Status            string         `json:"status"` // "pending", "resolved", "ignored"
+	ResolvedBy        *string        `json:"resolved_by,omitempty"`
+	ResolutionNotes   *string        `json:"resolution_notes,omitempty"`
+	CreatedAt         time.Time      `json:"created_at"`
+	Details           map[string]any `json:"details,omitempty"`
+	OwnerUserID       *string        `json:"owner_user_id,omitempty"`
+	FinancialImpact   float64        `json:"financial_impact,omitempty"`
+	Competence        *string        `json:"competence,omitempty"`
+	OperatorName      *string        `json:"operator_name,omitempty"`
+	AccountNumber     *string        `json:"account_number,omitempty"`
+	CustomerID        *string        `json:"customer_id,omitempty"`
+	PhoneLineID       *string        `json:"phone_line_id,omitempty"`
+	RecommendedAction *string        `json:"recommended_action,omitempty"`
+	Evidence          *string        `json:"evidence,omitempty"`
+	AgeHours          int            `json:"age_hours,omitempty"`
+}
+
+type ResolveDivergenceInput struct {
+	Action string `json:"action"` // "resolve", "ignore"
+	Notes  string `json:"notes"`
+}
+
+// --- Fase 6: Portal do Cliente e Relatórios Avançados ---
+
+type PortalCustomerMeResponse struct {
+	Customer           GetCustomerResponse                  `json:"customer"`
+	ActiveLinesCount   int                                  `json:"active_lines_count"`
+	TotalMonthlyAmount float64                              `json:"total_monthly_amount"`
+	LastInvoice        *ListCustomerBillingDocumentResponse `json:"last_invoice,omitempty"`
+}
+
+type PortalLineItemResponse struct {
+	ID                 string  `json:"id"`
+	Number             string  `json:"number"`
+	PlanName           string  `json:"plan_name"`
+	LineClassification string  `json:"line_classification"` // "titular", "dependente", "normal"
+	MonthlyAmount      float64 `json:"monthly_amount"`
+	Status             string  `json:"status"`
+	HasActiveFidelity  bool    `json:"has_active_fidelity"`
+}
+
+type PortalInvoiceItemResponse struct {
+	ID            string    `json:"id"`
+	InvoiceNumber string    `json:"invoice_number"`
+	DueDate       time.Time `json:"due_date"`
+	TotalAmount   float64   `json:"total_amount"`
+	Status        string    `json:"status"`
+	HasBoleto     bool      `json:"has_boleto"`
+	PixCode       *string   `json:"pix_code,omitempty"`
+}
+
+type SicrediPixGenerateResponse struct {
+	DocumentID   string    `json:"document_id"`
+	NossoNumero  string    `json:"nosso_numero"`
+	PixQrCode    string    `json:"pix_qr_code"`
+	PixCopiaCola string    `json:"pix_copia_cola"`
+	ExpiresAt    time.Time `json:"expires_at"`
+}
+
+type FinancialSummaryReportItem struct {
+	CustomerID          string  `json:"customer_id"`
+	CustomerName        string  `json:"customer_name"`
+	ContractedLuxusCnpj *string `json:"contracted_luxus_cnpj,omitempty"`
+	LinesCount          int     `json:"lines_count"`
+	TotalGrossRevenue   float64 `json:"total_gross_revenue"`
+	TotalOperatorCost   float64 `json:"total_operator_cost"`
+	GrossMargin         float64 `json:"gross_margin"`
+	MarginPercentage    float64 `json:"margin_percentage"`
+}
+
+type FinancialSummaryReportResponse struct {
+	GeneratedAt time.Time                    `json:"generated_at"`
+	TotalLines  int                          `json:"total_lines"`
+	TotalGross  float64                      `json:"total_gross"`
+	TotalCost   float64                      `json:"total_cost"`
+	TotalMargin float64                      `json:"total_margin"`
+	Items       []FinancialSummaryReportItem `json:"items"`
+}
+
+type CustomerProfitabilityItem struct {
+	CustomerID       string  `json:"customer_id"`
+	CustomerName     string  `json:"customer_name"`
+	ResponsibleSales *string `json:"responsible_sales,omitempty"`
+	ActiveLines      int     `json:"active_lines"`
+	AverageTicket    float64 `json:"average_ticket"`
+	GrossRevenue     float64 `json:"gross_revenue"`
+	Cost             float64 `json:"cost"`
+	Margin           float64 `json:"margin"`
+	MarginPercentage float64 `json:"margin_percentage"`
+}
+
+type CustomerProfitabilityReportResponse struct {
+	GeneratedAt time.Time                   `json:"generated_at"`
+	Items       []CustomerProfitabilityItem `json:"items"`
+}
+
+// --- Fase 7: Automações, Alertas e Gestão de Dispositivos ---
+
+type WebhookSubscriptionResponse struct {
+	ID        string    `json:"id"`
+	URL       string    `json:"url"`
+	Events    []string  `json:"events"`
+	IsActive  bool      `json:"is_active"`
+	Secret    string    `json:"secret"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type CreateWebhookSubscriptionInput struct {
+	URL    string   `json:"url"`
+	Events []string `json:"events"`
+}
+
+type TestWebhookResponse struct {
+	Success      bool   `json:"success"`
+	StatusCode   int    `json:"status_code"`
+	ResponseBody string `json:"response_body"`
+}
+
+type InventoryDeviceResponse struct {
+	ID                 string    `json:"id"`
+	Brand              string    `json:"brand"`
+	Model              string    `json:"model"`
+	IMEI               string    `json:"imei"`
+	SerialNumber       *string   `json:"serial_number,omitempty"`
+	Status             string    `json:"status"` // "in_stock", "assigned", "maintenance", "retired"
+	PurchaseValue      *float64  `json:"purchase_value,omitempty"`
+	CurrentCustomerID  *string   `json:"current_customer_id,omitempty"`
+	CurrentPhoneLineID *string   `json:"current_phone_line_id,omitempty"`
+	CreatedAt          time.Time `json:"created_at"`
+}
+
+type CreateInventoryDeviceInput struct {
+	Brand         string   `json:"brand"`
+	Model         string   `json:"model"`
+	IMEI          string   `json:"imei"`
+	SerialNumber  *string  `json:"serial_number"`
+	PurchaseValue *float64 `json:"purchase_value"`
+}
+
+type UpdateInventoryDeviceInput struct {
+	Brand         *string  `json:"brand"`
+	Model         *string  `json:"model"`
+	SerialNumber  *string  `json:"serial_number"`
+	Status        *string  `json:"status"`
+	PurchaseValue *float64 `json:"purchase_value"`
+}
+
+type OrganizationDataExportResponse struct {
+	OrganizationID string         `json:"organization_id"`
+	ExportedAt     time.Time      `json:"exported_at"`
+	ExportedBy     string         `json:"exported_by"`
+	ChecksumSHA256 string         `json:"checksum_sha256"`
+	Summary        map[string]int `json:"summary"`
+}
+
+type CreateApprovalRequestInput struct {
+	ActionType    string         `json:"action_type"`
+	EntityType    string         `json:"entity_type"`
+	EntityID      string         `json:"entity_id"`
+	Justification string         `json:"justification"`
+	Payload       map[string]any `json:"payload,omitempty"`
+	Before        map[string]any `json:"before,omitempty"`
+}
+
+type ApprovalRequestResponse struct {
+	ID                   string     `json:"id"`
+	OrganizationID       string     `json:"organization_id"`
+	ActionType           string     `json:"action_type"`
+	EntityType           string     `json:"entity_type"`
+	EntityID             string     `json:"entity_id"`
+	Status               string     `json:"status"`
+	RequesterUserID      string     `json:"requester_user_id"`
+	FirstApproverUserID  *string    `json:"first_approver_user_id,omitempty"`
+	SecondApproverUserID *string    `json:"second_approver_user_id,omitempty"`
+	Justification        *string    `json:"justification,omitempty"`
+	CreatedAt            time.Time  `json:"created_at"`
+	FirstApprovedAt      *time.Time `json:"first_approved_at,omitempty"`
+	SecondApprovedAt     *time.Time `json:"second_approved_at,omitempty"`
+	RejectedAt           *time.Time `json:"rejected_at,omitempty"`
+	RejectionReason      *string    `json:"rejection_reason,omitempty"`
+	ExecutedAt           *time.Time `json:"executed_at,omitempty"`
+}
+
+type RejectApprovalInput struct {
+	Reason string `json:"reason"`
+}
+
+type CreateSupportTicketInput struct {
+	Title       string `json:"title"`
+	Category    string `json:"category"`
+	Priority    string `json:"priority"`
+	Message     string `json:"message"`
+	CustomerID  string `json:"customer_id"`
+	PhoneLineID string `json:"phone_line_id"`
+	ChargeRef   string `json:"charge_ref"`
+	InvoiceID   string `json:"invoice_id"`
+}
+
+type UpdateSupportTicketInput struct {
+	Title          *string `json:"title"`
+	Category       *string `json:"category"`
+	Priority       *string `json:"priority"`
+	Status         *string `json:"status"`
+	AssigneeUserID *string `json:"assignee_user_id"`
+}
+
+type AddSupportTicketMessageInput struct {
+	Body                  string `json:"body"`
+	Visibility            string `json:"visibility"`
+	AttachmentKey         string `json:"attachment_key"`
+	AttachmentName        string `json:"attachment_name"`
+	AttachmentBucket      string `json:"attachment_bucket"`
+	AttachmentContentType string `json:"attachment_content_type"`
+	AttachmentSizeBytes   *int64 `json:"attachment_size_bytes"`
+}
+
+type TicketAttachmentUploadInput struct {
+	BucketName       string  `json:"bucket_name"`
+	FileName         string  `json:"file_name"`
+	ContentType      *string `json:"content_type"`
+	ExpiresInSeconds *int    `json:"expires_in_seconds"`
+	SizeBytes        *int64  `json:"size_bytes"`
+}
+
+type TicketAttachmentUploadResponse struct {
+	PresignedURLModel
+	ObjectKey  string `json:"object_key"`
+	BucketName string `json:"bucket_name"`
+}
+
+type TicketAttachmentDownloadResponse struct {
+	PresignedURLModel
+	FileName    string `json:"file_name"`
+	ContentType string `json:"content_type,omitempty"`
+}
+
+type SupportTicketMessageResponse struct {
+	ID                    string    `json:"id"`
+	AuthorUserID          *string   `json:"author_user_id,omitempty"`
+	AuthorName            *string   `json:"author_name,omitempty"`
+	Visibility            string    `json:"visibility"`
+	Body                  string    `json:"body"`
+	AttachmentKey         *string   `json:"attachment_key,omitempty"`
+	AttachmentName        *string   `json:"attachment_name,omitempty"`
+	AttachmentBucket      *string   `json:"attachment_bucket,omitempty"`
+	AttachmentContentType *string   `json:"attachment_content_type,omitempty"`
+	AttachmentSizeBytes   *int64    `json:"attachment_size_bytes,omitempty"`
+	CreatedAt             time.Time `json:"created_at"`
+}
+
+type SupportTicketHistoryResponse struct {
+	ID          string    `json:"id"`
+	ActorUserID *string   `json:"actor_user_id,omitempty"`
+	EventType   string    `json:"event_type"`
+	FromValue   *string   `json:"from_value,omitempty"`
+	ToValue     *string   `json:"to_value,omitempty"`
+	Notes       *string   `json:"notes,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+type SupportTicketResponse struct {
+	ID              string                         `json:"id"`
+	Number          int                            `json:"number"`
+	Title           string                         `json:"title"`
+	Category        string                         `json:"category"`
+	Priority        string                         `json:"priority"`
+	Status          string                         `json:"status"`
+	SlaDueAt        *time.Time                     `json:"sla_due_at,omitempty"`
+	AssigneeUserID  *string                        `json:"assignee_user_id,omitempty"`
+	RequesterUserID *string                        `json:"requester_user_id,omitempty"`
+	CustomerID      *string                        `json:"customer_id,omitempty"`
+	PhoneLineID     *string                        `json:"phone_line_id,omitempty"`
+	ChargeRef       *string                        `json:"charge_ref,omitempty"`
+	InvoiceID       *string                        `json:"invoice_id,omitempty"`
+	CreatedAt       time.Time                      `json:"created_at"`
+	UpdatedAt       time.Time                      `json:"updated_at"`
+	ResolvedAt      *time.Time                     `json:"resolved_at,omitempty"`
+	ClosedAt        *time.Time                     `json:"closed_at,omitempty"`
+	Messages        []SupportTicketMessageResponse `json:"messages"`
+	History         []SupportTicketHistoryResponse `json:"history"`
+}
+
+type DivergenceCommentResponse struct {
+	ID           string    `json:"id"`
+	AuthorUserID *string   `json:"author_user_id,omitempty"`
+	Body         string    `json:"body"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
+type DivergenceHistoryResponse struct {
+	ID          string    `json:"id"`
+	ActorUserID *string   `json:"actor_user_id,omitempty"`
+	EventType   string    `json:"event_type"`
+	FromValue   *string   `json:"from_value,omitempty"`
+	ToValue     *string   `json:"to_value,omitempty"`
+	Notes       *string   `json:"notes,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+type DivergenceDetailResponse struct {
+	DivergenceItemResponse
+	Comments []DivergenceCommentResponse `json:"comments"`
+	History  []DivergenceHistoryResponse `json:"history"`
+}
+
+type AssignDivergenceInput struct {
+	OwnerUserID string `json:"owner_user_id"`
+}
+
+type CommentDivergenceInput struct {
+	Body string `json:"body"`
+}
+
+type ProcessingMonthRunStepResponse struct {
+	Key         string     `json:"key"`
+	Order       int        `json:"order"`
+	Label       string     `json:"label"`
+	Status      string     `json:"status"`
+	StartedAt   *time.Time `json:"started_at,omitempty"`
+	CompletedAt *time.Time `json:"completed_at,omitempty"`
+	DurationMs  *int       `json:"duration_ms,omitempty"`
+	Error       *string    `json:"error,omitempty"`
+	SummaryJSON *string    `json:"summary_json,omitempty"`
+}
+
+type ProcessingMonthRunResponse struct {
+	ID                string                           `json:"id"`
+	ProcessingMonthID string                           `json:"processing_month_id"`
+	Version           int                              `json:"version"`
+	Status            string                           `json:"status"`
+	TriggeredBy       *string                          `json:"triggered_by,omitempty"`
+	CreatedAt         time.Time                        `json:"created_at"`
+	CompletedAt       *time.Time                       `json:"completed_at,omitempty"`
+	Steps             []ProcessingMonthRunStepResponse `json:"steps"`
+}
+
+type PortalUpdateProfileInput struct {
+	BillingEmail *string `json:"billing_email"`
+}
+
+type FinancialSFTPPushResponse struct {
+	Status  string `json:"status"`
+	Message string `json:"message"`
+}

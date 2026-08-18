@@ -2,10 +2,12 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/luxus-connect/telefonia/api/internal/billingcalc"
 	"github.com/luxus-connect/telefonia/api/internal/httputil"
 	"github.com/luxus-connect/telefonia/api/internal/models"
 	"github.com/luxus-connect/telefonia/api/internal/notifications"
@@ -205,6 +207,139 @@ func (s *Service) maybePromptFidelityRenewal(ctx context.Context, orgID, phoneLi
 	return true
 }
 
+func (s *Service) EstimateLineFidelityPenalty(ctx context.Context, phoneLineID string, cancelDateStr *string, penaltyPercent *float64) (*models.FidelityPenaltyEstimateResponse, error) {
+	orgID, err := orgFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+	line, err := s.GetPhoneLine(ctx, phoneLineID)
+	if err != nil {
+		return nil, err
+	}
+	fid, err := s.Store.GetLineFidelity(ctx, phoneLineID)
+	if err != nil {
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+	if fid == nil {
+		return nil, httputil.NotFoundError(notifications.LineFidelityNotFound)
+	}
+
+	cancelDate := time.Now().UTC()
+	if cancelDateStr != nil && strings.TrimSpace(*cancelDateStr) != "" {
+		parsed, err := parseFinancialDate(*cancelDateStr)
+		if err != nil {
+			return nil, err
+		}
+		cancelDate = parsed
+	}
+
+	pct := 30.0
+	if penaltyPercent != nil && *penaltyPercent > 0 {
+		pct = *penaltyPercent
+	}
+
+	monthlyAmount := 0.0
+	linkID, err := s.Store.GetActiveLinkIDForPhoneLine(ctx, orgID, phoneLineID)
+	if err == nil && linkID != "" {
+		processings, _ := s.Store.ListBillingProcessingsForLink(ctx, linkID)
+		for _, p := range processings {
+			if p.Perspective == perspectiveLuxusCustomer {
+				tot, err := s.Store.SumBillingProcessingTotal(ctx, p.ID)
+				if err == nil && tot > 0 {
+					monthlyAmount = tot
+				}
+				break
+			}
+		}
+	}
+	if monthlyAmount == 0 && line.BaseCost != nil {
+		monthlyAmount = *line.BaseCost
+	}
+
+	calc := billingcalc.CalculateFidelityPenalty(monthlyAmount, fid.StartDate, fid.PredictedEndDate, cancelDate, pct)
+
+	return &models.FidelityPenaltyEstimateResponse{
+		PhoneLineID:       phoneLineID,
+		FidelityStartDate: calc.FidelityStartDate,
+		PredictedEndDate:  calc.PredictedEndDate,
+		CancelDate:        calc.CancelDate,
+		TotalMonths:       calc.TotalMonths,
+		MonthsServed:      calc.MonthsServed,
+		MonthsRemaining:   calc.MonthsRemaining,
+		MonthlyAmount:     calc.MonthlyAmount,
+		PenaltyPercentage: calc.PenaltyPercentage,
+		PenaltyAmount:     calc.PenaltyAmount,
+		IsExempt:          calc.IsExempt,
+	}, nil
+}
+
+func (s *Service) ApplyLineFidelityPenalty(ctx context.Context, phoneLineID string, input models.ApplyFidelityPenaltyInput) (*models.FidelityPenaltyEstimateResponse, error) {
+	orgID, err := orgFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+	estimate, err := s.EstimateLineFidelityPenalty(ctx, phoneLineID, input.CancelDate, input.PenaltyPercentage)
+	if err != nil {
+		return nil, err
+	}
+	if estimate.IsExempt || estimate.PenaltyAmount <= 0 {
+		return estimate, nil
+	}
+
+	linkID, err := s.Store.GetActiveLinkIDForPhoneLine(ctx, orgID, phoneLineID)
+	if err != nil || linkID == "" {
+		return nil, httputil.BusinessError(notifications.PhoneLineActiveCustomerLinkNotFound)
+	}
+
+	processings, err := s.Store.ListBillingProcessingsForLink(ctx, linkID)
+	if err != nil {
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+	var primaryProcID string
+	for _, p := range processings {
+		if p.Perspective == perspectiveLuxusCustomer {
+			primaryProcID = p.ID
+			break
+		}
+	}
+	if primaryProcID == "" {
+		return nil, httputil.BusinessError(notifications.N("NO_PRIMARY_PROCESSING", "Processamento primário de faturamento não encontrado."))
+	}
+
+	now := time.Now().UTC()
+	penaltyDesc := fmt.Sprintf("Multa rescisória por quebra de fidelidade (%d meses restantes a %.1f%%)", estimate.MonthsRemaining, estimate.PenaltyPercentage)
+	if strings.TrimSpace(input.Justification) != "" {
+		penaltyDesc += " — " + strings.TrimSpace(input.Justification)
+	}
+
+	row := store.BillingCompositionItemRow{
+		ID:           uuid.New().String(),
+		ProcessingID: primaryProcID,
+		ItemType:     "extra_charge",
+		Description:  penaltyDesc,
+		Amount:       estimate.PenaltyAmount,
+		Quantity:     1,
+		Active:       true,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+		Proportional: false,
+	}
+	if err := s.Store.CreateBillingCompositionItem(ctx, row); err != nil {
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+
+	s.auditLog(ctx, "ApplyFidelityPenalty", "LineBillingCompositionItem", row.ID, nil, map[string]any{
+		"phone_line_id":      phoneLineID,
+		"penalty_amount":     estimate.PenaltyAmount,
+		"months_remaining":   estimate.MonthsRemaining,
+		"penalty_percentage": estimate.PenaltyPercentage,
+	})
+
+	_ = s.Store.InsertLineFidelityEvent(ctx, uuid.New().String(), phoneLineID, "penalty_applied", now, userIDPtr(ctx), &penaltyDesc)
+
+	return estimate, nil
+}
+
 func (s *Service) toFidelityResponse(ctx context.Context, row store.LineFidelityRow) (*models.LineFidelityResponse, error) {
 	history, err := s.Store.ListLineFidelityEvents(ctx, row.ID)
 	if err != nil {
@@ -227,3 +362,4 @@ func userIDPtr(ctx context.Context) *string {
 }
 
 func strPtr(v string) *string { return &v }
+

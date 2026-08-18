@@ -16,6 +16,7 @@ import (
 	"github.com/luxus-connect/telefonia/api/internal/models"
 	"github.com/luxus-connect/telefonia/api/internal/notifications"
 	"github.com/luxus-connect/telefonia/api/internal/sicredi"
+	"github.com/luxus-connect/telefonia/api/internal/statemachine"
 	"github.com/luxus-connect/telefonia/api/internal/store"
 )
 
@@ -24,12 +25,37 @@ type ImportProcessor interface {
 }
 
 type Service struct {
-	Store     *store.Store
-	Publisher EventPublisher
-	Processor ImportProcessor
-	Keycloak  *keycloak.AdminClient
-	Mailer    *email.Sender
-	Sicredi   SicrediBoletoIssuer
+	Store        *store.Store
+	Publisher    EventPublisher
+	Processor    ImportProcessor
+	Keycloak     *keycloak.AdminClient
+	Mailer       *email.Sender
+	Sicredi      SicrediBoletoIssuer
+	StateMachine *statemachine.Engine
+}
+
+func (s *Service) SM() *statemachine.Engine {
+	if s.StateMachine == nil {
+		s.StateMachine = statemachine.NewEngine(s.Store)
+	}
+	return s.StateMachine
+}
+
+func userRoles(ctx context.Context) []string {
+	u := auth.UserFromContext(ctx)
+	if u == nil {
+		return []string{"operational"}
+	}
+	roles := append([]string{}, u.Roles...)
+	for _, r := range u.Roles {
+		switch strings.ToLower(strings.TrimSpace(r)) {
+		case auth.RoleEmployee, auth.RoleOperator:
+			roles = append(roles, "operational")
+		case auth.RoleAdmin:
+			roles = append(roles, auth.RoleMaster)
+		}
+	}
+	return roles
 }
 
 type SicrediBoletoIssuer interface {
@@ -336,17 +362,20 @@ func (s *Service) CreateCustomer(ctx context.Context, input models.CreateCustome
 	if dup {
 		return nil, httputil.BusinessError(notifications.CustomerDocumentDuplicated)
 	}
-	ok, err := s.Store.ProviderExists(ctx, orgID, input.ProviderID)
-	if err != nil {
-		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
-	}
-	if !ok {
-		return nil, httputil.NotFoundError(notifications.ProviderNotFound)
+	providerID := strings.TrimSpace(input.ProviderID)
+	if providerID != "" {
+		ok, err := s.Store.ProviderExists(ctx, orgID, providerID)
+		if err != nil {
+			return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+		}
+		if !ok {
+			return nil, httputil.NotFoundError(notifications.ProviderNotFound)
+		}
 	}
 	customerType := httputil.CustomerTypeFromInput(input.Type)
 	docType := httputil.DocumentTypeForCustomer(customerType)
 	id := uuid.New().String()
-	if err := s.Store.CreateCustomer(ctx, orgID, id, input.ProviderID, customerType,
+	if err := s.Store.CreateCustomer(ctx, orgID, id, providerID, customerType,
 		strings.TrimSpace(input.Name), doc, docType, input.LegalName, input.StateRegistration,
 		input.ResponsibleSalespersonUserID, birthDate); err != nil {
 		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
@@ -763,4 +792,73 @@ func (s *Service) DeleteProviderPlanService(ctx context.Context, providerID, pla
 		return httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
 	return nil
+}
+
+func (s *Service) AnonymizeCustomer(ctx context.Context, customerID string) (*models.GetCustomerResponse, error) {
+	orgID, err := orgFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !auth.CanAnonymizeData(ctx) {
+		return nil, httputil.BusinessError(notifications.N("ANONYMIZATION_FORBIDDEN", "Apenas administradores master ou DPO podem executar a anonimização de titulares."))
+	}
+	cust, err := s.Store.GetCustomer(ctx, customerID)
+	if err != nil {
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+	if cust == nil {
+		return nil, httputil.NotFoundError(notifications.CustomerNotFound)
+	}
+
+	if err := s.Store.AnonymizeCustomer(ctx, orgID, customerID); err != nil {
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+
+	s.auditLog(ctx, "LGPD_Anonymize", "Customer", customerID, map[string]any{
+		"previous_name": cust.Name,
+	}, map[string]any{
+		"status": "anonymized",
+	})
+
+	return s.Store.GetCustomer(ctx, customerID)
+}
+
+func (s *Service) ExportCustomerPersonalData(ctx context.Context, customerID string) (*models.CustomerPersonalDataExportResponse, error) {
+	orgID, err := orgFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+	user, err := userFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+	cust, err := s.Store.GetCustomer(ctx, customerID)
+	if err != nil {
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+	if cust == nil {
+		return nil, httputil.NotFoundError(notifications.CustomerNotFound)
+	}
+
+	lines, _, err := s.Store.ListCustomerPhoneLines(ctx, orgID, customerID, httputil.PageSearch{PageSize: 200})
+	if err != nil {
+		lines = []models.CustomerPhoneLineLinkResponse{}
+	}
+
+	contracts, err := s.Store.ListGeneratedContractsForCustomer(ctx, orgID, customerID)
+	if err != nil {
+		contracts = []models.GeneratedContractResponse{}
+	}
+
+	s.auditLog(ctx, "LGPD_Export", "Customer", customerID, nil, map[string]any{
+		"exported_by": user.ID,
+	})
+
+	return &models.CustomerPersonalDataExportResponse{
+		Customer:           *cust,
+		PhoneLines:         lines,
+		GeneratedContracts: contracts,
+		ExportedAt:         time.Now().UTC(),
+		ExportedBy:         user.Email,
+	}, nil
 }

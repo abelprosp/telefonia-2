@@ -19,6 +19,7 @@ func (s *Store) GetOrganizationSettings(ctx context.Context, orgID string) (*mod
 			"SupportEmail", "SupportPhone", "FooterText",
 			"DefaultDueDay", "LateFeePercentage", "InterestRateMonthly", "DaysBeforeDueReminder",
 			"DaysAfterDueReminder", "AutoSendInvoiceEmail", "AutoSendCollectionReminder",
+			COALESCE("ProrataDivisor", 30),
 			"UpdatedAt", "UpdatedBy"
 		FROM "OrganizationSettings"
 		WHERE "OrganizationId" = $1
@@ -38,6 +39,7 @@ func (s *Store) GetOrganizationSettings(ctx context.Context, orgID string) (*mod
 		&white.SupportEmail, &white.SupportPhone, &white.FooterText,
 		&sys.DefaultDueDay, &sys.LateFeePercentage, &sys.InterestRateMonthly, &sys.DaysBeforeDueReminder,
 		&sys.DaysAfterDueReminder, &sys.AutoSendInvoiceEmail, &sys.AutoSendCollectionReminder,
+		&sys.ProrataDivisor,
 		&res.UpdatedAt, &res.UpdatedBy,
 	)
 
@@ -80,6 +82,7 @@ func (s *Store) GetOrganizationSettings(ctx context.Context, orgID string) (*mod
 				DaysAfterDueReminder:       2,
 				AutoSendInvoiceEmail:       true,
 				AutoSendCollectionReminder: false,
+				ProrataDivisor:             30,
 			},
 			UpdatedAt: time.Now(),
 		}, nil
@@ -91,7 +94,26 @@ func (s *Store) GetOrganizationSettings(ctx context.Context, orgID string) (*mod
 	res.Company = comp
 	res.Whitelabel = white
 	res.System = sys
+	if res.System.ProrataDivisor < 1 {
+		res.System.ProrataDivisor = 30
+	}
 	return &res, nil
+}
+
+func (s *Store) GetProrataDivisor(ctx context.Context, orgID string) (int, error) {
+	var n int
+	err := s.q(ctx).QueryRow(ctx, `
+		SELECT COALESCE("ProrataDivisor", 30) FROM "OrganizationSettings" WHERE "OrganizationId" = $1`, orgID).Scan(&n)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 30, nil
+	}
+	if err != nil {
+		return 30, err
+	}
+	if n < 1 {
+		return 30, nil
+	}
+	return n, nil
 }
 
 func (s *Store) UpsertOrganizationSettings(ctx context.Context, orgID string, updatedBy *string, current *models.OrganizationSettingsResponse) error {
@@ -105,6 +127,7 @@ func (s *Store) UpsertOrganizationSettings(ctx context.Context, orgID string, up
 			"SupportEmail", "SupportPhone", "FooterText",
 			"DefaultDueDay", "LateFeePercentage", "InterestRateMonthly", "DaysBeforeDueReminder",
 			"DaysAfterDueReminder", "AutoSendInvoiceEmail", "AutoSendCollectionReminder",
+			"ProrataDivisor",
 			"UpdatedAt", "UpdatedBy"
 		) VALUES (
 			$1, $2, $3, $4, $5, $6, $7, $8,
@@ -113,7 +136,8 @@ func (s *Store) UpsertOrganizationSettings(ctx context.Context, orgID string, up
 			$22, $23, $24,
 			$25, $26, $27, $28,
 			$29, $30, $31,
-			now(), $32
+			$32,
+			now(), $33
 		)
 		ON CONFLICT ("OrganizationId") DO UPDATE SET
 			"CompanyName" = EXCLUDED."CompanyName",
@@ -146,6 +170,7 @@ func (s *Store) UpsertOrganizationSettings(ctx context.Context, orgID string, up
 			"DaysAfterDueReminder" = EXCLUDED."DaysAfterDueReminder",
 			"AutoSendInvoiceEmail" = EXCLUDED."AutoSendInvoiceEmail",
 			"AutoSendCollectionReminder" = EXCLUDED."AutoSendCollectionReminder",
+			"ProrataDivisor" = EXCLUDED."ProrataDivisor",
 			"UpdatedAt" = now(),
 			"UpdatedBy" = EXCLUDED."UpdatedBy"
 	`
@@ -159,7 +184,7 @@ func (s *Store) UpsertOrganizationSettings(ctx context.Context, orgID string, up
 		current.Whitelabel.FooterText,
 		current.System.DefaultDueDay, current.System.LateFeePercentage, current.System.InterestRateMonthly,
 		current.System.DaysBeforeDueReminder, current.System.DaysAfterDueReminder, current.System.AutoSendInvoiceEmail,
-		current.System.AutoSendCollectionReminder,
+		current.System.AutoSendCollectionReminder, current.System.ProrataDivisor,
 		updatedBy,
 	)
 	return err

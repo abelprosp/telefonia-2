@@ -1,5 +1,4 @@
 import {
-  Bell,
   ChevronDown,
   HelpCircle,
   LogOut,
@@ -25,6 +24,8 @@ import { Input } from '@/components/ui/input';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { roleLabel, useAuthRoles } from '@/lib/auth-roles';
 import { performLogout } from '@/lib/auth-actions';
+
+import { NotificationsDropdown } from '@/components/notifications-dropdown';
 
 export const AppTopBar = () => {
   const auth = useAuth();
@@ -62,9 +63,7 @@ export const AppTopBar = () => {
       </div>
 
       <div className="ml-auto flex items-center gap-1">
-        <Button variant="ghost" size="icon" className="rounded-full">
-          <Bell className="size-4" />
-        </Button>
+        <NotificationsDropdown />
         <Button variant="ghost" size="icon" className="rounded-full">
           <HelpCircle className="size-4" />
         </Button>

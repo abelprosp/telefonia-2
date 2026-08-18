@@ -20,14 +20,18 @@ import (
 	"github.com/luxus-connect/telefonia/api/internal/importservice"
 	"github.com/luxus-connect/telefonia/api/internal/keycloak"
 	"github.com/luxus-connect/telefonia/api/internal/messaging"
+	"github.com/luxus-connect/telefonia/api/internal/observability"
 	"github.com/luxus-connect/telefonia/api/internal/services"
 	"github.com/luxus-connect/telefonia/api/internal/sicredi"
+	"github.com/luxus-connect/telefonia/api/internal/statemachine"
 	"github.com/luxus-connect/telefonia/api/internal/storage"
 	"github.com/luxus-connect/telefonia/api/internal/store"
 )
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	slog.SetDefault(logger)
+
 	cfg := config.Load()
 
 	if cfg.MonitoringTestEnabled {
@@ -45,7 +49,7 @@ func main() {
 
 	st, err := store.New(ctx, cfg.DatabaseURL)
 	if err != nil {
-		logger.Error("database connection failed", "error", err)
+		logger.Error("store connect failed", "error", err)
 		os.Exit(1)
 	}
 	defer st.Close()
@@ -70,7 +74,14 @@ func main() {
 		}
 	}
 
-	svc := &services.Service{Store: st, Publisher: publisher, Keycloak: kcAdmin, Mailer: email.NewSender(cfg), Sicredi: sicredi.NewClient(sicredi.ConfigFrom(cfg))}
+	svc := &services.Service{
+		Store:        st,
+		Publisher:    publisher,
+		Keycloak:     kcAdmin,
+		Mailer:       email.NewSender(cfg),
+		Sicredi:      sicredi.NewClient(sicredi.ConfigFrom(cfg)),
+		StateMachine: statemachine.NewEngine(st),
+	}
 	if svc.Mailer.Enabled() {
 		logger.Info("smtp mailer enabled", "host", cfg.SMTPHost)
 	} else {
@@ -115,7 +126,7 @@ func main() {
 			logger.Warn("object storage unavailable", "error", err)
 		} else {
 			presigned = &services.PresignedService{Storage: s3Client}
-			processor := &importservice.Processor{Store: st, Storage: s3Client, Log: logger}
+			processor := &importservice.Processor{Store: st, Storage: s3Client, Log: logger, SM: svc.StateMachine}
 			svc.Processor = processor
 
 			if cfg.RabbitMQURL != "" {
@@ -139,23 +150,55 @@ func main() {
 
 	h := &handlers.Handler{Svc: svc, Presigned: presigned}
 
+	healthChecker := observability.NewHealthChecker()
+	healthChecker.Register("postgres", func(c context.Context) observability.ComponentHealth {
+		start := time.Now()
+		err := st.Pool().Ping(c)
+		observability.Observe("db.ping", time.Since(start), err == nil)
+		if err != nil {
+			return observability.ComponentHealth{Status: observability.StatusDown, Message: err.Error()}
+		}
+		return observability.ComponentHealth{Status: observability.StatusUp}
+	})
+	healthChecker.Register("rabbitmq", func(_ context.Context) observability.ComponentHealth {
+		if cfg.RabbitMQURL == "" {
+			return observability.ComponentHealth{Status: observability.StatusDisabled, Message: "RabbitMQ not configured"}
+		}
+		if publisher != nil {
+			return observability.ComponentHealth{Status: observability.StatusUp}
+		}
+		return observability.ComponentHealth{Status: observability.StatusDown, Message: "Publisher unavailable"}
+	})
+	healthChecker.Register("sicredi", func(c context.Context) observability.ComponentHealth {
+		if !cfg.SicrediEnabled || svc.Sicredi == nil || !svc.Sicredi.Enabled() {
+			return observability.ComponentHealth{Status: observability.StatusDisabled, Message: "Sicredi disabled"}
+		}
+		if err := svc.Sicredi.Ping(c); err != nil {
+			return observability.ComponentHealth{Status: observability.StatusDegraded, Message: err.Error()}
+		}
+		return observability.ComponentHealth{Status: observability.StatusUp}
+	})
+
 	r := chi.NewRouter()
-	r.Use(middleware.RequestID, middleware.RealIP, middleware.Logger, middleware.Recoverer)
+	r.Use(observability.CorrelationMiddleware)
+	r.Use(middleware.RealIP)
+	r.Use(observability.StructuredLoggerMiddleware(logger))
+	r.Use(middleware.Recoverer)
 
 	if len(cfg.CORSOrigins) > 0 {
 		r.Use(cors.Handler(cors.Options{
 			AllowedOrigins:   cfg.CORSOrigins,
-			AllowedMethods:   []string{"GET", "POST", "PATCH", "DELETE", "OPTIONS"},
-			AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
+			AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"},
+			AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Correlation-ID", "X-Request-ID"},
+			ExposedHeaders:   []string{"X-Correlation-ID", "X-Request-ID"},
 			AllowCredentials: true,
 			MaxAge:           300,
 		}))
 	}
 
-	r.Get("/health", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("ok"))
-	})
+	r.Get("/health", healthChecker.ReadinessHandler())
+	r.Get("/health/live", observability.LivenessHandler())
+	r.Get("/metrics/operations", observability.MetricsHandler())
 
 	h.RegisterRoutes(r, authMW.Authenticate, authMW.RequireOperational, authMW.RequireFinancialAccess, authMW.RequireMaster, authMW.RequirePartner)
 

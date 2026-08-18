@@ -16,15 +16,15 @@ import (
 )
 
 type AdminClient struct {
-	baseURL      string
-	realm        string
-	adminUser    string
-	adminPass    string
-	httpClient   *http.Client
-	tokenMu      sync.Mutex
-	accessToken  string
-	tokenExpires time.Time
-	clientMu         sync.Mutex
+	baseURL           string
+	realm             string
+	adminUser         string
+	adminPass         string
+	httpClient        *http.Client
+	tokenMu           sync.Mutex
+	accessToken       string
+	tokenExpires      time.Time
+	clientMu          sync.Mutex
 	connectClientName string
 	connectClientID   string
 	sessionCache      *sessionUserCache
@@ -45,6 +45,13 @@ func (c *AdminClient) Enabled() bool {
 	return c.baseURL != "" && c.realm != "" && c.adminPass != ""
 }
 
+func (c *AdminClient) AccountSecurityURL() string {
+	if c.baseURL == "" || c.realm == "" {
+		return ""
+	}
+	return strings.TrimRight(c.baseURL, "/") + "/realms/" + c.realm + "/account/#/security/signingin"
+}
+
 type UserRecord struct {
 	ID         string              `json:"id"`
 	Username   string              `json:"username"`
@@ -55,7 +62,6 @@ type UserRecord struct {
 	Attributes map[string][]string `json:"attributes,omitempty"`
 	Roles      []string            `json:"-"`
 }
-
 
 type CreateUserPayload struct {
 	Username      string              `json:"username"`
@@ -292,6 +298,34 @@ func (c *AdminClient) GetUserByID(ctx context.Context, userID string) (*UserReco
 	return &u, nil
 }
 
+type credentialRepresentation struct {
+	ID   string `json:"id"`
+	Type string `json:"type"`
+}
+
+func (c *AdminClient) UserHasOTP(ctx context.Context, userID string) (bool, error) {
+	path := fmt.Sprintf("/admin/realms/%s/users/%s/credentials", c.realm, userID)
+	resp, err := c.do(ctx, http.MethodGet, path, nil)
+	if err != nil {
+		return false, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return false, fmt.Errorf("list credentials: %s", string(body))
+	}
+	var creds []credentialRepresentation
+	if err := json.NewDecoder(resp.Body).Decode(&creds); err != nil {
+		return false, err
+	}
+	for _, cred := range creds {
+		switch strings.ToLower(cred.Type) {
+		case "otp", "totp":
+			return true, nil
+		}
+	}
+	return false, nil
+}
 
 func (c *AdminClient) ReplaceUserRealmRoles(ctx context.Context, userID string, roleNames []string) error {
 	current, err := c.GetUserRealmRoles(ctx, userID)

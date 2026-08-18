@@ -599,3 +599,39 @@ li {
 /* Update-profile-ra */
 
 /* END Update-profile-ra */
+
+/* WCAG 2.2 AA — foco, contraste, erros associados, movimento reduzido */
+.login-pf :focus-visible,
+.login-pf a:focus-visible,
+.login-pf button:focus-visible,
+.login-pf input:focus-visible {
+  outline: 3px solid #1d4ed8;
+  outline-offset: 2px;
+}
+
+.pf-c-form__label,
+#kc-form-options span,
+#kc-page-title {
+  color: #0f172a;
+}
+
+.kc-feedback-text,
+.alert-error,
+.pf-c-alert__title {
+  color: #7f1d1d;
+}
+
+.kc-feedback-text {
+  margin-top: 0.25rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-pf *,
+  .login-pf *::before,
+  .login-pf *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+

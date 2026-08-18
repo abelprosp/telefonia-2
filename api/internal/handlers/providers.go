@@ -160,6 +160,20 @@ func (h *Handler) requestProviderInvoiceImport(w http.ResponseWriter, r *http.Re
 	httputil.WriteJSON(w, http.StatusCreated, item)
 }
 
+func (h *Handler) previewProviderInvoiceImport(w http.ResponseWriter, r *http.Request) {
+	var input models.ProviderInvoiceImportRequestInput
+	if err := decodeJSON(r, &input); err != nil {
+		httputil.WriteFail(w, http.StatusBadRequest, notifications.N("REQUEST_VALIDATION", "Invalid request body"))
+		return
+	}
+	item, err := h.Svc.PreviewProviderInvoiceImport(r.Context(), input)
+	if err != nil {
+		httputil.HandleServiceError(w, err)
+		return
+	}
+	httputil.WriteJSON(w, http.StatusOK, item)
+}
+
 func (h *Handler) getImportRequestStatus(w http.ResponseWriter, r *http.Request) {
 	item, err := h.Svc.GetImportRequestStatus(r.Context(), chi.URLParam(r, "id"))
 	if err != nil {

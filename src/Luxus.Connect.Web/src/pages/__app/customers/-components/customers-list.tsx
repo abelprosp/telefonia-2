@@ -168,11 +168,7 @@ export function CustomersList() {
         onPageSizeChange={setPageSize}
       />
 
-      <CustomerCreateSheet
-        open={createOpen}
-        onOpenChange={setCreateOpen}
-        preferredProviderId={providerId}
-      />
+      <CustomerCreateSheet open={createOpen} onOpenChange={setCreateOpen} />
     </div>
   );
 }

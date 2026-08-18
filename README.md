@@ -25,6 +25,17 @@
 
 Utilizadores e organizações vivem no **Keycloak** (SSO). O PostgreSQL da aplicação **não** duplica tabelas de utilizadores/organizações; campos de auditoria e contexto multi-tenant usam identificadores do token (ex.: _subject_, claims) como texto, com regras na API.
 
+**MFA (OTP):** o IdP é o Keycloak — não há TOTP próprio na API. No Admin Console do realm `luxus`:
+
+1. **Authentication → Required actions → Configure OTP** — Enabled (já no `luxus-realm.json` para instalações novas; `defaultAction` permanece `false` para não bloquear o utilizador `dev` local).
+2. Para papéis privilegiados (master/admin/financeiro), marque Configure OTP como ação obrigatória no utilizador, ou ative o fluxo Browser com **OTP Form**.
+3. Conta do utilizador: `{KEYCLOAK}/realms/luxus/account/#/security/signingin`.
+4. A API lê `acr`/`amr` do JWT e, se o admin client estiver configurado, verifica credencial `otp`. Sem MFA, a aplicação mostra um aviso com o link acima.
+
+Não altere `otpRequired` no realm em massa em ambientes já importados: isso pode forçar OTP em todas as contas (incluindo `dev`).
+
+**APM:** não há Datadog/New Relic. Durações de HTTP, importação, passos do pipeline e `db.ping` ficam em `GET /metrics/operations` e na tabela `OperationMetrics`.
+
 ## Arquitetura
 
 O backend é uma **API REST em Go** (binário único, ~15 MB) com o mesmo contrato HTTP que o frontend já consome. O schema PostgreSQL existente é reutilizado.

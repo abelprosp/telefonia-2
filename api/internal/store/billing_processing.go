@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/luxus-connect/telefonia/api/internal/billingcalc"
 	"github.com/luxus-connect/telefonia/api/internal/models"
+	"github.com/luxus-connect/telefonia/api/internal/precision"
 )
 
 func signedCompositionAmount(itemType string, amount, quantity float64) float64 {
@@ -70,6 +71,7 @@ type BillingCompositionItemRow struct {
 	ServiceType           *string
 	ProviderPlanServiceID *string
 	Proportional          bool
+	InstallmentTotal      *float64
 }
 
 func (s *Store) ListActiveCustomerLinkIDs(ctx context.Context, customerID string) ([]string, error) {
@@ -227,28 +229,44 @@ func (s *Store) SumBillingProcessingTotalForCycle(ctx context.Context, processin
 	if err != nil {
 		return 0, err
 	}
-	var total float64
+	divisor := s.prorataDivisorForProcessing(ctx, processingID)
+	var values []float64
 	for _, it := range items {
 		signed := signedCompositionAmount(it.ItemType, it.Amount, it.Quantity)
 		if it.Proportional && cycleStart != nil {
 			if signed < 0 {
-				signed = -billingcalc.ProRataAmount(-signed, cycleStart, it.StartDate, it.EndDate)
+				signed = -billingcalc.ProRataAmountWithDivisor(-signed, divisor, cycleStart, it.StartDate, it.EndDate)
 			} else {
-				signed = billingcalc.ProRataAmount(signed, cycleStart, it.StartDate, it.EndDate)
+				signed = billingcalc.ProRataAmountWithDivisor(signed, divisor, cycleStart, it.StartDate, it.EndDate)
 			}
-		} else if cycleStart != nil && !itemActiveInCycle(cycleStart, it.StartDate, it.EndDate) {
+		} else if cycleStart != nil && billingcalc.ActiveDaysWithDivisor(divisor, cycleStart, it.StartDate, it.EndDate) == 0 {
 			signed = 0
 		}
-		total += signed
+		values = append(values, signed)
 	}
-	return total, nil
+	return precision.SumCents(values...), nil
+}
+
+func (s *Store) prorataDivisorForProcessing(ctx context.Context, processingID string) int {
+	var n int
+	err := s.q(ctx).QueryRow(ctx, `
+		SELECT COALESCE(os."ProrataDivisor", 30)
+		FROM "LineBillingProcessings" p
+		JOIN "PhoneLineCustomerLinks" l ON l."Id" = p."PhoneLineCustomerLinkId"
+		JOIN "Customers" c ON c."Id" = l."CustomerId"
+		LEFT JOIN "OrganizationSettings" os ON os."OrganizationId" = c."OrganizationId"
+		WHERE p."Id" = $1`, processingID).Scan(&n)
+	if err != nil || n < 1 {
+		return billingcalc.CycleDays
+	}
+	return n
 }
 
 func (s *Store) ListBillingCompositionItems(ctx context.Context, processingID string) ([]BillingCompositionItemRow, error) {
 	rows, err := s.q(ctx).Query(ctx, `
 		SELECT "Id", "ProcessingId", "ItemType"::text, "Description", "Amount", "Quantity",
 			"InstallmentCount", "InstallmentCurrent", "StartDate", "EndDate", "Active", "CreatedAt", "UpdatedAt",
-			"ServiceType"::text, "ProviderPlanServiceId", COALESCE("Proportional", true)
+			"ServiceType"::text, "ProviderPlanServiceId", COALESCE("Proportional", true), "InstallmentTotal"
 		FROM "LineBillingCompositionItems"
 		WHERE "ProcessingId" = $1 AND "Active" = true
 		ORDER BY "CreatedAt"`, processingID)
@@ -261,7 +279,7 @@ func (s *Store) ListBillingCompositionItems(ctx context.Context, processingID st
 		var row BillingCompositionItemRow
 		if err := rows.Scan(&row.ID, &row.ProcessingID, &row.ItemType, &row.Description, &row.Amount, &row.Quantity,
 			&row.InstallmentCount, &row.InstallmentCurrent, &row.StartDate, &row.EndDate, &row.Active, &row.CreatedAt, &row.UpdatedAt,
-			&row.ServiceType, &row.ProviderPlanServiceID, &row.Proportional); err != nil {
+			&row.ServiceType, &row.ProviderPlanServiceID, &row.Proportional, &row.InstallmentTotal); err != nil {
 			return nil, err
 		}
 		items = append(items, row)
@@ -277,7 +295,7 @@ func (s *Store) GetBillingCompositionItem(ctx context.Context, orgID, itemID str
 	err := s.q(ctx).QueryRow(ctx, `
 		SELECT ci."Id", ci."ProcessingId", ci."ItemType"::text, ci."Description", ci."Amount", ci."Quantity",
 			ci."InstallmentCount", ci."InstallmentCurrent", ci."StartDate", ci."EndDate", ci."Active", ci."CreatedAt", ci."UpdatedAt",
-			ci."ServiceType"::text, ci."ProviderPlanServiceId", COALESCE(ci."Proportional", true)
+			ci."ServiceType"::text, ci."ProviderPlanServiceId", COALESCE(ci."Proportional", true), ci."InstallmentTotal"
 		FROM "LineBillingCompositionItems" ci
 		JOIN "LineBillingProcessings" pr ON pr."Id" = ci."ProcessingId"
 		JOIN "PhoneLineCustomerLinks" l ON l."Id" = pr."PhoneLineCustomerLinkId"
@@ -288,7 +306,7 @@ func (s *Store) GetBillingCompositionItem(ctx context.Context, orgID, itemID str
 		WHERE ci."Id" = $1 AND p."OrganizationId" = $2 AND ci."Active" = true`,
 		itemID, orgID).Scan(&row.ID, &row.ProcessingID, &row.ItemType, &row.Description, &row.Amount, &row.Quantity,
 		&row.InstallmentCount, &row.InstallmentCurrent, &row.StartDate, &row.EndDate, &row.Active, &row.CreatedAt, &row.UpdatedAt,
-		&row.ServiceType, &row.ProviderPlanServiceID, &row.Proportional)
+		&row.ServiceType, &row.ProviderPlanServiceID, &row.Proportional, &row.InstallmentTotal)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -306,12 +324,12 @@ func (s *Store) CreateBillingCompositionItem(ctx context.Context, row BillingCom
 		INSERT INTO "LineBillingCompositionItems" (
 			"Id", "ProcessingId", "ItemType", "Description", "Amount", "Quantity",
 			"InstallmentCount", "InstallmentCurrent", "StartDate", "EndDate", "Active", "CreatedAt", "UpdatedAt",
-			"ServiceType", "ProviderPlanServiceId", "Proportional"
+			"ServiceType", "ProviderPlanServiceId", "Proportional", "InstallmentTotal"
 		) VALUES ($1, $2, $3::billing_composition_item_type, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
-			$14, $15, $16)`,
+			$14, $15, $16, $17)`,
 		row.ID, row.ProcessingID, row.ItemType, row.Description, row.Amount, row.Quantity,
 		row.InstallmentCount, row.InstallmentCurrent, row.StartDate, row.EndDate, row.Active, row.CreatedAt, row.UpdatedAt,
-		nullableServiceType(row.ServiceType), row.ProviderPlanServiceID, row.Proportional)
+		nullableServiceType(row.ServiceType), row.ProviderPlanServiceID, row.Proportional, row.InstallmentTotal)
 	return err
 }
 

@@ -162,6 +162,7 @@ var (
 	InvoiceNotFound                      = N("INVOICE_NOT_FOUND", "Invoice was not found.")
 	InvoiceDuplicateSameProcessingMonth  = N("INVOICE_DUPLICATE_SAME_PROCESSING_MONTH", "Invoice duplicate for same processing month.")
 	InvoiceDuplicateOtherProcessingMonth = N("INVOICE_DUPLICATE_OTHER_PROCESSING_MONTH", "Esta fatura já foi importada em outro mês de processamento.")
+	InvoiceDuplicateFileHash             = N("INVOICE_DUPLICATE_FILE_HASH", "Este arquivo já foi importado (SHA-256 idêntico). Use o fluxo explícito de fatura substituta se for uma substituição.")
 	InvoiceImportedLineOrphanDestination = N("INVOICE_IMPORTED_LINE_ORPHAN_DESTINATION", "Imported line has incompatible status.")
 )
 
@@ -197,6 +198,10 @@ var (
 	ObjectStorageUnavailable = N("OBJECT_STORAGE_UNAVAILABLE", "Object storage is not configured.")
 	PresignedExpiresInvalid    = N("PRESIGNED_EXPIRES_IN_SECONDS_INVALID", "Expires in seconds must be between 60 and 604800.")
 	ObjectKeyInvalid           = N("OBJECT_KEY_INVALID", "Object key is invalid.")
+	TicketAttachmentRequired   = N("TICKET_ATTACHMENT_REQUIRED", "Informe o arquivo ou a chave do anexo.")
+	TicketAttachmentNotFound   = N("TICKET_ATTACHMENT_NOT_FOUND", "Anexo do ticket não encontrado.")
+	TicketMessageEmpty         = N("TICKET_MESSAGE_REQUIRED", "Informe a mensagem ou anexe um arquivo.")
+	TicketFilenameInvalid      = N("TICKET_ATTACHMENT_FILENAME_INVALID", "Nome de arquivo inválido.")
 )
 
 // Billing & email

@@ -5,12 +5,16 @@ import (
 	"time"
 )
 
-func (s *Store) InsertAuditLog(ctx context.Context, id, changeType, entityName, keyValues string, changedBy *string, oldValues, newValues *string, ts time.Time) error {
+func (s *Store) InsertAuditLog(ctx context.Context, id, changeType, entityName, keyValues string, changedBy *string, oldValues, newValues *string, ts time.Time, correlationID string) error {
+	var corr any
+	if correlationID != "" {
+		corr = correlationID
+	}
 	_, err := s.q(ctx).Exec(ctx, `
 		INSERT INTO "AuditLogs" (
-			"Id", "ChangeType", "EntityName", "KeyValues", "ChangedBy", "OldValues", "NewValues", "Timestamp"
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-		id, changeType, entityName, keyValues, changedBy, oldValues, newValues, ts)
+			"Id", "ChangeType", "EntityName", "KeyValues", "ChangedBy", "OldValues", "NewValues", "Timestamp", "CorrelationId"
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+		id, changeType, entityName, keyValues, changedBy, oldValues, newValues, ts, corr)
 	return err
 }
 

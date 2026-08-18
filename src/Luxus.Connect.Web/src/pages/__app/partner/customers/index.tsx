@@ -150,7 +150,6 @@ function PartnerCustomersPage() {
       <PartnerCustomerCreateSheet
         open={createOpen}
         onOpenChange={setCreateOpen}
-        preferredProviderId={providerId}
       />
     </div>
   );

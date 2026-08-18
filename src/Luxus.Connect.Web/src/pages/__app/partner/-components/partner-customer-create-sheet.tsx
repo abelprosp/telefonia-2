@@ -1,5 +1,3 @@
-import { useEffect } from 'react';
-
 import { zodResolver } from '@hookform/resolvers/zod';
 import { format } from 'date-fns';
 import { Controller, useForm, useWatch } from 'react-hook-form';
@@ -14,7 +12,6 @@ import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue
@@ -29,14 +26,10 @@ import {
   SheetTitle
 } from '@/components/ui/sheet';
 import { getErrorMessage, isApiHttpError } from '@/lib/api-error';
-import {
-  useCreatePartnerCustomer,
-  usePartnerProviders
-} from '@/lib/partner-api';
+import { useCreatePartnerCustomer } from '@/lib/partner-api';
 
 const formSchema = z
   .object({
-    providerId: z.string().min(1, 'Selecione a operadora inicial'),
     type: z.enum(['PF', 'PJ']),
     name: z.string().min(1, 'Informe o nome').max(256, 'Nome muito longo'),
     legal_name: z.string().optional(),
@@ -62,11 +55,9 @@ type FormValues = z.infer<typeof formSchema>;
 type PartnerCustomerCreateSheetProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  preferredProviderId?: string;
 };
 
 const defaultValues: FormValues = {
-  providerId: '',
   type: 'PJ',
   name: '',
   legal_name: '',
@@ -77,11 +68,8 @@ const defaultValues: FormValues = {
 
 export function PartnerCustomerCreateSheet({
   open,
-  onOpenChange,
-  preferredProviderId
+  onOpenChange
 }: PartnerCustomerCreateSheetProps) {
-  const providersQuery = usePartnerProviders();
-
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues
@@ -89,18 +77,11 @@ export function PartnerCustomerCreateSheet({
 
   const customerType = useWatch({ control: form.control, name: 'type' }) ?? 'PJ';
 
-  useEffect(() => {
-    if (open && preferredProviderId) {
-      form.setValue('providerId', preferredProviderId);
-    }
-  }, [form, open, preferredProviderId]);
-
   const createMutation = useCreatePartnerCustomer();
 
   const onSubmit = form.handleSubmit((values) => {
     createMutation.mutate(
       {
-        provider_id: values.providerId,
         type: values.type,
         name: values.name.trim(),
         legal_name: values.legal_name?.trim() || null,
@@ -136,47 +117,13 @@ export function PartnerCustomerCreateSheet({
         <SheetHeader>
           <SheetTitle>Novo cliente</SheetTitle>
           <SheetDescription>
-            O cliente será vinculado automaticamente à sua carteira de vendas.
+            O cliente será vinculado automaticamente à sua carteira de vendas. A
+            operadora pode ser associada depois, ao vincular uma linha.
           </SheetDescription>
         </SheetHeader>
 
         <form className="flex min-h-0 flex-1 flex-col" onSubmit={onSubmit}>
           <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6">
-            <Controller
-              control={form.control}
-              name="providerId"
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel>Operadora inicial</FieldLabel>
-                  <Select
-                    value={field.value || ''}
-                    onValueChange={(value) => field.onChange(value ?? '')}
-                    disabled={providersQuery.isPending}
-                  >
-                    <SelectTrigger className="border-input bg-background w-full max-w-none rounded-xl border">
-                      <SelectValue placeholder="Selecione">
-                        {(providersQuery.data?.items ?? []).find(
-                          (p) => p.id === field.value
-                        )?.name ?? 'Selecione'}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {(providersQuery.data?.items ?? []).map((p) => (
-                          <SelectItem key={p.id} value={p.id}>
-                            {p.name}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                  {fieldState.invalid ? (
-                    <FieldError errors={[fieldState.error]} />
-                  ) : null}
-                </Field>
-              )}
-            />
-
             <Controller
               control={form.control}
               name="type"

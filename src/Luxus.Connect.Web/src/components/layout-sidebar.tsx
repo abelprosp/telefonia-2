@@ -8,11 +8,13 @@ import {
   FileText,
   Layers,
   LayoutDashboard,
+  LifeBuoy,
   LogOut,
   Phone,
   Receipt,
   ShoppingCart,
   Settings,
+  Sparkles,
   TrendingUp,
   UserCog,
   Users,
@@ -72,6 +74,16 @@ const operationalMenuItems: MenuItem[] = [
     ]
   },
   {
+    title: 'Operação avançada',
+    url: '/tickets',
+    icon: <LifeBuoy />,
+    items: [
+      { title: 'Tickets', url: '/tickets' },
+      { title: 'Divergências', url: '/divergences' },
+      { title: 'Aprovações', url: '/approvals' }
+    ]
+  },
+  {
     title: 'Vendas',
     url: '/sales',
     icon: <ShoppingCart />,
@@ -86,7 +98,9 @@ const operationalMenuItems: MenuItem[] = [
     icon: <TrendingUp />,
     items: [
       { title: 'Movimentação de linhas', url: '/reports/transition-pending' },
-      { title: 'Solicitações de parceiros', url: '/line-requests' }
+      { title: 'Solicitações de parceiros', url: '/line-requests' },
+      { title: 'Resumo financeiro', url: '/finance' },
+      { title: 'Rentabilidade', url: '/finance' }
     ]
   }
 ];
@@ -118,6 +132,10 @@ const adminProductItems: MenuItem[] = [
   { title: 'Operadoras', url: '/providers', icon: <Building2 /> },
   { title: 'Linhas', url: '/phone-lines', icon: <Phone /> },
   { title: 'Faturas', url: '/invoices', icon: <Receipt /> }
+];
+
+const portalMenuItems: MenuItem[] = [
+  { title: 'Meu portal', url: '/portal', icon: <LayoutDashboard /> }
 ];
 
 const partnerMenuItems: MenuItem[] = [
@@ -162,6 +180,7 @@ export const LayoutSidebar = ({ ...props }: ComponentProps<typeof Sidebar>) => {
   const {
     isMaster,
     isPartnerOnly,
+    isCustomerPortal,
     canAccessOperations,
     canAccessFinance,
     canManageUsers
@@ -170,14 +189,24 @@ export const LayoutSidebar = ({ ...props }: ComponentProps<typeof Sidebar>) => {
   const navigate = useNavigate();
 
   const menuItems = useMemo(() => {
+    if (isCustomerPortal) {
+      return portalMenuItems;
+    }
     if (isPartnerOnly) {
       return partnerMenuItems;
     }
     return buildStaffMenu(canAccessOperations, canAccessFinance, canManageUsers);
-  }, [isPartnerOnly, canAccessOperations, canAccessFinance, canManageUsers]);
+  }, [isCustomerPortal, isPartnerOnly, canAccessOperations, canAccessFinance, canManageUsers]);
 
   useEffect(() => {
     const path = location.pathname;
+
+    if (isCustomerPortal) {
+      if (!path.startsWith('/portal') && path !== '/settings') {
+        void navigate({ to: '/portal' });
+      }
+      return;
+    }
 
     if (isPartnerOnly) {
       if (!path.startsWith('/partner') && path !== '/settings') {
@@ -199,6 +228,7 @@ export const LayoutSidebar = ({ ...props }: ComponentProps<typeof Sidebar>) => {
       }
     }
   }, [
+    isCustomerPortal,
     isPartnerOnly,
     canAccessOperations,
     canAccessFinance,
@@ -214,17 +244,21 @@ export const LayoutSidebar = ({ ...props }: ComponentProps<typeof Sidebar>) => {
     await performLogout(auth);
   };
 
-  const homeTo = isPartnerOnly
-    ? '/partner'
-    : canAccessFinance && !canAccessOperations
-      ? '/finance'
-      : '/';
+  const homeTo = isCustomerPortal
+    ? '/portal'
+    : isPartnerOnly
+      ? '/partner'
+      : canAccessFinance && !canAccessOperations
+        ? '/finance'
+        : '/';
 
-  const portalLabel = isPartnerOnly
-    ? 'Portal do parceiro'
-    : canAccessFinance && !canAccessOperations
-      ? 'Financeiro'
-      : (whitelabel.app_slogan || 'Gestão de telefonia');
+  const portalLabel = isCustomerPortal
+    ? 'Portal do cliente'
+    : isPartnerOnly
+      ? 'Portal do parceiro'
+      : canAccessFinance && !canAccessOperations
+        ? 'Financeiro'
+        : (whitelabel.app_slogan || 'Gestão de telefonia');
 
   const appDisplayName = whitelabel.app_name || 'Luxus.Connect';
 
@@ -264,7 +298,7 @@ export const LayoutSidebar = ({ ...props }: ComponentProps<typeof Sidebar>) => {
 
 
       <SidebarContent className="gap-0">
-        <NavMain label={isPartnerOnly ? 'Parceiro' : 'Menu'} items={menuItems} />
+        <NavMain label={isPartnerOnly ? 'Parceiro' : 'Navegação'} items={menuItems} />
         {isMaster && !isPartnerOnly ? (
           <NavMain label="Cadastros rápidos" items={adminProductItems} />
         ) : null}
@@ -280,22 +314,46 @@ export const LayoutSidebar = ({ ...props }: ComponentProps<typeof Sidebar>) => {
             ]}
           />
         ) : null}
+
+        {/* Card Inferior de Faturamento */}
+        {!isCustomerPortal ? (
+          <div className="p-3">
+            <div className="flex flex-col gap-2 rounded-2xl border bg-muted/40 p-4 text-foreground shadow-xs">
+              <div className="flex items-center gap-2">
+                <div className="bg-primary text-primary-foreground flex size-7 items-center justify-center rounded-lg">
+                  <Sparkles className="size-3.5" />
+                </div>
+                <span className="text-xs font-bold tracking-tight uppercase">Ciclo Vigente</span>
+              </div>
+              <p className="text-muted-foreground text-[11px] leading-snug">
+                Acompanhe e concilie faturas de operadoras em aberto.
+              </p>
+              <Link
+                to="/invoices"
+                search={{ page: 1, pageSize: 10, processingMonthId: undefined }}
+                className="bg-primary text-primary-foreground hover:bg-primary/90 mt-1 flex items-center justify-center rounded-xl py-2 text-xs font-semibold shadow-xs transition-colors"
+              >
+                Faturamento
+              </Link>
+            </div>
+          </div>
+        ) : null}
       </SidebarContent>
 
-      <SidebarFooter className="gap-2">
+      <SidebarFooter className="gap-2 border-t p-3">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton render={<Link to="/settings" />}>
-              <Settings />
+              <Settings className="size-4" />
               <span>Configurações</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton
               onClick={onSignout}
-              className="text-primary hover:text-primary"
+              className="text-destructive hover:text-destructive"
             >
-              <LogOut />
+              <LogOut className="size-4" />
               <span>Sair</span>
             </SidebarMenuButton>
           </SidebarMenuItem>

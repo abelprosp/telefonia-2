@@ -20,8 +20,9 @@ type ProcessingMonthRow struct {
 	Status                  string
 	ClosedAt                *time.Time
 	ClosedBy                *string
-	ClosedInContingency     bool
+	ClosedInContingency      bool
 	ContingencyJustification *string
+	ConsolidationHash        *string
 }
 
 func (s *Store) ListProcessingMonths(ctx context.Context, orgID string, page httputil.PageSearch) ([]models.ListProcessingMonthResponse, int64, error) {
@@ -57,11 +58,13 @@ func (s *Store) GetProcessingMonth(ctx context.Context, orgID, id string) (*Proc
 	var m ProcessingMonthRow
 	err := s.q(ctx).QueryRow(ctx, `
 		SELECT "Id", "OrganizationId", "ProviderId", "Year", "Month", "DisplayName",
-			"Status"::text, "ClosedAt", "ClosedBy", "ClosedInContingency", "ContingencyJustification"
+			"Status"::text, "ClosedAt", "ClosedBy", "ClosedInContingency", "ContingencyJustification",
+			"ConsolidationHash"
 		FROM "ProcessingMonths"
 		WHERE "OrganizationId" = $1 AND "Id" = $2`, orgID, id).
 		Scan(&m.ID, &m.OrganizationID, &m.ProviderID, &m.Year, &m.Month, &m.DisplayName,
-			&m.Status, &m.ClosedAt, &m.ClosedBy, &m.ClosedInContingency, &m.ContingencyJustification)
+			&m.Status, &m.ClosedAt, &m.ClosedBy, &m.ClosedInContingency, &m.ContingencyJustification,
+			&m.ConsolidationHash)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -103,6 +106,49 @@ func (s *Store) CloseProcessingMonth(ctx context.Context, orgID, id, userID stri
 	return nil
 }
 
+func (s *Store) ReopenProcessingMonth(ctx context.Context, orgID, id string) error {
+	tag, err := s.q(ctx).Exec(ctx, `
+		UPDATE "ProcessingMonths"
+		SET "Status" = 'open'::processing_month_status, "ClosedAt" = NULL,
+			"ClosedBy" = NULL, "ClosedInContingency" = false, "ContingencyJustification" = NULL
+		WHERE "OrganizationId" = $1 AND "Id" = $2 AND "Status" = 'closed'::processing_month_status`,
+		orgID, id)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+	return nil
+}
+
+func (s *Store) UpdateProcessingMonthConsolidationHash(ctx context.Context, orgID, id, hash string) error {
+	_, err := s.q(ctx).Exec(ctx, `
+		UPDATE "ProcessingMonths" SET "ConsolidationHash" = $3
+		WHERE "OrganizationId" = $1 AND "Id" = $2`, orgID, id, hash)
+	return err
+}
+
+func (s *Store) FindPreviousProcessingMonth(ctx context.Context, orgID, providerID string, year, month int) (*ProcessingMonthRow, error) {
+	prevYear, prevMonth := year, month-1
+	if prevMonth < 1 {
+		prevMonth = 12
+		prevYear--
+	}
+	var id string
+	err := s.q(ctx).QueryRow(ctx, `
+		SELECT "Id" FROM "ProcessingMonths"
+		WHERE "OrganizationId" = $1 AND "ProviderId" = $2 AND "Year" = $3 AND "Month" = $4`,
+		orgID, providerID, prevYear, prevMonth).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return s.GetProcessingMonth(ctx, orgID, id)
+}
+
 func ToProcessingMonthResponse(m *ProcessingMonthRow) models.GetProcessingMonthResponse {
 	return models.GetProcessingMonthResponse{
 		ListProcessingMonthResponse: models.ListProcessingMonthResponse{
@@ -111,5 +157,6 @@ func ToProcessingMonthResponse(m *ProcessingMonthRow) models.GetProcessingMonthR
 			ClosedBy: m.ClosedBy, ClosedInContingency: m.ClosedInContingency,
 		},
 		ContingencyJustification: m.ContingencyJustification,
+		ConsolidationHash:        m.ConsolidationHash,
 	}
 }

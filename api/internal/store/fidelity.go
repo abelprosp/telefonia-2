@@ -277,3 +277,50 @@ func scanGeneratedContracts(rows pgx.Rows) ([]models.GeneratedContractResponse, 
 	}
 	return items, rows.Err()
 }
+
+func (s *Store) ListExpiringContracts(ctx context.Context, orgID string, daysAhead int) ([]models.ExpiringContractResponse, error) {
+	now := time.Now().UTC()
+	targetDate := now.AddDate(0, 0, daysAhead)
+
+	rows, err := s.q(ctx).Query(ctx, `
+		SELECT f."Id", f."PhoneLineId", pl."Number", c."Id", c."Name",
+			'fidelity' AS contract_type, f."StartDate", f."PredictedEndDate",
+			f."Status"::text
+		FROM "LineFidelities" f
+		JOIN "PhoneLines" pl ON pl."Id" = f."PhoneLineId"
+		JOIN "Providers" p ON p."Id" = pl."ProviderId"
+		LEFT JOIN "PhoneLineCustomerLinks" cl ON cl."PhoneLineId" = pl."Id" AND cl."IsActive" = TRUE
+		LEFT JOIN "Customers" c ON c."Id" = cl."CustomerId"
+		WHERE p."OrganizationId" = $1
+			AND f."Status" = 'active'
+			AND f."PredictedEndDate" >= $2
+			AND f."PredictedEndDate" <= $3
+		ORDER BY f."PredictedEndDate" ASC`, orgID, now.Truncate(24*time.Hour), targetDate)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []models.ExpiringContractResponse
+	for rows.Next() {
+		var item models.ExpiringContractResponse
+		if err := rows.Scan(
+			&item.ContractID, &item.PhoneLineID, &item.PhoneNumber,
+			&item.CustomerID, &item.CustomerName, &item.ContractType,
+			&item.StartDate, &item.PredictedEndDate, &item.Status,
+		); err != nil {
+			return nil, err
+		}
+		daysRemaining := int(item.PredictedEndDate.Sub(now).Hours() / 24.0)
+		if daysRemaining < 0 {
+			daysRemaining = 0
+		}
+		item.DaysRemaining = daysRemaining
+		items = append(items, item)
+	}
+	if items == nil {
+		items = []models.ExpiringContractResponse{}
+	}
+	return items, rows.Err()
+}
+

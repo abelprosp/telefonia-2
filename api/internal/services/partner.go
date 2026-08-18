@@ -238,10 +238,29 @@ func (s *Service) ReviewLineOperationRequest(ctx context.Context, id string, inp
 	if err != nil {
 		return nil, err
 	}
+	if !auth.CanApproveOperations(ctx) {
+		return nil, httputil.BusinessError(notifications.N("APPROVAL_FORBIDDEN", "Apenas administradores master ou gestores autorizados podem aprovar/rejeitar operações de linha."))
+	}
 
 	status := strings.ToLower(strings.TrimSpace(input.Status))
 	if status != "approved" && status != "rejected" {
 		return nil, httputil.ValidationError(notifications.N("PHONE_LINE_OPERATION_REVIEW_INVALID", "Review status must be approved or rejected."))
+	}
+	if status == "rejected" && (input.AdminNotes == nil || strings.TrimSpace(*input.AdminNotes) == "") {
+		return nil, httputil.ValidationError(notifications.N("REJECTION_JUSTIFICATION_REQUIRED", "Justificativa de rejeição é obrigatória."))
+	}
+
+	req, err := s.Store.GetPhoneLineOperationRequest(ctx, orgID, id, nil)
+	if err != nil {
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+	if req == nil {
+		return nil, httputil.NotFoundError(notifications.PhoneLineOperationNotFound)
+	}
+
+	// Regra de Segregação de Funções (SoD): O solicitante não pode aprovar a própria operação
+	if req.RequestedByUserID == user.ID {
+		return nil, httputil.BusinessError(notifications.N("SOD_VIOLATION_SELF_APPROVAL", "O operador solicitante não pode aprovar a própria solicitação. Requer aprovação de um segundo nível."))
 	}
 
 	phoneLineID, opType, err := s.Store.GetPhoneLineOperationRequestPhoneLineID(ctx, orgID, id)
@@ -269,6 +288,13 @@ func (s *Service) ReviewLineOperationRequest(ctx context.Context, id string, inp
 			return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 		}
 	}
+
+	s.auditLog(ctx, "ReviewOperationRequest", "PhoneLineOperationRequest", id, map[string]any{
+		"previous_status": req.Status,
+	}, map[string]any{
+		"new_status":  status,
+		"reviewed_by": user.ID,
+	})
 
 	return s.Store.GetPhoneLineOperationRequest(ctx, orgID, id, nil)
 }

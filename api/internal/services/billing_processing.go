@@ -2,7 +2,10 @@ package services
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
@@ -10,6 +13,9 @@ import (
 	"github.com/luxus-connect/telefonia/api/internal/httputil"
 	"github.com/luxus-connect/telefonia/api/internal/models"
 	"github.com/luxus-connect/telefonia/api/internal/notifications"
+	"github.com/luxus-connect/telefonia/api/internal/observability"
+	"github.com/luxus-connect/telefonia/api/internal/precision"
+	"github.com/luxus-connect/telefonia/api/internal/statemachine"
 	"github.com/luxus-connect/telefonia/api/internal/store"
 )
 
@@ -326,6 +332,54 @@ func (s *Service) CreateLineBillingCompositionItem(ctx context.Context, phoneLin
 		}
 		row.EndDate = &t
 	}
+
+	// Regra 2.4: Parcelamento de Aparelhos (calcula término automático se omitido)
+	if row.ItemType == "installment" && row.InstallmentCount != nil && *row.InstallmentCount > 0 {
+		if row.InstallmentCurrent == nil || *row.InstallmentCurrent <= 0 {
+			first := 1
+			row.InstallmentCurrent = &first
+		}
+		if row.StartDate != nil && row.EndDate == nil {
+			calcEnd := row.StartDate.AddDate(0, *row.InstallmentCount, 0)
+			row.EndDate = &calcEnd
+		}
+		total := input.Amount
+		row.InstallmentTotal = &total
+		parcels, splitErr := precision.SplitInstallments(total, *row.InstallmentCount)
+		if splitErr != nil {
+			return nil, httputil.ValidationError(notifications.N("INSTALLMENT_SPLIT_INVALID", splitErr.Error()))
+		}
+		idx := 0
+		if row.InstallmentCurrent != nil && *row.InstallmentCurrent > 0 {
+			idx = *row.InstallmentCurrent - 1
+			if idx < 0 {
+				idx = 0
+			}
+			if idx >= len(parcels) {
+				idx = len(parcels) - 1
+			}
+		}
+		row.Amount = parcels[idx]
+	}
+
+	// Regra 2.3: Validação de Descontos (não pode exceder o valor dos serviços)
+	if row.ItemType == "discount" {
+		items, _ := s.Store.ListBillingCompositionItems(ctx, processingID)
+		var servicesTotal float64
+		var existingDiscounts float64
+		for _, it := range items {
+			if it.ItemType == "service" {
+				servicesTotal = precision.SumCents(servicesTotal, it.Amount*it.Quantity)
+			} else if it.ItemType == "discount" {
+				existingDiscounts = precision.SumCents(existingDiscounts, it.Amount*it.Quantity)
+			}
+		}
+		newDiscountTotal := precision.SumCents(existingDiscounts, input.Amount*qty)
+		if servicesTotal > 0 && newDiscountTotal > servicesTotal {
+			return nil, httputil.ValidationError(notifications.N("DISCOUNT_EXCEEDS_SERVICES", fmt.Sprintf("O somatório de descontos (R$ %.2f) não pode exceder o total de serviços da linha (R$ %.2f).", newDiscountTotal, servicesTotal)))
+		}
+	}
+
 	if row.ItemType == "service" && row.ServiceType != nil && strings.TrimSpace(*row.ServiceType) != "" {
 		dup, err := s.Store.ActiveCompositionServiceTypeExists(ctx, processingID, strings.ToLower(strings.TrimSpace(*row.ServiceType)), "")
 		if err != nil {
@@ -335,6 +389,11 @@ func (s *Service) CreateLineBillingCompositionItem(ctx context.Context, phoneLin
 			return nil, httputil.BusinessError(notifications.PhoneLineServiceTypeDuplicated)
 		}
 	}
+
+	if err := s.gateCompositionTwoLevel(ctx, phoneLineID, processingID, row.ItemType, input.Amount*qty, input); err != nil {
+		return nil, err
+	}
+
 	if err := s.Store.CreateBillingCompositionItem(ctx, row); err != nil {
 		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
@@ -344,6 +403,30 @@ func (s *Service) CreateLineBillingCompositionItem(ctx context.Context, phoneLin
 	}
 	resp := store.CompositionItemToModel(row)
 	return &resp, nil
+}
+
+func (s *Service) gateCompositionTwoLevel(ctx context.Context, phoneLineID, processingID, itemType string, amount float64, input models.CreateLineBillingCompositionItemInput) error {
+	payload := map[string]any{
+		"phone_line_id": phoneLineID,
+		"processing_id": processingID,
+		"item":          input,
+	}
+	switch itemType {
+	case "extra_charge", "exceedance":
+		return s.queueTwoLevel(ctx, "forced_charge", "billing_item", processingID, "Cobrança forçada / avulsa", payload)
+	case "discount":
+		items, _ := s.Store.ListBillingCompositionItems(ctx, processingID)
+		var servicesTotal float64
+		for _, it := range items {
+			if it.ItemType == "service" {
+				servicesTotal = precision.SumCents(servicesTotal, it.Amount*it.Quantity)
+			}
+		}
+		if servicesTotal > 0 && amount >= servicesTotal*0.30 {
+			return s.queueTwoLevel(ctx, "high_discount", "billing_item", processingID, "Desconto elevado (≥ 30% dos serviços)", payload)
+		}
+	}
+	return nil
 }
 
 func (s *Service) UpdateLineBillingCompositionItem(ctx context.Context, phoneLineID, processingID, itemID string, input models.UpdateLineBillingCompositionItemInput) (*models.LineBillingCompositionItemResponse, error) {
@@ -432,6 +515,9 @@ func (s *Service) DeleteLineBillingCompositionItem(ctx context.Context, phoneLin
 		return httputil.ValidationError(notifications.N("BILLING_MIN_ONE_SERVICE", "O processamento deve ter ao menos um serviço ativo."))
 	}
 	now := time.Now().UTC()
+	if err := s.blockRetroactiveIfClosed(ctx, orgID, phoneLineID, now); err != nil {
+		return err
+	}
 	if err := s.Store.DeactivateBillingCompositionItem(ctx, itemID, now); err != nil {
 		return httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
@@ -441,6 +527,92 @@ func (s *Service) DeleteLineBillingCompositionItem(ctx context.Context, phoneLin
 		_ = s.syncLinkMonthlyAmountFromPrimary(ctx, proc.PhoneLineCustomerLinkID, processingID)
 	}
 	return nil
+}
+
+func (s *Service) PayoffInstallmentItem(ctx context.Context, phoneLineID, processingID, itemID string) (*models.LineBillingCompositionItemResponse, error) {
+	orgID, err := orgFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := s.GetPhoneLine(ctx, phoneLineID); err != nil {
+		return nil, err
+	}
+	item, err := s.Store.GetBillingCompositionItem(ctx, orgID, itemID)
+	if err != nil || item == nil || item.ProcessingID != processingID {
+		return nil, httputil.NotFoundError(notifications.N("BILLING_ITEM_NOT_FOUND", "Item de parcelamento não encontrado."))
+	}
+	if item.ItemType != "installment" {
+		return nil, httputil.ValidationError(notifications.N("ITEM_NOT_INSTALLMENT", "Apenas itens de parcelamento podem ser quitados antecipadamente."))
+	}
+	now := time.Now().UTC()
+	if err := s.blockRetroactiveIfClosed(ctx, orgID, phoneLineID, now); err != nil {
+		return nil, err
+	}
+
+	count := 1
+	if item.InstallmentCount != nil && *item.InstallmentCount > 0 {
+		count = *item.InstallmentCount
+	}
+	current := 1
+	if item.InstallmentCurrent != nil && *item.InstallmentCurrent > 0 {
+		current = *item.InstallmentCurrent
+	}
+	remaining := count - current + 1
+	if remaining <= 0 {
+		remaining = 1
+	}
+
+	total := precision.Round2(item.Amount * float64(count))
+	if item.InstallmentTotal != nil && *item.InstallmentTotal > 0 {
+		total = *item.InstallmentTotal
+	}
+	payoffAmount := precision.Round2(item.Amount * float64(remaining))
+	if parcels, splitErr := precision.SplitInstallments(total, count); splitErr == nil {
+		payoffAmount = 0
+		for i := current - 1; i < len(parcels); i++ {
+			if i >= 0 {
+				payoffAmount = precision.SumCents(payoffAmount, parcels[i])
+			}
+		}
+	}
+
+	// Inativa o parcelamento recorrente
+	if err := s.Store.DeactivateBillingCompositionItem(ctx, itemID, now); err != nil {
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+
+	// Cria o lançamento de quitação avulsa
+	payoffID := uuid.New().String()
+	payoffDesc := fmt.Sprintf("Quitação antecipada de aparelho (%s) — %d parcela(s) restante(s)", item.Description, remaining)
+	payoffRow := store.BillingCompositionItemRow{
+		ID:           payoffID,
+		ProcessingID: processingID,
+		ItemType:     "extra_charge",
+		Description:  payoffDesc,
+		Amount:       payoffAmount,
+		Quantity:     1,
+		Active:       true,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+		Proportional: false,
+	}
+	if err := s.Store.CreateBillingCompositionItem(ctx, payoffRow); err != nil {
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+
+	s.auditLog(ctx, "Payoff", "LineBillingCompositionItem", itemID, compositionAuditMap(*item), map[string]any{
+		"payoff_item_id":   payoffID,
+		"payoff_amount":    payoffAmount,
+		"remaining_months": remaining,
+	})
+
+	proc, _ := s.Store.GetBillingProcessing(ctx, orgID, processingID)
+	if proc != nil && proc.Perspective == perspectiveLuxusCustomer {
+		_ = s.syncLinkMonthlyAmountFromPrimary(ctx, proc.PhoneLineCustomerLinkID, processingID)
+	}
+
+	resp := store.CompositionItemToModel(payoffRow)
+	return &resp, nil
 }
 
 func (s *Service) ListLineBillingProcessingAudit(ctx context.Context, phoneLineID, processingID string) ([]models.AuditLogResponse, error) {
@@ -525,11 +697,369 @@ func (s *Service) auditLog(ctx context.Context, changeType, entityName, key stri
 	if u, err := userFrom(ctx); err == nil && u != nil {
 		changedBy = &u.ID
 	}
-	_ = s.Store.InsertAuditLog(ctx, uuid.New().String(), changeType, entityName, key, changedBy, oldStr, newStr, time.Now().UTC())
+	corrID := observability.CorrelationIDFromContext(ctx)
+	_ = s.Store.InsertAuditLog(ctx, uuid.New().String(), changeType, entityName, key, changedBy, oldStr, newStr, time.Now().UTC(), corrID)
 }
 
 func compositionAuditMap(row store.BillingCompositionItemRow) map[string]any {
 	return map[string]any{
 		"item_type": row.ItemType, "description": row.Description, "amount": row.Amount, "quantity": row.Quantity,
 	}
+}
+
+func (s *Service) SimulateBillingImpact(ctx context.Context, processingMonthID string) (*models.BillingImpactSimulationResponse, error) {
+	orgID, err := orgFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+	month, err := s.Store.GetProcessingMonth(ctx, orgID, processingMonthID)
+	if err != nil {
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+	if month == nil {
+		return nil, httputil.NotFoundError(notifications.ProcessingMonthNotFound)
+	}
+
+	lines, totalLines, err := s.Store.ListPhoneLines(ctx, orgID, nil, httputil.PageSearch{PageSize: 1000})
+	if err != nil {
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+
+	var projectedRevenue float64
+	var projectedCost float64
+	for _, l := range lines {
+		if l.Status == "active" {
+			if l.BaseCost != nil {
+				projectedCost = precision.SumCents(projectedCost, *l.BaseCost)
+			}
+			linkID, err := s.Store.GetActiveLinkIDForPhoneLine(ctx, orgID, l.ID)
+			if err == nil && linkID != "" {
+				processings, _ := s.Store.ListBillingProcessingsForLink(ctx, linkID)
+				for _, p := range processings {
+					if p.Perspective == perspectiveLuxusCustomer {
+						tot, _ := s.Store.SumBillingProcessingTotal(ctx, p.ID)
+						projectedRevenue = precision.SumCents(projectedRevenue, tot)
+						break
+					}
+				}
+			}
+		}
+	}
+
+	projectedMargin := precision.Round2(projectedRevenue - projectedCost)
+	marginPct := 0.0
+	if projectedRevenue > 0 {
+		marginPct = precision.Round2((projectedMargin / projectedRevenue) * 100.0)
+	}
+
+	if invoiceCost, err := s.Store.SumProviderInvoiceTotalsForMonth(ctx, orgID, processingMonthID); err == nil && invoiceCost > 0 {
+		projectedCost = invoiceCost
+		projectedMargin = precision.Round2(projectedRevenue - projectedCost)
+		if projectedRevenue > 0 {
+			marginPct = precision.Round2((projectedMargin / projectedRevenue) * 100.0)
+		}
+	}
+
+	var prevRevenue float64
+	prev, _ := s.Store.FindPreviousProcessingMonth(ctx, orgID, month.ProviderID, month.Year, month.Month)
+	if prev != nil {
+		if rev, err := s.Store.SumCustomerBillingForMonth(ctx, orgID, prev.ID); err == nil {
+			prevRevenue = rev
+		}
+	}
+
+	delta := precision.Round2(projectedRevenue - prevRevenue)
+	deltaPct := 0.0
+	if prevRevenue > 0 {
+		deltaPct = precision.Round2((delta / prevRevenue) * 100.0)
+	}
+
+	return &models.BillingImpactSimulationResponse{
+		ProcessingMonthID: processingMonthID,
+		DisplayName:       month.DisplayName,
+		ProjectedRevenue:  projectedRevenue,
+		ProjectedCost:     projectedCost,
+		ProjectedMargin:   projectedMargin,
+		MarginPercentage:  marginPct,
+		PreviousRevenue:   prevRevenue,
+		RevenueDelta:      delta,
+		RevenueDeltaPct:   deltaPct,
+		TotalActiveLines:  int(totalLines),
+	}, nil
+}
+
+func (s *Service) GetProcessingMonthLineReadiness(ctx context.Context, processingMonthID string) (*models.ProcessingMonthLineReadinessResponse, error) {
+	orgID, err := orgFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+	lines, _, err := s.Store.ListPhoneLines(ctx, orgID, nil, httputil.PageSearch{PageSize: 1000})
+	if err != nil {
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+
+	var items []models.LineProcessingReadinessItem
+	readyCount := 0
+	blockedCount := 0
+
+	for _, l := range lines {
+		if l.Status != "active" {
+			continue
+		}
+		var blocking []string
+		linkID, err := s.Store.GetActiveLinkIDForPhoneLine(ctx, orgID, l.ID)
+		var custID, custName *string
+		monthlyAmt := 0.0
+
+		if err != nil || linkID == "" {
+			blocking = append(blocking, "Linha sem cliente ativo vinculado.")
+		} else {
+			links, _ := s.Store.ListPhoneLineCustomerLinks(ctx, orgID, l.ID)
+			for _, cl := range links {
+				if cl.IsActive {
+					cID := cl.CustomerID
+					cName := cl.CustomerName
+					custID = &cID
+					custName = &cName
+					break
+				}
+			}
+
+			processings, _ := s.Store.ListBillingProcessingsForLink(ctx, linkID)
+			hasService := false
+			for _, p := range processings {
+				if p.Perspective == perspectiveLuxusCustomer {
+					compItems, _ := s.Store.ListBillingCompositionItems(ctx, p.ID)
+					for _, ci := range compItems {
+						if ci.ItemType == "service" {
+							hasService = true
+							break
+						}
+					}
+					tot, _ := s.Store.SumBillingProcessingTotal(ctx, p.ID)
+					monthlyAmt = tot
+					break
+				}
+			}
+			if !hasService {
+				blocking = append(blocking, "Nenhum serviço contratado ativo na composição.")
+			}
+		}
+
+		isReady := len(blocking) == 0
+		if isReady {
+			readyCount++
+		} else {
+			blockedCount++
+		}
+
+		items = append(items, models.LineProcessingReadinessItem{
+			PhoneLineID:   l.ID,
+			PhoneNumber:   l.Number,
+			CustomerID:    custID,
+			CustomerName:  custName,
+			MonthlyAmount: monthlyAmt,
+			IsReady:       isReady,
+			BlockingRules: blocking,
+		})
+	}
+
+	return &models.ProcessingMonthLineReadinessResponse{
+		ProcessingMonthID: processingMonthID,
+		TotalLines:        len(items),
+		ReadyLines:        readyCount,
+		BlockedLines:      blockedCount,
+		Items:             items,
+	}, nil
+}
+
+func (s *Service) GetLineBillingExplanation(ctx context.Context, phoneLineID, processingMonthID string) (*models.BillingExplanationResponse, error) {
+	orgID, err := orgFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+	line, err := s.GetPhoneLine(ctx, phoneLineID)
+	if err != nil {
+		return nil, err
+	}
+
+	linkID, err := s.Store.GetActiveLinkIDForPhoneLine(ctx, orgID, phoneLineID)
+	if err != nil || linkID == "" {
+		return nil, httputil.BusinessError(notifications.PhoneLineActiveCustomerLinkNotFound)
+	}
+
+	var custID, custName string
+	links, _ := s.Store.ListPhoneLineCustomerLinks(ctx, orgID, phoneLineID)
+	for _, cl := range links {
+		if cl.IsActive {
+			custID = cl.CustomerID
+			custName = cl.CustomerName
+			break
+		}
+	}
+
+	var components []models.BillingExplanationComponent
+	var total float64
+	var formulaParts []string
+
+	processings, err := s.Store.ListBillingProcessingsForLink(ctx, linkID)
+	if err == nil {
+		for _, p := range processings {
+			if p.Perspective == perspectiveLuxusCustomer {
+				items, _ := s.Store.ListBillingCompositionItems(ctx, p.ID)
+				for _, it := range items {
+					itemAmt := precision.Round2(it.Amount * it.Quantity)
+					switch it.ItemType {
+					case "service":
+						components = append(components, models.BillingExplanationComponent{
+							Type:        "service",
+							Description: it.Description,
+							Amount:      itemAmt,
+							Details:     "Serviço recorrente de plano",
+						})
+						total = precision.SumCents(total, itemAmt)
+						formulaParts = append(formulaParts, fmt.Sprintf("+ R$ %.2f (%s)", itemAmt, it.Description))
+					case "discount":
+						components = append(components, models.BillingExplanationComponent{
+							Type:        "discount",
+							Description: it.Description,
+							Amount:      -itemAmt,
+							Details:     "Desconto contratual/rateio",
+						})
+						total = precision.Round2(total - itemAmt)
+						formulaParts = append(formulaParts, fmt.Sprintf("- R$ %.2f (%s)", itemAmt, it.Description))
+					case "installment":
+						cur := 1
+						if it.InstallmentCurrent != nil {
+							cur = *it.InstallmentCurrent
+						}
+						cnt := 1
+						if it.InstallmentCount != nil {
+							cnt = *it.InstallmentCount
+						}
+						components = append(components, models.BillingExplanationComponent{
+							Type:        "device",
+							Description: it.Description,
+							Amount:      itemAmt,
+							Details:     fmt.Sprintf("Parcela %d de %d", cur, cnt),
+						})
+						total = precision.SumCents(total, itemAmt)
+						formulaParts = append(formulaParts, fmt.Sprintf("+ R$ %.2f (Aparelho %d/%d)", itemAmt, cur, cnt))
+					case "extra_charge":
+						components = append(components, models.BillingExplanationComponent{
+							Type:        "exceedance",
+							Description: it.Description,
+							Amount:      itemAmt,
+							Details:     "Cobrança avulsa / excedente",
+						})
+						total = precision.SumCents(total, itemAmt)
+						formulaParts = append(formulaParts, fmt.Sprintf("+ R$ %.2f (%s)", itemAmt, it.Description))
+					}
+				}
+				break
+			}
+		}
+	}
+
+	formulaText := strings.Join(formulaParts, " ") + fmt.Sprintf(" = R$ %.2f", total)
+	if len(formulaParts) == 0 {
+		formulaText = fmt.Sprintf("Total da linha: R$ %.2f", total)
+	}
+
+	return &models.BillingExplanationResponse{
+		PhoneLineID:       phoneLineID,
+		PhoneNumber:       line.Number,
+		CustomerID:        custID,
+		CustomerName:      custName,
+		ProcessingMonthID: processingMonthID,
+		TotalAmount:       total,
+		FormulaText:       formulaText,
+		Components:        components,
+	}, nil
+}
+
+func (s *Service) CloseProcessingMonthWithHash(ctx context.Context, processingMonthID string) (*models.CloseMonthWithHashResponse, error) {
+	orgID, err := orgFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+	month, err := s.Store.GetProcessingMonth(ctx, orgID, processingMonthID)
+	if err != nil {
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+	if month == nil {
+		return nil, httputil.NotFoundError(notifications.ProcessingMonthNotFound)
+	}
+	if month.Status == "closed" {
+		hash := ""
+		if month.ConsolidationHash != nil {
+			hash = *month.ConsolidationHash
+		}
+		closedBy := ""
+		if month.ClosedBy != nil {
+			closedBy = *month.ClosedBy
+		}
+		closedAt := time.Time{}
+		if month.ClosedAt != nil {
+			closedAt = *month.ClosedAt
+		}
+		return &models.CloseMonthWithHashResponse{
+			ProcessingMonthID: processingMonthID, Status: "closed", ClosedAt: closedAt,
+			ClosedBy: closedBy, ConsolidationHash: hash,
+		}, nil
+	}
+	if _, err := s.RequestTwoLevelApproval(ctx, models.CreateApprovalRequestInput{
+		ActionType: "consolidation", EntityType: "processing_month", EntityID: processingMonthID,
+		Justification: "Consolidação e fechamento da competência",
+	}); err != nil {
+		return nil, err
+	}
+	return &models.CloseMonthWithHashResponse{
+		ProcessingMonthID: processingMonthID,
+		Status:            "pending_approval",
+		ClosedBy:          "",
+		ConsolidationHash: "",
+	}, nil
+}
+
+func (s *Service) doConsolidateMonth(ctx context.Context, processingMonthID string) error {
+	orgID, err := orgFrom(ctx)
+	if err != nil {
+		return err
+	}
+	user, err := userFrom(ctx)
+	if err != nil {
+		return err
+	}
+	month, err := s.Store.GetProcessingMonth(ctx, orgID, processingMonthID)
+	if err != nil {
+		return httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+	if month == nil {
+		return httputil.NotFoundError(notifications.ProcessingMonthNotFound)
+	}
+	if err := s.SM().ValidateTransition(statemachine.EntityProcessingMonth, month.Status, "closed", userRoles(ctx)); err != nil {
+		return err
+	}
+	if err := s.Store.CloseProcessingMonth(ctx, orgID, processingMonthID, user.ID, false, nil); err != nil {
+		return httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+	_ = s.SM().RecordTransition(ctx, orgID, statemachine.EntityProcessingMonth, processingMonthID, month.Status, "closed", "close_month_hash", nil, &user.ID, nil)
+	now := time.Now().UTC()
+	hashData := fmt.Sprintf("ORG=%s|MONTH=%s|CLOSED_BY=%s|TIMESTAMP=%d", orgID, processingMonthID, user.ID, now.Unix())
+	hashBytes := sha256.Sum256([]byte(hashData))
+	consolidationHash := hex.EncodeToString(hashBytes[:])
+	_ = s.Store.UpdateProcessingMonthConsolidationHash(ctx, orgID, processingMonthID, consolidationHash)
+	s.auditLog(ctx, "ConsolidateClose", "ProcessingMonth", processingMonthID, map[string]any{
+		"previous_status": month.Status,
+	}, map[string]any{
+		"new_status": "closed", "consolidation_hash": consolidationHash, "closed_by": user.ID,
+	})
+	s.DispatchWebhookEvent(orgID, WebhookEventBillingClosed, map[string]any{
+		"processing_month_id": processingMonthID, "consolidation_hash": consolidationHash,
+	})
+	if expiring, err := s.Store.ListExpiringContracts(ctx, orgID, 30); err == nil && len(expiring) > 0 {
+		s.DispatchWebhookEvent(orgID, WebhookEventFidelityExpiring, map[string]any{"count": len(expiring)})
+	}
+	return nil
 }

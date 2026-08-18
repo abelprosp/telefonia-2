@@ -12,6 +12,7 @@ import (
 	"github.com/luxus-connect/telefonia/api/internal/invoicelayout"
 	"github.com/luxus-connect/telefonia/api/internal/models"
 	"github.com/luxus-connect/telefonia/api/internal/notifications"
+	"github.com/luxus-connect/telefonia/api/internal/precision"
 	"github.com/luxus-connect/telefonia/api/internal/store"
 )
 
@@ -523,6 +524,9 @@ func (s *Service) BulkGenerateBillingDocuments(ctx context.Context, input models
 	if pm.Status == "closed" {
 		return nil, httputil.BusinessError(notifications.ProcessingMonthAlreadyClosed)
 	}
+	if err := s.queueTwoLevel(ctx, "batch_change", "processing_month", monthID, "Geração em lote de faturas", input); err != nil {
+		return nil, err
+	}
 	s.applyMonthlyBillingRules(ctx, orgID, monthID, pm, candidates)
 	if len(input.BillingGroupIDs) > 0 {
 		selected := make(map[string]struct{}, len(input.BillingGroupIDs))
@@ -564,7 +568,7 @@ func (s *Service) recomputeCustomerCycleAmount(ctx context.Context, customerID s
 	if err != nil {
 		return 0, err
 	}
-	var total float64
+	var values []float64
 	for _, linkID := range linkIDs {
 		processings, err := s.Store.ListBillingProcessingsForLink(ctx, linkID)
 		if err != nil {
@@ -576,11 +580,11 @@ func (s *Service) recomputeCustomerCycleAmount(ctx context.Context, customerID s
 			}
 			amt, err := s.Store.SumBillingProcessingTotalForCycle(ctx, p.ID, cycle)
 			if err == nil {
-				total += amt
+				values = append(values, amt)
 			}
 		}
 	}
-	return total, nil
+	return precision.SumCents(values...), nil
 }
 
 func bulkSkipReasonMessage(reason string) string {

@@ -27,6 +27,7 @@ import {
   useBillingSendLog,
   useCancelSicrediBoleto,
   useCustomerBillingDocument,
+  useGenerateSicrediPix,
   useIssueSicrediBoleto,
   useSendCustomerBillingDocument,
   useSyncSicrediPayment,
@@ -46,6 +47,7 @@ function CustomerInvoiceDetailPage() {
   const updateMutation = useUpdateCustomerBillingDocument();
   const sendMutation = useSendCustomerBillingDocument();
   const boletoMutation = useIssueSicrediBoleto();
+  const pixMutation = useGenerateSicrediPix();
   const syncPaymentMutation = useSyncSicrediPayment();
   const cancelBoletoMutation = useCancelSicrediBoleto();
   const alterDueDateMutation = useAlterSicrediBoletoDueDate();
@@ -103,6 +105,19 @@ function CustomerInvoiceDetailPage() {
     try {
       const result = await boletoMutation.mutateAsync(id);
       toast.success(result.message);
+      await docQuery.refetch();
+    } catch (e) {
+      toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e));
+    }
+  };
+
+  const handleGeneratePix = async () => {
+    try {
+      const result = await pixMutation.mutateAsync(id);
+      toast.success('PIX gerado. Use o copia e cola abaixo.');
+      if (result.pix_copia_cola) {
+        await navigator.clipboard.writeText(result.pix_copia_cola).catch(() => undefined);
+      }
       await docQuery.refetch();
     } catch (e) {
       toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e));
@@ -329,6 +344,15 @@ function CustomerInvoiceDetailPage() {
                       {boletoMutation.isPending ? 'Gerando…' : 'Gerar boleto'}
                     </Button>
                   )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={pixMutation.isPending}
+                    onClick={() => void handleGeneratePix()}
+                  >
+                    <QrCode className="mr-2 size-4" />
+                    {pixMutation.isPending ? 'Gerando PIX…' : 'Gerar PIX'}
+                  </Button>
                 </div>
               </div>
               {doc.sicredi_boleto_status && (

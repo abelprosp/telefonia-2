@@ -1,5 +1,5 @@
 {
-  "required": ["provider_id", "type", "name", "document"],
+  "required": ["type", "name", "document"],
   "type": "object",
   "properties": {
     "provider_id": { "type": "string" },

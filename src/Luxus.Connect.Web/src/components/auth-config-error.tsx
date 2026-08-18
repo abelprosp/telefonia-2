@@ -34,22 +34,25 @@ export const AuthConfigError = ({
 
   return (
     <div className="flex h-full min-h-[60vh] w-full flex-col items-center justify-center gap-4 p-8 text-center">
+      <a href="#login-retry" className="skip-link">
+        Pular para o login
+      </a>
       <div className="rounded-full bg-destructive/10 p-3 text-destructive">
-        <RefreshCw className="size-6 animate-pulse" />
+        <RefreshCw className="size-6" aria-hidden />
       </div>
       <h1 className="text-xl font-bold">{title}</h1>
-      <p className="text-muted-foreground max-w-md text-sm">
+      <p className="max-w-md text-sm">
         {isStateError
           ? 'A sessão de login anterior expirou ou o redirecionamento foi interrompido.'
           : message}
       </p>
       {hint && (
-        <p className="text-muted-foreground max-w-lg text-xs whitespace-pre-wrap bg-muted/50 p-3 rounded-lg border font-mono">
+        <p className="max-w-lg rounded-lg border bg-muted/50 p-3 text-xs whitespace-pre-wrap">
           {hint}
         </p>
       )}
-      <Button onClick={handleRetry} className="gap-2 mt-2">
-        <LogIn className="size-4" />
+      <Button id="login-retry" onClick={handleRetry} className="mt-2 gap-2">
+        <LogIn className="size-4" aria-hidden />
         Fazer Login Novamente
       </Button>
     </div>

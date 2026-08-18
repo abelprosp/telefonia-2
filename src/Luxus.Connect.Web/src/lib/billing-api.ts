@@ -440,6 +440,29 @@ export function useSendCustomerBillingDocument() {
   });
 }
 
+export function useGenerateSicrediPix() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { data } = await client<{
+        document_id: string;
+        nosso_numero: string;
+        pix_qr_code: string;
+        pix_copia_cola: string;
+        expires_at: string;
+      }>({
+        url: `/v1/customer-billing-documents/${id}/generate-pix`,
+        method: 'POST'
+      });
+      return data;
+    },
+    onSuccess: (_, id) => {
+      void qc.invalidateQueries({ queryKey: billingKeys.document(id) });
+      void qc.invalidateQueries({ queryKey: ['billing', 'documents'] });
+    }
+  });
+}
+
 export function useIssueSicrediBoleto() {
   const qc = useQueryClient();
   return useMutation({

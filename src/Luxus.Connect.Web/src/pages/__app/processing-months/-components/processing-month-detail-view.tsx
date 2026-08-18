@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { format, parseISO } from 'date-fns';
-import { ExternalLink, Lock, Download } from 'lucide-react';
+import { ExternalLink, Lock, Download, Play, RotateCcw, Calculator } from 'lucide-react';
 import { Controller, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -32,6 +32,15 @@ import { Textarea } from '@/components/ui/textarea';
 import { getErrorMessage, isApiHttpError } from '@/lib/api-error';
 import { formatProcessingMonthStatus } from '@/lib/format';
 import { downloadFinancialExport } from '@/lib/fidelity-api';
+import {
+  useCloseProcessingMonthWithHash,
+  useProcessingMonthLineReadiness,
+  useProcessingMonthRuns,
+  useReopenProcessingMonth,
+  useRunProcessingMonthPipeline,
+  useSimulateBillingImpact
+} from '@/lib/ops-api';
+import { formatMoney } from '@/lib/financial-api';
 
 export type ProcessingMonthListSearch = {
   page: number;
@@ -94,7 +103,7 @@ export function ProcessingMonthDetailView({
   const closeMutation = usePostV1ProcessingMonthsIdClose({
     mutation: {
       onSuccess: async () => {
-        toast.success('Mês fechado.');
+        toast.success('Pedido de fechamento enviado para aprovação em dois níveis.');
         setCloseSheetOpen(false);
         await queryClient.invalidateQueries({
           queryKey: getV1ProcessingMonthsQueryKey()
@@ -133,6 +142,16 @@ export function ProcessingMonthDetailView({
     pageSize: listSearch.pageSize,
     processingMonthId: month.id
   };
+
+  const pipelineQuery = useProcessingMonthRuns(month.id);
+  const runPipeline = useRunProcessingMonthPipeline(month.id);
+  const simulateImpact = useSimulateBillingImpact(month.id);
+  const closeWithHash = useCloseProcessingMonthWithHash(month.id);
+  const reopenMonth = useReopenProcessingMonth(month.id);
+  const readinessQuery = useProcessingMonthLineReadiness(month.id, true);
+  const runs = pipelineQuery.data ?? [];
+  const latest = runs[0];
+  const previous = runs[1];
 
   return (
     <div className="flex flex-col gap-8">
@@ -208,8 +227,74 @@ export function ProcessingMonthDetailView({
               >
                 Fecho em contingência
               </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={simulateImpact.isPending}
+                onClick={() =>
+                  simulateImpact.mutate(undefined, {
+                    onSuccess: () => toast.success('Simulação calculada com dados reais do mês anterior.'),
+                    onError: (e) => toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+                  })
+                }
+              >
+                <Calculator className="size-4" />
+                {simulateImpact.isPending ? 'Simulando…' : 'Simular impacto'}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={closeWithHash.isPending}
+                onClick={() =>
+                  closeWithHash.mutate(undefined, {
+                    onSuccess: async (res) => {
+                      toast.success(
+                        res.status === 'pending_approval'
+                          ? 'Fechamento com hash enviado para aprovação em dois níveis.'
+                          : `Hash SHA-256: ${res.consolidation_hash || '—'}`
+                      );
+                      await queryClient.invalidateQueries({
+                        queryKey: getV1ProcessingMonthsQueryKey()
+                      });
+                      await queryClient.invalidateQueries({
+                        queryKey: processingMonthsControllerGetByIdQueryKey(month.id)
+                      });
+                    },
+                    onError: (e) => toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+                  })
+                }
+              >
+                <Lock className="size-4" />
+                Fechar com hash
+              </Button>
             </>
-          ) : null}
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={reopenMonth.isPending}
+              onClick={() =>
+                reopenMonth.mutate(undefined, {
+                  onSuccess: async () => {
+                    toast.success('Reabertura enviada para aprovação auditada.');
+                    await queryClient.invalidateQueries({
+                      queryKey: getV1ProcessingMonthsQueryKey()
+                    });
+                    await queryClient.invalidateQueries({
+                      queryKey: processingMonthsControllerGetByIdQueryKey(month.id)
+                    });
+                  },
+                  onError: (e) => toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+                })
+              }
+            >
+              <RotateCcw className="size-4" />
+              Reabrir competência
+            </Button>
+          )}
         </div>
       </div>
 
@@ -242,6 +327,13 @@ export function ProcessingMonthDetailView({
             {month.closed_in_contingency ? 'Sim' : 'Não'}
           </dd>
         </div>
+        <div>
+          <dt className="text-muted-foreground text-sm">Hash de consolidação</dt>
+          <dd className="mt-1 font-mono text-xs break-all">
+            {(month as GetProcessingMonthResponse & { consolidation_hash?: string | null })
+              .consolidation_hash ?? '—'}
+          </dd>
+        </div>
         <div className="sm:col-span-2">
           <dt className="text-muted-foreground text-sm">
             Justificativa de contingência
@@ -251,6 +343,158 @@ export function ProcessingMonthDetailView({
           </dd>
         </div>
       </dl>
+
+      {simulateImpact.data ? (
+        <section className="rounded-xl border p-4">
+          <h3 className="font-semibold">Impacto simulado</h3>
+          <p className="text-muted-foreground mt-1 text-sm">
+            Receita, custo e margem com dados reais (mês anterior e faturas do mês, sem heurística).
+          </p>
+          <dl className="mt-3 grid gap-3 sm:grid-cols-3">
+            <div>
+              <dt className="text-muted-foreground text-xs">Receita projetada</dt>
+              <dd className="font-medium">{formatMoney(simulateImpact.data.projected_revenue)}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground text-xs">Custo</dt>
+              <dd className="font-medium">{formatMoney(simulateImpact.data.projected_cost)}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground text-xs">Margem</dt>
+              <dd className="font-medium">
+                {formatMoney(simulateImpact.data.projected_margin)} (
+                {simulateImpact.data.margin_percentage.toFixed(1)}%)
+              </dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground text-xs">Receita mês anterior</dt>
+              <dd className="font-medium">{formatMoney(simulateImpact.data.previous_revenue)}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground text-xs">Delta vs anterior</dt>
+              <dd className="font-medium">
+                {formatMoney(simulateImpact.data.revenue_delta)} (
+                {simulateImpact.data.revenue_delta_percentage.toFixed(1)}%)
+              </dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground text-xs">Linhas ativas</dt>
+              <dd className="font-medium">{simulateImpact.data.total_active_lines}</dd>
+            </div>
+          </dl>
+        </section>
+      ) : null}
+
+      <section className="rounded-xl border p-4">
+        <h3 className="font-semibold">Prontidão das linhas</h3>
+        {readinessQuery.isPending ? (
+          <p className="text-muted-foreground mt-2 text-sm">Carregando…</p>
+        ) : readinessQuery.data ? (
+          <p className="mt-2 text-sm">
+            {readinessQuery.data.ready_lines} prontas · {readinessQuery.data.blocked_lines} bloqueadas
+            · {readinessQuery.data.total_lines} no total
+          </p>
+        ) : (
+          <p className="text-muted-foreground mt-2 text-sm">Sem dados de prontidão.</p>
+        )}
+        {(readinessQuery.data?.items ?? []).filter((i) => !i.is_ready).slice(0, 8).length > 0 ? (
+          <ul className="mt-2 space-y-1 text-sm">
+            {(readinessQuery.data?.items ?? [])
+              .filter((i) => !i.is_ready)
+              .slice(0, 8)
+              .map((item) => (
+                <li key={item.phone_line_id}>
+                  {item.phone_number} — {(item.blocking_rules ?? []).join(', ') || 'bloqueada'}
+                </li>
+              ))}
+          </ul>
+        ) : null}
+      </section>
+
+      <section aria-labelledby="pipeline-title" className="flex flex-col gap-3">
+        <a href="#pipeline-title" className="skip-link">
+          Pular para o pipeline
+        </a>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h3 id="pipeline-title" className="text-foreground font-semibold">
+              Pipeline mensal
+            </h3>
+            <p className="text-muted-foreground text-sm">
+              Importar → validar → simular → identificar linhas → estoque vs clientes → vigências →
+              composição → pró-rata → dependentes → contas de origem → pendências → prévia →
+              auditoria → liberação → consolidar.
+            </p>
+          </div>
+          {open ? (
+            <Button
+              type="button"
+              size="sm"
+              disabled={runPipeline.isPending}
+              onClick={() =>
+                runPipeline.mutate(undefined, {
+                  onSuccess: () => toast.success('Pipeline executado.'),
+                  onError: (e) => toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+                })
+              }
+            >
+              <Play className="size-4" aria-hidden />
+              {runPipeline.isPending ? 'Executando…' : 'Reprocessar'}
+            </Button>
+          ) : null}
+        </div>
+        {latest ? (
+          <p className="text-sm">
+            Versão {latest.version} · {latest.status}
+            {previous ? ` · comparação com versão ${previous.version} (${previous.status})` : ''}
+          </p>
+        ) : (
+          <p className="text-muted-foreground text-sm">Nenhuma execução registrada.</p>
+        )}
+        <ol className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {(latest?.steps ?? []).map((step) => {
+            const prevStep = previous?.steps?.find((s) => s.key === step.key);
+            const changed = Boolean(prevStep && prevStep.status !== step.status);
+            let skip: string | null = null;
+            if (step.summary_json) {
+              try {
+                skip = (JSON.parse(step.summary_json) as { skip_reason?: string }).skip_reason ?? null;
+              } catch {
+                skip = null;
+              }
+            }
+            const statusLabel =
+              step.status === 'done'
+                ? skip
+                  ? `Concluído com lacuna (${skip})`
+                  : 'Concluído'
+                : step.status === 'failed'
+                  ? 'Falhou'
+                  : step.status === 'running'
+                    ? 'Em execução'
+                    : step.status;
+            return (
+              <li
+                key={step.key}
+                className="rounded-lg border p-3 text-sm"
+                aria-label={`${step.label}: ${statusLabel}`}
+              >
+                <p className="font-medium">{step.label}</p>
+                <p>
+                  {statusLabel}
+                  {typeof step.duration_ms === 'number' ? ` · ${step.duration_ms} ms` : ''}
+                </p>
+                {changed ? (
+                  <p className="text-xs">
+                    Mudou em relação à versão anterior ({prevStep?.status})
+                  </p>
+                ) : null}
+                {step.error ? <p className="text-destructive text-xs">{step.error}</p> : null}
+              </li>
+            );
+          })}
+        </ol>
+      </section>
 
       <Sheet open={closeSheetOpen} onOpenChange={setCloseSheetOpen}>
         <SheetContent className="flex w-full flex-col sm:max-w-md">

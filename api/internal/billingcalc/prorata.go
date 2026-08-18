@@ -1,34 +1,48 @@
 package billingcalc
 
 import (
-	"math"
 	"time"
+
+	"github.com/luxus-connect/telefonia/api/internal/precision"
 )
 
 const CycleDays = 30
 
-// ProRataAmount applies daily pro-rata on a 30-day cycle.
-// Mid-cycle start uses remaining days (day 16 → 15 days). Mid-cycle end uses days elapsed (day 10 → 10 days).
+func NormalizeDivisor(divisor int) int {
+	if divisor < 1 {
+		return CycleDays
+	}
+	if divisor > 31 {
+		return 31
+	}
+	return divisor
+}
+
+// ProRataAmount applies daily pro-rata on a 30-day cycle using deterministic financial precision.
 func ProRataAmount(amount float64, cycleStart, itemStart, itemEnd *time.Time) float64 {
+	return ProRataAmountWithDivisor(amount, CycleDays, cycleStart, itemStart, itemEnd)
+}
+
+func ProRataAmountWithDivisor(amount float64, divisor int, cycleStart, itemStart, itemEnd *time.Time) float64 {
 	if amount == 0 {
 		return 0
 	}
-	days := ActiveDays(cycleStart, itemStart, itemEnd)
-	if days >= CycleDays {
-		return round2(amount)
-	}
-	if days <= 0 {
-		return 0
-	}
-	return round2(amount / float64(CycleDays) * float64(days))
+	divisor = NormalizeDivisor(divisor)
+	days := ActiveDaysWithDivisor(divisor, cycleStart, itemStart, itemEnd)
+	return precision.CalculateProRata(amount, divisor, days)
 }
 
 func ActiveDays(cycleStart, itemStart, itemEnd *time.Time) int {
+	return ActiveDaysWithDivisor(CycleDays, cycleStart, itemStart, itemEnd)
+}
+
+func ActiveDaysWithDivisor(divisor int, cycleStart, itemStart, itemEnd *time.Time) int {
+	divisor = NormalizeDivisor(divisor)
 	start := dateOnly(cycleStart)
 	if start.IsZero() {
 		start = time.Date(time.Now().UTC().Year(), time.Now().UTC().Month(), 1, 0, 0, 0, 0, time.UTC)
 	}
-	cycleEnd := start.AddDate(0, 0, CycleDays-1)
+	cycleEnd := start.AddDate(0, 0, divisor-1)
 
 	from := start
 	if itemStart != nil {
@@ -54,8 +68,8 @@ func ActiveDays(cycleStart, itemStart, itemEnd *time.Time) int {
 		return 0
 	}
 	days := int(to.Sub(from).Hours()/24) + 1
-	if days > CycleDays {
-		return CycleDays
+	if days > divisor {
+		return divisor
 	}
 	return days
 }
@@ -76,7 +90,7 @@ func SignedItemAmount(itemType string, amount, quantity float64) float64 {
 	if quantity <= 0 {
 		quantity = 1
 	}
-	total := amount * quantity
+	total := precision.Round2(amount * quantity)
 	if itemType == "discount" {
 		return -total
 	}
@@ -84,5 +98,5 @@ func SignedItemAmount(itemType string, amount, quantity float64) float64 {
 }
 
 func round2(v float64) float64 {
-	return math.Round(v*100) / 100
+	return precision.Round2(v)
 }

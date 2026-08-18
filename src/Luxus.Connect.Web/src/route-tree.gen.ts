@@ -12,20 +12,25 @@ import { Route as rootRouteImport } from './pages/__root'
 import { Route as _appLayoutRouteImport } from './pages/__app/layout'
 import { Route as _appIndexRouteImport } from './pages/__app/index'
 import { Route as _appUsersIndexRouteImport } from './pages/__app/users/index'
+import { Route as _appTicketsIndexRouteImport } from './pages/__app/tickets/index'
 import { Route as _appStockIndexRouteImport } from './pages/__app/stock/index'
 import { Route as _appSettingsIndexRouteImport } from './pages/__app/settings/index'
 import { Route as _appSalesIndexRouteImport } from './pages/__app/sales/index'
 import { Route as _appProvidersIndexRouteImport } from './pages/__app/providers/index'
 import { Route as _appProcessingMonthsIndexRouteImport } from './pages/__app/processing-months/index'
+import { Route as _appPortalIndexRouteImport } from './pages/__app/portal/index'
 import { Route as _appPhoneLinesIndexRouteImport } from './pages/__app/phone-lines/index'
 import { Route as _appPartnerIndexRouteImport } from './pages/__app/partner/index'
 import { Route as _appLineRequestsIndexRouteImport } from './pages/__app/line-requests/index'
 import { Route as _appInvoicesIndexRouteImport } from './pages/__app/invoices/index'
 import { Route as _appFinanceIndexRouteImport } from './pages/__app/finance/index'
 import { Route as _appExceedanceTermsIndexRouteImport } from './pages/__app/exceedance-terms/index'
+import { Route as _appDivergencesIndexRouteImport } from './pages/__app/divergences/index'
 import { Route as _appCustomersIndexRouteImport } from './pages/__app/customers/index'
 import { Route as _appContractTemplatesIndexRouteImport } from './pages/__app/contract-templates/index'
 import { Route as _appBillingCyclesIndexRouteImport } from './pages/__app/billing-cycles/index'
+import { Route as _appApprovalsIndexRouteImport } from './pages/__app/approvals/index'
+import { Route as _appTicketsTicketIdRouteImport } from './pages/__app/tickets/$ticketId'
 import { Route as _appStockPhoneLineIdRouteImport } from './pages/__app/stock/$phoneLineId'
 import { Route as _appSalesSaleIdRouteImport } from './pages/__app/sales/$saleId'
 import { Route as _appProvidersProviderIdRouteImport } from './pages/__app/providers/$providerId'
@@ -69,6 +74,11 @@ const _appUsersIndexRoute = _appUsersIndexRouteImport.update({
   path: '/users/',
   getParentRoute: () => _appLayoutRoute,
 } as any)
+const _appTicketsIndexRoute = _appTicketsIndexRouteImport.update({
+  id: '/tickets/',
+  path: '/tickets/',
+  getParentRoute: () => _appLayoutRoute,
+} as any)
 const _appStockIndexRoute = _appStockIndexRouteImport.update({
   id: '/stock/',
   path: '/stock/',
@@ -95,6 +105,11 @@ const _appProcessingMonthsIndexRoute =
     path: '/processing-months/',
     getParentRoute: () => _appLayoutRoute,
   } as any)
+const _appPortalIndexRoute = _appPortalIndexRouteImport.update({
+  id: '/portal/',
+  path: '/portal/',
+  getParentRoute: () => _appLayoutRoute,
+} as any)
 const _appPhoneLinesIndexRoute = _appPhoneLinesIndexRouteImport.update({
   id: '/phone-lines/',
   path: '/phone-lines/',
@@ -126,6 +141,11 @@ const _appExceedanceTermsIndexRoute =
     path: '/exceedance-terms/',
     getParentRoute: () => _appLayoutRoute,
   } as any)
+const _appDivergencesIndexRoute = _appDivergencesIndexRouteImport.update({
+  id: '/divergences/',
+  path: '/divergences/',
+  getParentRoute: () => _appLayoutRoute,
+} as any)
 const _appCustomersIndexRoute = _appCustomersIndexRouteImport.update({
   id: '/customers/',
   path: '/customers/',
@@ -140,6 +160,16 @@ const _appContractTemplatesIndexRoute =
 const _appBillingCyclesIndexRoute = _appBillingCyclesIndexRouteImport.update({
   id: '/billing-cycles/',
   path: '/billing-cycles/',
+  getParentRoute: () => _appLayoutRoute,
+} as any)
+const _appApprovalsIndexRoute = _appApprovalsIndexRouteImport.update({
+  id: '/approvals/',
+  path: '/approvals/',
+  getParentRoute: () => _appLayoutRoute,
+} as any)
+const _appTicketsTicketIdRoute = _appTicketsTicketIdRouteImport.update({
+  id: '/tickets/$ticketId',
+  path: '/tickets/$ticketId',
   getParentRoute: () => _appLayoutRoute,
 } as any)
 const _appStockPhoneLineIdRoute = _appStockPhoneLineIdRouteImport.update({
@@ -314,20 +344,25 @@ export interface FileRoutesByFullPath {
   '/providers/$providerId': typeof _appProvidersProviderIdRoute
   '/sales/$saleId': typeof _appSalesSaleIdRoute
   '/stock/$phoneLineId': typeof _appStockPhoneLineIdRoute
+  '/tickets/$ticketId': typeof _appTicketsTicketIdRoute
+  '/approvals/': typeof _appApprovalsIndexRoute
   '/billing-cycles/': typeof _appBillingCyclesIndexRoute
   '/contract-templates/': typeof _appContractTemplatesIndexRoute
   '/customers/': typeof _appCustomersIndexRoute
+  '/divergences/': typeof _appDivergencesIndexRoute
   '/exceedance-terms/': typeof _appExceedanceTermsIndexRoute
   '/finance/': typeof _appFinanceIndexRoute
   '/invoices/': typeof _appInvoicesIndexRoute
   '/line-requests/': typeof _appLineRequestsIndexRoute
   '/partner/': typeof _appPartnerIndexRoute
   '/phone-lines/': typeof _appPhoneLinesIndexRoute
+  '/portal/': typeof _appPortalIndexRoute
   '/processing-months/': typeof _appProcessingMonthsIndexRoute
   '/providers/': typeof _appProvidersIndexRoute
   '/sales/': typeof _appSalesIndexRoute
   '/settings/': typeof _appSettingsIndexRoute
   '/stock/': typeof _appStockIndexRoute
+  '/tickets/': typeof _appTicketsIndexRoute
   '/users/': typeof _appUsersIndexRoute
   '/finance/customer-invoices/$id': typeof _appFinanceCustomerInvoicesIdRoute
   '/finance/customer-invoices/bulk-generate': typeof _appFinanceCustomerInvoicesBulkGenerateRoute
@@ -360,20 +395,25 @@ export interface FileRoutesByTo {
   '/providers/$providerId': typeof _appProvidersProviderIdRoute
   '/sales/$saleId': typeof _appSalesSaleIdRoute
   '/stock/$phoneLineId': typeof _appStockPhoneLineIdRoute
+  '/tickets/$ticketId': typeof _appTicketsTicketIdRoute
+  '/approvals': typeof _appApprovalsIndexRoute
   '/billing-cycles': typeof _appBillingCyclesIndexRoute
   '/contract-templates': typeof _appContractTemplatesIndexRoute
   '/customers': typeof _appCustomersIndexRoute
+  '/divergences': typeof _appDivergencesIndexRoute
   '/exceedance-terms': typeof _appExceedanceTermsIndexRoute
   '/finance': typeof _appFinanceIndexRoute
   '/invoices': typeof _appInvoicesIndexRoute
   '/line-requests': typeof _appLineRequestsIndexRoute
   '/partner': typeof _appPartnerIndexRoute
   '/phone-lines': typeof _appPhoneLinesIndexRoute
+  '/portal': typeof _appPortalIndexRoute
   '/processing-months': typeof _appProcessingMonthsIndexRoute
   '/providers': typeof _appProvidersIndexRoute
   '/sales': typeof _appSalesIndexRoute
   '/settings': typeof _appSettingsIndexRoute
   '/stock': typeof _appStockIndexRoute
+  '/tickets': typeof _appTicketsIndexRoute
   '/users': typeof _appUsersIndexRoute
   '/finance/customer-invoices/$id': typeof _appFinanceCustomerInvoicesIdRoute
   '/finance/customer-invoices/bulk-generate': typeof _appFinanceCustomerInvoicesBulkGenerateRoute
@@ -408,20 +448,25 @@ export interface FileRoutesById {
   '/__app/providers/$providerId': typeof _appProvidersProviderIdRoute
   '/__app/sales/$saleId': typeof _appSalesSaleIdRoute
   '/__app/stock/$phoneLineId': typeof _appStockPhoneLineIdRoute
+  '/__app/tickets/$ticketId': typeof _appTicketsTicketIdRoute
+  '/__app/approvals/': typeof _appApprovalsIndexRoute
   '/__app/billing-cycles/': typeof _appBillingCyclesIndexRoute
   '/__app/contract-templates/': typeof _appContractTemplatesIndexRoute
   '/__app/customers/': typeof _appCustomersIndexRoute
+  '/__app/divergences/': typeof _appDivergencesIndexRoute
   '/__app/exceedance-terms/': typeof _appExceedanceTermsIndexRoute
   '/__app/finance/': typeof _appFinanceIndexRoute
   '/__app/invoices/': typeof _appInvoicesIndexRoute
   '/__app/line-requests/': typeof _appLineRequestsIndexRoute
   '/__app/partner/': typeof _appPartnerIndexRoute
   '/__app/phone-lines/': typeof _appPhoneLinesIndexRoute
+  '/__app/portal/': typeof _appPortalIndexRoute
   '/__app/processing-months/': typeof _appProcessingMonthsIndexRoute
   '/__app/providers/': typeof _appProvidersIndexRoute
   '/__app/sales/': typeof _appSalesIndexRoute
   '/__app/settings/': typeof _appSettingsIndexRoute
   '/__app/stock/': typeof _appStockIndexRoute
+  '/__app/tickets/': typeof _appTicketsIndexRoute
   '/__app/users/': typeof _appUsersIndexRoute
   '/__app/finance/customer-invoices/$id': typeof _appFinanceCustomerInvoicesIdRoute
   '/__app/finance/customer-invoices/bulk-generate': typeof _appFinanceCustomerInvoicesBulkGenerateRoute
@@ -456,20 +501,25 @@ export interface FileRouteTypes {
     | '/providers/$providerId'
     | '/sales/$saleId'
     | '/stock/$phoneLineId'
+    | '/tickets/$ticketId'
+    | '/approvals/'
     | '/billing-cycles/'
     | '/contract-templates/'
     | '/customers/'
+    | '/divergences/'
     | '/exceedance-terms/'
     | '/finance/'
     | '/invoices/'
     | '/line-requests/'
     | '/partner/'
     | '/phone-lines/'
+    | '/portal/'
     | '/processing-months/'
     | '/providers/'
     | '/sales/'
     | '/settings/'
     | '/stock/'
+    | '/tickets/'
     | '/users/'
     | '/finance/customer-invoices/$id'
     | '/finance/customer-invoices/bulk-generate'
@@ -502,20 +552,25 @@ export interface FileRouteTypes {
     | '/providers/$providerId'
     | '/sales/$saleId'
     | '/stock/$phoneLineId'
+    | '/tickets/$ticketId'
+    | '/approvals'
     | '/billing-cycles'
     | '/contract-templates'
     | '/customers'
+    | '/divergences'
     | '/exceedance-terms'
     | '/finance'
     | '/invoices'
     | '/line-requests'
     | '/partner'
     | '/phone-lines'
+    | '/portal'
     | '/processing-months'
     | '/providers'
     | '/sales'
     | '/settings'
     | '/stock'
+    | '/tickets'
     | '/users'
     | '/finance/customer-invoices/$id'
     | '/finance/customer-invoices/bulk-generate'
@@ -549,20 +604,25 @@ export interface FileRouteTypes {
     | '/__app/providers/$providerId'
     | '/__app/sales/$saleId'
     | '/__app/stock/$phoneLineId'
+    | '/__app/tickets/$ticketId'
+    | '/__app/approvals/'
     | '/__app/billing-cycles/'
     | '/__app/contract-templates/'
     | '/__app/customers/'
+    | '/__app/divergences/'
     | '/__app/exceedance-terms/'
     | '/__app/finance/'
     | '/__app/invoices/'
     | '/__app/line-requests/'
     | '/__app/partner/'
     | '/__app/phone-lines/'
+    | '/__app/portal/'
     | '/__app/processing-months/'
     | '/__app/providers/'
     | '/__app/sales/'
     | '/__app/settings/'
     | '/__app/stock/'
+    | '/__app/tickets/'
     | '/__app/users/'
     | '/__app/finance/customer-invoices/$id'
     | '/__app/finance/customer-invoices/bulk-generate'
@@ -613,6 +673,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof _appUsersIndexRouteImport
       parentRoute: typeof _appLayoutRoute
     }
+    '/__app/tickets/': {
+      id: '/__app/tickets/'
+      path: '/tickets'
+      fullPath: '/tickets/'
+      preLoaderRoute: typeof _appTicketsIndexRouteImport
+      parentRoute: typeof _appLayoutRoute
+    }
     '/__app/stock/': {
       id: '/__app/stock/'
       path: '/stock'
@@ -646,6 +713,13 @@ declare module '@tanstack/react-router' {
       path: '/processing-months'
       fullPath: '/processing-months/'
       preLoaderRoute: typeof _appProcessingMonthsIndexRouteImport
+      parentRoute: typeof _appLayoutRoute
+    }
+    '/__app/portal/': {
+      id: '/__app/portal/'
+      path: '/portal'
+      fullPath: '/portal/'
+      preLoaderRoute: typeof _appPortalIndexRouteImport
       parentRoute: typeof _appLayoutRoute
     }
     '/__app/phone-lines/': {
@@ -690,6 +764,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof _appExceedanceTermsIndexRouteImport
       parentRoute: typeof _appLayoutRoute
     }
+    '/__app/divergences/': {
+      id: '/__app/divergences/'
+      path: '/divergences'
+      fullPath: '/divergences/'
+      preLoaderRoute: typeof _appDivergencesIndexRouteImport
+      parentRoute: typeof _appLayoutRoute
+    }
     '/__app/customers/': {
       id: '/__app/customers/'
       path: '/customers'
@@ -709,6 +790,20 @@ declare module '@tanstack/react-router' {
       path: '/billing-cycles'
       fullPath: '/billing-cycles/'
       preLoaderRoute: typeof _appBillingCyclesIndexRouteImport
+      parentRoute: typeof _appLayoutRoute
+    }
+    '/__app/approvals/': {
+      id: '/__app/approvals/'
+      path: '/approvals'
+      fullPath: '/approvals/'
+      preLoaderRoute: typeof _appApprovalsIndexRouteImport
+      parentRoute: typeof _appLayoutRoute
+    }
+    '/__app/tickets/$ticketId': {
+      id: '/__app/tickets/$ticketId'
+      path: '/tickets/$ticketId'
+      fullPath: '/tickets/$ticketId'
+      preLoaderRoute: typeof _appTicketsTicketIdRouteImport
       parentRoute: typeof _appLayoutRoute
     }
     '/__app/stock/$phoneLineId': {
@@ -920,20 +1015,25 @@ interface _appLayoutRouteChildren {
   _appProvidersProviderIdRoute: typeof _appProvidersProviderIdRoute
   _appSalesSaleIdRoute: typeof _appSalesSaleIdRoute
   _appStockPhoneLineIdRoute: typeof _appStockPhoneLineIdRoute
+  _appTicketsTicketIdRoute: typeof _appTicketsTicketIdRoute
+  _appApprovalsIndexRoute: typeof _appApprovalsIndexRoute
   _appBillingCyclesIndexRoute: typeof _appBillingCyclesIndexRoute
   _appContractTemplatesIndexRoute: typeof _appContractTemplatesIndexRoute
   _appCustomersIndexRoute: typeof _appCustomersIndexRoute
+  _appDivergencesIndexRoute: typeof _appDivergencesIndexRoute
   _appExceedanceTermsIndexRoute: typeof _appExceedanceTermsIndexRoute
   _appFinanceIndexRoute: typeof _appFinanceIndexRoute
   _appInvoicesIndexRoute: typeof _appInvoicesIndexRoute
   _appLineRequestsIndexRoute: typeof _appLineRequestsIndexRoute
   _appPartnerIndexRoute: typeof _appPartnerIndexRoute
   _appPhoneLinesIndexRoute: typeof _appPhoneLinesIndexRoute
+  _appPortalIndexRoute: typeof _appPortalIndexRoute
   _appProcessingMonthsIndexRoute: typeof _appProcessingMonthsIndexRoute
   _appProvidersIndexRoute: typeof _appProvidersIndexRoute
   _appSalesIndexRoute: typeof _appSalesIndexRoute
   _appSettingsIndexRoute: typeof _appSettingsIndexRoute
   _appStockIndexRoute: typeof _appStockIndexRoute
+  _appTicketsIndexRoute: typeof _appTicketsIndexRoute
   _appUsersIndexRoute: typeof _appUsersIndexRoute
   _appFinanceCustomerInvoicesIdRoute: typeof _appFinanceCustomerInvoicesIdRoute
   _appFinanceCustomerInvoicesBulkGenerateRoute: typeof _appFinanceCustomerInvoicesBulkGenerateRoute
@@ -968,20 +1068,25 @@ const _appLayoutRouteChildren: _appLayoutRouteChildren = {
   _appProvidersProviderIdRoute: _appProvidersProviderIdRoute,
   _appSalesSaleIdRoute: _appSalesSaleIdRoute,
   _appStockPhoneLineIdRoute: _appStockPhoneLineIdRoute,
+  _appTicketsTicketIdRoute: _appTicketsTicketIdRoute,
+  _appApprovalsIndexRoute: _appApprovalsIndexRoute,
   _appBillingCyclesIndexRoute: _appBillingCyclesIndexRoute,
   _appContractTemplatesIndexRoute: _appContractTemplatesIndexRoute,
   _appCustomersIndexRoute: _appCustomersIndexRoute,
+  _appDivergencesIndexRoute: _appDivergencesIndexRoute,
   _appExceedanceTermsIndexRoute: _appExceedanceTermsIndexRoute,
   _appFinanceIndexRoute: _appFinanceIndexRoute,
   _appInvoicesIndexRoute: _appInvoicesIndexRoute,
   _appLineRequestsIndexRoute: _appLineRequestsIndexRoute,
   _appPartnerIndexRoute: _appPartnerIndexRoute,
   _appPhoneLinesIndexRoute: _appPhoneLinesIndexRoute,
+  _appPortalIndexRoute: _appPortalIndexRoute,
   _appProcessingMonthsIndexRoute: _appProcessingMonthsIndexRoute,
   _appProvidersIndexRoute: _appProvidersIndexRoute,
   _appSalesIndexRoute: _appSalesIndexRoute,
   _appSettingsIndexRoute: _appSettingsIndexRoute,
   _appStockIndexRoute: _appStockIndexRoute,
+  _appTicketsIndexRoute: _appTicketsIndexRoute,
   _appUsersIndexRoute: _appUsersIndexRoute,
   _appFinanceCustomerInvoicesIdRoute: _appFinanceCustomerInvoicesIdRoute,
   _appFinanceCustomerInvoicesBulkGenerateRoute:

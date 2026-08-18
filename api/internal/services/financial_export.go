@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/csv"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -91,6 +92,22 @@ func FinancialExportCSV(data *models.FinancialExportResponse) []byte {
 	}
 	w.Flush()
 	return buf.Bytes()
+}
+
+func (s *Service) PushFinancialExportSFTP(ctx context.Context, processingMonthID string) (*models.FinancialSFTPPushResponse, error) {
+	host := strings.TrimSpace(os.Getenv("FINANCIAL_SFTP_HOST"))
+	user := strings.TrimSpace(os.Getenv("FINANCIAL_SFTP_USER"))
+	pass := os.Getenv("FINANCIAL_SFTP_PASSWORD")
+	if host == "" || user == "" || pass == "" {
+		return &models.FinancialSFTPPushResponse{
+			Status:  "not_configured",
+			Message: "SFTP não configurado. Defina FINANCIAL_SFTP_HOST, FINANCIAL_SFTP_USER e FINANCIAL_SFTP_PASSWORD. Exportação disponível via API e CSV.",
+		}, nil
+	}
+	return &models.FinancialSFTPPushResponse{
+		Status:  "unavailable",
+		Message: "Credenciais SFTP presentes, mas o envio SFTP não está habilitado neste ambiente (não simula sucesso). Use CSV ou a API JSON.",
+	}, nil
 }
 
 func (s *Service) ListGeneratedContractsForCustomer(ctx context.Context, customerID string) ([]models.GeneratedContractResponse, error) {

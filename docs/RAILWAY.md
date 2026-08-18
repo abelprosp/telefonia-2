@@ -73,7 +73,7 @@ railway link
 railway run --service connect-api -- psql "$DATABASE_URL" -f db/migrations/001_initial_schema.sql
 ```
 
-Ou execute os scripts `db/migrations/*.sql` em ordem numérica (001 … 013) via cliente SQL conectado ao Postgres do Railway.
+Ou execute os scripts `db/migrations/*.sql` em ordem numérica (001 … 022) via cliente SQL conectado ao Postgres do Railway. **A API não aplica migrações no startup.** Não rode 017–022 em produção a partir desta sessão sem `DATABASE_URL` válido e aprovação explícita.
 
 ## 5. Keycloak
 

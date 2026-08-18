@@ -94,3 +94,12 @@ func (h *Handler) listLineBillingProcessingAudit(w http.ResponseWriter, r *http.
 	}
 	httputil.WriteJSON(w, http.StatusOK, items)
 }
+
+func (h *Handler) payoffLineBillingCompositionItem(w http.ResponseWriter, r *http.Request) {
+	item, err := h.Svc.PayoffInstallmentItem(r.Context(), chi.URLParam(r, "id"), chi.URLParam(r, "processingId"), chi.URLParam(r, "itemId"))
+	if err != nil {
+		httputil.HandleServiceError(w, err)
+		return
+	}
+	httputil.WriteJSON(w, http.StatusOK, item)
+}

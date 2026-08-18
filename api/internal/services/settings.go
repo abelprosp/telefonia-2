@@ -16,7 +16,6 @@ func (s *Service) GetCurrentUserProfile(ctx context.Context) (*models.UserProfil
 		return nil, httputil.ForbiddenError(notifications.N("UNAUTHORIZED", "Usuário não autenticado."))
 	}
 
-
 	fullName := strings.TrimSpace(u.Name)
 	var firstName, lastName string
 	parts := strings.Split(fullName, " ")
@@ -50,15 +49,32 @@ func (s *Service) GetCurrentUserProfile(ctx context.Context) (*models.UserProfil
 		calcFullName = u.Username
 	}
 
+	mfaEnrolled := auth.MFAVerifiedFromClaims(u.Acr, u.Amr)
+	if !mfaEnrolled && s.Keycloak != nil && s.Keycloak.Enabled() {
+		if hasOTP, err := s.Keycloak.UserHasOTP(ctx, u.ID); err == nil {
+			mfaEnrolled = hasOTP
+		}
+	}
+	accountURL := ""
+	if s.Keycloak != nil {
+		accountURL = s.Keycloak.AccountSecurityURL()
+	}
+
 	return &models.UserProfileResponse{
-		ID:        u.ID,
-		Username:  u.Username,
-		Email:     u.Email,
-		FirstName: firstName,
-		LastName:  lastName,
-		FullName:  calcFullName,
-		Roles:     u.Roles,
-		Profile:   profileFromRoles(u.Roles),
+		ID:               u.ID,
+		Username:         u.Username,
+		Email:            u.Email,
+		FirstName:        firstName,
+		LastName:         lastName,
+		FullName:         calcFullName,
+		Roles:            u.Roles,
+		Profile:          profileFromRoles(u.Roles),
+		MFAEnrolled:      mfaEnrolled,
+		MFAVerified:      auth.MFAVerifiedFromClaims(u.Acr, u.Amr),
+		MFAAccountURL:    accountURL,
+		Acr:              u.Acr,
+		Amr:              u.Amr,
+		PrivilegedAccess: auth.CanApproveTwoLevel(ctx) || auth.IsMaster(ctx),
 	}, nil
 }
 
@@ -67,7 +83,6 @@ func (s *Service) UpdateCurrentUserProfile(ctx context.Context, input models.Upd
 	if u == nil || u.ID == "" {
 		return nil, httputil.ForbiddenError(notifications.N("UNAUTHORIZED", "Usuário não autenticado."))
 	}
-
 
 	if s.Keycloak == nil || !s.Keycloak.Enabled() {
 		return nil, httputil.InternalError(notifications.N("KEYCLOAK_ADMIN_UNAVAILABLE", "Keycloak admin is not available."))
@@ -273,6 +288,13 @@ func (s *Service) UpdateSystemSettings(ctx context.Context, input models.UpdateS
 	}
 	if input.AutoSendCollectionReminder != nil {
 		current.System.AutoSendCollectionReminder = *input.AutoSendCollectionReminder
+	}
+	if input.ProrataDivisor != nil {
+		d := *input.ProrataDivisor
+		if d < 1 || d > 31 {
+			return nil, httputil.ValidationError(notifications.N("PRORATA_DIVISOR_INVALID", "O divisor de pró-rata deve estar entre 1 e 31."))
+		}
+		current.System.ProrataDivisor = d
 	}
 
 	var updatedBy *string

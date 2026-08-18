@@ -2,13 +2,27 @@ import { Link } from '@tanstack/react-router';
 import { ArrowDownCircle, ArrowUpCircle, FileText, Handshake, Layers, Mail, Wallet } from 'lucide-react';
 
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from '@/components/ui/table';
 import { getErrorMessage, isApiHttpError } from '@/lib/api-error';
 import { formatMoney, useFinancialSummary } from '@/lib/financial-api';
+import {
+  useCustomerProfitabilityReport,
+  useFinancialSummaryReport
+} from '@/lib/ops-api';
 
 import { DashboardMetricCard } from '../../-components/dashboard/dashboard-metric-card';
 
 export function FinanceDashboardView() {
   const summaryQuery = useFinancialSummary();
+  const reportQuery = useFinancialSummaryReport();
+  const profitabilityQuery = useCustomerProfitabilityReport();
 
   if (summaryQuery.isPending) {
     return (
@@ -228,6 +242,79 @@ export function FinanceDashboardView() {
             Meses de processamento
           </Link>
         </div>
+      </div>
+
+      <div className="dashboard-card overflow-hidden">
+        <div className="border-b px-5 py-4">
+          <h3 className="text-lg font-semibold">Resumo financeiro por cliente</h3>
+          <p className="text-muted-foreground text-sm">
+            GET /v1/reports/financial-summary — receita, custo e margem.
+            {reportQuery.data
+              ? ` Total margem ${formatMoney(reportQuery.data.total_margin)}.`
+              : ''}
+          </p>
+        </div>
+        {reportQuery.isPending ? (
+          <p className="text-muted-foreground p-5 text-sm">Carregando resumo…</p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Cliente</TableHead>
+                <TableHead>Linhas</TableHead>
+                <TableHead className="text-right">Receita</TableHead>
+                <TableHead className="text-right">Custo</TableHead>
+                <TableHead className="text-right">Margem</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {(reportQuery.data?.items ?? []).slice(0, 12).map((row) => (
+                <TableRow key={row.customer_id}>
+                  <TableCell className="font-medium">{row.customer_name}</TableCell>
+                  <TableCell>{row.lines_count}</TableCell>
+                  <TableCell className="text-right">{formatMoney(row.total_gross_revenue)}</TableCell>
+                  <TableCell className="text-right">{formatMoney(row.total_operator_cost)}</TableCell>
+                  <TableCell className="text-right">
+                    {formatMoney(row.gross_margin)} ({row.margin_percentage.toFixed(1)}%)
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </div>
+
+      <div className="dashboard-card overflow-hidden">
+        <div className="border-b px-5 py-4">
+          <h3 className="text-lg font-semibold">Rentabilidade por cliente</h3>
+          <p className="text-muted-foreground text-sm">GET /v1/reports/customer-profitability</p>
+        </div>
+        {profitabilityQuery.isPending ? (
+          <p className="text-muted-foreground p-5 text-sm">Carregando rentabilidade…</p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Cliente</TableHead>
+                <TableHead>Ticket médio</TableHead>
+                <TableHead className="text-right">Receita</TableHead>
+                <TableHead className="text-right">Margem</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {(profitabilityQuery.data?.items ?? []).slice(0, 12).map((row) => (
+                <TableRow key={row.customer_id}>
+                  <TableCell className="font-medium">{row.customer_name}</TableCell>
+                  <TableCell>{formatMoney(row.average_ticket)}</TableCell>
+                  <TableCell className="text-right">{formatMoney(row.gross_revenue)}</TableCell>
+                  <TableCell className="text-right">
+                    {formatMoney(row.margin)} ({row.margin_percentage.toFixed(1)}%)
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </div>
     </div>
   );

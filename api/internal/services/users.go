@@ -23,8 +23,14 @@ func profileFromRoles(roles []string) string {
 		return auth.RoleMaster
 	case hasRole(set, auth.RoleFinancial):
 		return auth.RoleFinancial
+	case hasRole(set, auth.RoleSales):
+		return auth.RoleSales
+	case hasRole(set, auth.RoleOperator):
+		return auth.RoleOperator
 	case hasRole(set, auth.RoleEmployee):
 		return auth.RoleEmployee
+	case hasRole(set, auth.RoleViewer):
+		return auth.RoleViewer
 	case hasRole(set, auth.RolePartner):
 		return auth.RolePartner
 	default:
@@ -43,8 +49,14 @@ func rolesForProfile(profile string) ([]string, error) {
 		return []string{auth.RoleMaster, auth.RoleUser}, nil
 	case auth.RoleEmployee:
 		return []string{auth.RoleEmployee, auth.RoleUser}, nil
+	case auth.RoleOperator:
+		return []string{auth.RoleOperator, auth.RoleEmployee, auth.RoleUser}, nil
 	case auth.RoleFinancial:
 		return []string{auth.RoleFinancial, auth.RoleUser}, nil
+	case auth.RoleSales:
+		return []string{auth.RoleSales, auth.RoleUser}, nil
+	case auth.RoleViewer:
+		return []string{auth.RoleViewer, auth.RoleUser}, nil
 	case auth.RolePartner:
 		return []string{auth.RolePartner, auth.RoleUser}, nil
 	default:

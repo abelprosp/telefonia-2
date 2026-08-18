@@ -892,3 +892,14 @@ func (s *Store) IsBillingDocumentSicrediPaid(ctx context.Context, orgID, documen
 	}
 	return paid, err
 }
+
+func (s *Store) SumCustomerBillingForMonth(ctx context.Context, orgID, processingMonthID string) (float64, error) {
+	var total float64
+	err := s.q(ctx).QueryRow(ctx, `
+		SELECT COALESCE(SUM("Amount"), 0)
+		FROM "CustomerBillingDocuments"
+		WHERE "OrganizationId" = $1 AND "ProcessingMonthId" = $2
+			AND "Status" <> 'cancelled'::customer_billing_document_status`,
+		orgID, processingMonthID).Scan(&total)
+	return total, err
+}

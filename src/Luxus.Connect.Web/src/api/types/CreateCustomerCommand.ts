@@ -9,7 +9,7 @@ export type CreateCustomerCommand = {
   /**
    * @type string
    */
-  provider_id: string;
+  provider_id?: string;
   /**
    * @type string
    */

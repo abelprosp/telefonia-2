@@ -27,8 +27,8 @@ export const PageLoader = ({
   }
 
   return (
-    <div className="flex h-full w-full flex-col items-center justify-center gap-4">
-      <div className="border-primary/10 border-t-primary border-b-primary size-12 animate-spin rounded-full border-[3px]" />
+    <div className="flex h-full w-full flex-col items-center justify-center gap-4" role="status" aria-live="polite">
+      <div className="border-primary/10 border-t-primary border-b-primary size-12 animate-spin rounded-full border-[3px]" aria-hidden />
       {label && <span className="text-muted-foreground text-sm">{label}</span>}
     </div>
   );

@@ -19,6 +19,9 @@ type User struct {
 	Name     string
 	Username string
 	Roles    []string
+	Document string
+	Acr      string
+	Amr      []string
 }
 
 type Organization struct {

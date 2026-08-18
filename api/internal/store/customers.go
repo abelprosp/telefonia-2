@@ -146,12 +146,12 @@ func (s *Store) CreateCustomer(ctx context.Context, orgID, id, providerID, custo
 			return err
 		}
 	}
-	linkID := newUUID()
-	now := time.Now().UTC()
-	if _, err := q.Exec(ctx, `
-		INSERT INTO "CustomerProviderLinks" ("Id", "CustomerId", "ProviderId", "StartDate")
-		VALUES ($1, $2, $3, $4)`, linkID, id, providerID, now); err != nil {
-		return err
+	if providerID != "" {
+		if _, err := q.Exec(ctx, `
+			INSERT INTO "CustomerProviderLinks" ("Id", "CustomerId", "ProviderId", "StartDate")
+			VALUES ($1, $2, $3, $4)`, newUUID(), id, providerID, time.Now().UTC()); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -359,4 +359,35 @@ func (s *Store) CountDashboardCustomers(ctx context.Context, orgID string) (int3
 	var n int32
 	err := s.q(ctx).QueryRow(ctx, `SELECT COUNT(*)::int FROM "Customers" WHERE "OrganizationId" = $1`, orgID).Scan(&n)
 	return n, err
+}
+
+func (s *Store) AnonymizeCustomer(ctx context.Context, orgID, customerID string) error {
+	_, err := s.q(ctx).Exec(ctx, `
+		UPDATE "Customers"
+		SET "Name" = 'Cliente Anonimizado (LGPD)',
+			"LegalName" = NULL,
+			"BillingEmail" = NULL,
+			"BirthOrOpeningDate" = NULL,
+			"Active" = false
+		WHERE "OrganizationId" = $1 AND "Id" = $2`, orgID, customerID)
+	if err != nil {
+		return err
+	}
+	_, _ = s.q(ctx).Exec(ctx, `
+		UPDATE "CustomerDocuments"
+		SET "Number" = '000.000.000-00'
+		WHERE "CustomerId" = $1`, customerID)
+	_, _ = s.q(ctx).Exec(ctx, `
+		UPDATE "CustomerPhones"
+		SET "AreaCode" = '00', "PhoneNumber" = '000000000'
+		WHERE "CustomerId" = $1`, customerID)
+	_, _ = s.q(ctx).Exec(ctx, `
+		UPDATE "CustomerEmails"
+		SET "Email" = 'anonimizado@lgpd.local'
+		WHERE "CustomerId" = $1`, customerID)
+	_, _ = s.q(ctx).Exec(ctx, `
+		UPDATE "CustomerAddresses"
+		SET "Street" = 'Anonimizado', "Number" = 'S/N', "Complement" = NULL, "Neighborhood" = 'Anonimizado'
+		WHERE "CustomerId" = $1`, customerID)
+	return nil
 }

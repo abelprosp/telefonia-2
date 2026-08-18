@@ -10,6 +10,7 @@ import (
 	"github.com/luxus-connect/telefonia/api/internal/httputil"
 	"github.com/luxus-connect/telefonia/api/internal/models"
 	"github.com/luxus-connect/telefonia/api/internal/notifications"
+	"github.com/luxus-connect/telefonia/api/internal/statemachine"
 )
 
 func (s *Service) UpdatePhoneLineClassification(ctx context.Context, phoneLineID string, input models.UpdatePhoneLineClassificationInput) (*models.GetPhoneLineResponse, error) {
@@ -122,9 +123,19 @@ func (s *Service) normalizeOrphanTitular(ctx context.Context, titularID string) 
 }
 
 func (s *Service) PutPhoneLineTransition(ctx context.Context, phoneLineID string, input models.PutPhoneLineTransitionInput) (*models.GetPhoneLineResponse, error) {
-	if _, err := s.GetPhoneLine(ctx, phoneLineID); err != nil {
+	orgID, err := orgFrom(ctx)
+	if err != nil {
 		return nil, err
 	}
+	line, err := s.GetPhoneLine(ctx, phoneLineID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.SM().ValidateTransition(statemachine.EntityPhoneLine, line.Status, "in_transition", userRoles(ctx)); err != nil {
+		return nil, err
+	}
+
 	sub := strings.ToLower(strings.TrimSpace(input.TransitionSubStatus))
 	switch sub {
 	case "pending_activation", "pending_cancellation", "pending_portability", "pending_pp", "pending_tt":
@@ -142,8 +153,18 @@ func (s *Service) PutPhoneLineTransition(ctx context.Context, phoneLineID string
 	if err := s.Store.UpdatePhoneLineTransition(ctx, phoneLineID, "in_transition", sub, start); err != nil {
 		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
+
+	var actorUserID *string
+	if u := auth.UserFromContext(ctx); u != nil && u.ID != "" {
+		actorUserID = &u.ID
+	}
+	_ = s.SM().RecordTransition(ctx, orgID, statemachine.EntityPhoneLine, phoneLineID, line.Status, "in_transition", "put_transition", nil, actorUserID, nil)
+
 	s.auditLog(ctx, "Transition", "PhoneLine", phoneLineID, nil, map[string]any{
 		"status": "in_transition", "sub_status": sub, "started_at": start.Format("2006-01-02"),
+	})
+	s.DispatchWebhookEvent(orgID, WebhookEventLineTransition, map[string]any{
+		"phone_line_id": phoneLineID, "from": line.Status, "to": "in_transition", "sub_status": sub,
 	})
 	return s.GetPhoneLine(ctx, phoneLineID)
 }

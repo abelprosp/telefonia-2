@@ -16,6 +16,7 @@ import {
   Settings,
   ShieldCheck,
   Sparkles,
+  Webhook,
   UserCheck,
   UserCircle,
   UserCog,
@@ -44,14 +45,17 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { getErrorMessage, isApiHttpError } from '@/lib/api-error';
 import { performLogout } from '@/lib/auth-actions';
 import { roleLabel, useAuthRoles } from '@/lib/auth-roles';
+import { useExportOrganizationData } from '@/lib/ops-api';
+import { WebhooksSettingsPanel } from './-components/webhooks-settings-panel';
 
 export const Route = createFileRoute('/__app/settings/')({
   component: SettingsPage
 });
 
-type TabKey = 'profile' | 'company' | 'whitelabel' | 'system' | 'users';
+type TabKey = 'profile' | 'company' | 'whitelabel' | 'system' | 'users' | 'webhooks';
 
 const COLOR_PRESETS = [
   { name: 'Esmeralda / Teal', color: '#0f766e' },
@@ -80,6 +84,7 @@ function SettingsPage() {
   const updateCompanyMutation = useUpdateCompanySettingsMutation();
   const updateWhitelabelMutation = useUpdateWhitelabelSettingsMutation();
   const updateSystemMutation = useUpdateSystemSettingsMutation();
+  const exportOrg = useExportOrganizationData();
 
   // Form States - Perfil
   const [firstName, setFirstName] = useState('');
@@ -130,7 +135,8 @@ function SettingsPage() {
     days_before_due_reminder: 3,
     days_after_due_reminder: 2,
     auto_send_invoice_email: true,
-    auto_send_collection_reminder: false
+    auto_send_collection_reminder: false,
+    prorata_divisor: 30
   });
 
   // Carregar dados iniciais de perfil
@@ -343,6 +349,20 @@ function SettingsPage() {
             >
               <Users className="size-4" />
               Gestão de Usuários
+            </button>
+          )}
+          {authRoles.canManageUsers && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('webhooks')}
+              className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors whitespace-nowrap ${
+                activeTab === 'webhooks'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Webhook className="size-4" />
+              Webhooks
             </button>
           )}
         </div>
@@ -1012,6 +1032,22 @@ function SettingsPage() {
                       placeholder="Ex: 2"
                     />
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="prorata_divisor">Divisor de pró-rata (dias)</Label>
+                    <Input
+                      id="prorata_divisor"
+                      type="number"
+                      min={1}
+                      max={31}
+                      value={systemForm.prorata_divisor ?? 30}
+                      onChange={(e) =>
+                        setSystemForm({ ...systemForm, prorata_divisor: Number(e.target.value) || 30 })
+                      }
+                    />
+                    <p className="text-muted-foreground text-xs">
+                      Padrão 30. Use 28 ou 31 conforme a competência.
+                    </p>
+                  </div>
                 </div>
 
                 <div className="space-y-3 pt-2">
@@ -1101,8 +1137,39 @@ function SettingsPage() {
                 </div>
               </CardContent>
             </Card>
+            {authRoles.isMaster ? (
+              <Card className="rounded-2xl border shadow-xs">
+                <CardHeader>
+                  <CardTitle className="text-lg">Exportação organizacional</CardTitle>
+                  <CardDescription>
+                    Dump master-only com checksum SHA-256 auditado. Use apenas para backup controlado.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={exportOrg.isPending}
+                    onClick={() =>
+                      exportOrg.mutate(undefined, {
+                        onSuccess: (res) =>
+                          toast.success(
+                            `Exportação gerada. SHA-256 ${res.checksum_sha256 ?? '—'}`
+                          ),
+                        onError: (e) =>
+                          toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+                      })
+                    }
+                  >
+                    {exportOrg.isPending ? 'Exportando…' : 'Gerar dump (SHA-256)'}
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : null}
           </form>
         )}
+
+        {activeTab === 'webhooks' && authRoles.canManageUsers && <WebhooksSettingsPanel />}
 
         {/* 5. ABA GESTÃO DE USUÁRIOS */}
         {activeTab === 'users' && authRoles.canManageUsers && (

@@ -57,6 +57,9 @@ import {
 } from '@/lib/format';
 import { formatMoney } from '@/lib/financial-api';
 import { invalidateDashboardCaches } from '@/lib/query-utils';
+import { useCustomer360, useAnonymizeCustomer } from '@/lib/ops-api';
+import { useAuthRoles } from '@/lib/auth-roles';
+import { client } from '@/lib/client';
 import { cn } from '@/lib/utils';
 
 import { CustomerAttachmentsView } from './customer-attachments-view';
@@ -236,6 +239,9 @@ export function CustomerDetailView({
   const unassignDeviceMutation = useUnassignCustomerDevice(customer.id);
 
   const customerAttachmentsQuery = useGetV1CustomersIdAttachments(customer.id);
+  const customer360Query = useCustomer360(customer.id);
+  const anonymizeCustomer = useAnonymizeCustomer(customer.id);
+  const { isMaster } = useAuthRoles();
 
   const backTo = {
     to: '/customers' as const,
@@ -410,6 +416,99 @@ export function CustomerDetailView({
               </Field>
             </div>
           </FieldGroup>
+        </DetailSection>
+
+        <Separator />
+
+        <DetailSection
+          title="Visão 360 do cliente"
+          description="Linhas, faturamento mensal, contratos gerados e anexos em um único painel."
+        >
+          {customer360Query.isPending ? (
+            <p className="text-muted-foreground text-sm">Carregando visão 360…</p>
+          ) : customer360Query.isError ? (
+            <p className="text-destructive text-sm">
+              {isApiHttpError(customer360Query.error)
+                ? customer360Query.error.message
+                : getErrorMessage(customer360Query.error)}
+            </p>
+          ) : (
+            <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <dt className="text-muted-foreground text-sm">Linhas ativas</dt>
+                <dd className="mt-1 font-medium">
+                  {customer360Query.data?.active_lines_count ?? 0} /{' '}
+                  {customer360Query.data?.total_lines_count ?? 0}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground text-sm">Mensalidade consolidada</dt>
+                <dd className="mt-1 font-medium">
+                  {formatMoney(customer360Query.data?.total_monthly_amount ?? 0)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground text-sm">Contratos gerados</dt>
+                <dd className="mt-1 font-medium">
+                  {customer360Query.data?.generated_contracts?.length ?? 0}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground text-sm">Anexos</dt>
+                <dd className="mt-1 font-medium">
+                  {customer360Query.data?.attachments_count ?? 0}
+                </dd>
+              </div>
+            </dl>
+          )}
+          {isMaster ? (
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  void (async () => {
+                    try {
+                      const { data } = await client<Record<string, unknown>>({
+                        url: `/v1/customers/${customer.id}/personal-data`,
+                        method: 'GET'
+                      });
+                      const blob = new Blob([JSON.stringify(data, null, 2)], {
+                        type: 'application/json'
+                      });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `dados-pessoais-${customer.id}.json`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                      toast.success('Exportação LGPD baixada.');
+                    } catch (e) {
+                      toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e));
+                    }
+                  })();
+                }}
+              >
+                Exportar dados pessoais
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                disabled={anonymizeCustomer.isPending}
+                onClick={() => {
+                  if (!window.confirm('Anonimizar este cliente? Ação irreversível.')) return;
+                  anonymizeCustomer.mutate(undefined, {
+                    onSuccess: () => toast.success('Cliente anonimizado.'),
+                    onError: (e) => toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+                  });
+                }}
+              >
+                Anonimizar
+              </Button>
+            </div>
+          ) : null}
         </DetailSection>
 
         <Separator />

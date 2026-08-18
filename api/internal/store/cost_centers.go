@@ -49,6 +49,7 @@ type ImportRequestRow struct {
 	Error             *string
 	CompletedAt       *time.Time
 	CreatedBy         string
+	AllowSubstitute   bool
 }
 
 func (s *Store) GetImportRequest(ctx context.Context, id string) (*ImportRequestRow, error) {
@@ -56,12 +57,12 @@ func (s *Store) GetImportRequest(ctx context.Context, id string) (*ImportRequest
 	err := s.q(ctx).QueryRow(ctx, `
 		SELECT "Id", "OrganizationId", "ProviderId", "ProcessingMonthId",
 			"StorageBucket", "StorageObjectKey", "OriginalFileName", "Status",
-			"Error", "CompletedAt", "CreatedBy"
+			"Error", "CompletedAt", "CreatedBy", COALESCE("AllowSubstitute", false)
 		FROM "ProviderInvoiceImportRequests"
 		WHERE "Id" = $1`, id).
 		Scan(&r.ID, &r.OrganizationID, &r.ProviderID, &r.ProcessingMonthID,
 			&r.StorageBucket, &r.StorageObjectKey, &r.OriginalFileName, &r.Status,
-			&r.Error, &r.CompletedAt, &r.CreatedBy)
+			&r.Error, &r.CompletedAt, &r.CreatedBy, &r.AllowSubstitute)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -72,10 +73,10 @@ func (s *Store) CreateImportRequest(ctx context.Context, r ImportRequestRow) err
 	_, err := s.q(ctx).Exec(ctx, `
 		INSERT INTO "ProviderInvoiceImportRequests"
 		("Id", "OrganizationId", "ProviderId", "ProcessingMonthId", "StorageBucket",
-			"StorageObjectKey", "OriginalFileName", "Status", "CreatedBy")
-		VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8)`,
+			"StorageObjectKey", "OriginalFileName", "Status", "CreatedBy", "AllowSubstitute")
+		VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8, $9)`,
 		r.ID, r.OrganizationID, r.ProviderID, r.ProcessingMonthID,
-		r.StorageBucket, r.StorageObjectKey, r.OriginalFileName, r.CreatedBy)
+		r.StorageBucket, r.StorageObjectKey, r.OriginalFileName, r.CreatedBy, r.AllowSubstitute)
 	return err
 }
 
@@ -93,12 +94,12 @@ func (s *Store) GetImportRequestForOrg(ctx context.Context, orgID, id string) (*
 	err := s.q(ctx).QueryRow(ctx, `
 		SELECT ir."Id", ir."OrganizationId", ir."ProviderId", ir."ProcessingMonthId",
 			ir."StorageBucket", ir."StorageObjectKey", ir."OriginalFileName", ir."Status",
-			ir."Error", ir."CompletedAt", ir."CreatedBy"
+			ir."Error", ir."CompletedAt", ir."CreatedBy", COALESCE(ir."AllowSubstitute", false)
 		FROM "ProviderInvoiceImportRequests" ir
 		WHERE ir."Id" = $1 AND ir."OrganizationId" = $2`, id, orgID).
 		Scan(&r.ID, &r.OrganizationID, &r.ProviderID, &r.ProcessingMonthID,
 			&r.StorageBucket, &r.StorageObjectKey, &r.OriginalFileName, &r.Status,
-			&r.Error, &r.CompletedAt, &r.CreatedBy)
+			&r.Error, &r.CompletedAt, &r.CreatedBy, &r.AllowSubstitute)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}

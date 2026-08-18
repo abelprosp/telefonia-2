@@ -18,10 +18,10 @@ import (
 )
 
 type Middleware struct {
-	jwks      keyfunc.Keyfunc
-	cfg       config.Config
-	logger    *slog.Logger
-	keycloak  *keycloak.AdminClient
+	jwks     keyfunc.Keyfunc
+	cfg      config.Config
+	logger   *slog.Logger
+	keycloak *keycloak.AdminClient
 }
 
 func NewMiddleware(cfg config.Config, logger *slog.Logger, kc *keycloak.AdminClient) (*Middleware, error) {
@@ -134,7 +134,57 @@ func extractUser(claims jwt.MapClaims) *User {
 		Name:     name,
 		Username: preferred,
 		Roles:    extractRoles(claims),
+		Document: extractDocument(claims),
+		Acr:      claimString(claims["acr"]),
+		Amr:      parseRoleSlice(claims["amr"]),
 	}
+}
+
+func claimString(raw any) string {
+	if s, ok := raw.(string); ok {
+		return s
+	}
+	if n, ok := raw.(float64); ok {
+		return fmt.Sprintf("%.0f", n)
+	}
+	return ""
+}
+
+func MFAVerifiedFromClaims(acr string, amr []string) bool {
+	for _, item := range amr {
+		switch strings.ToLower(strings.TrimSpace(item)) {
+		case "otp", "mfa", "totp", "hwk":
+			return true
+		}
+	}
+	switch strings.TrimSpace(acr) {
+	case "2", "loa2", "http://schemas.openid.net/pape/policies/2007/06/multi-factor":
+		return true
+	}
+	return false
+}
+
+func extractDocument(claims jwt.MapClaims) string {
+	keys := []string{"cpf_cnpj", "document", "cpf", "cnpj", "tax_id"}
+	for _, k := range keys {
+		if v, ok := claims[k].(string); ok {
+			digits := onlyDigits(v)
+			if len(digits) == 11 || len(digits) == 14 {
+				return digits
+			}
+		}
+	}
+	return ""
+}
+
+func onlyDigits(s string) string {
+	var b strings.Builder
+	for _, r := range s {
+		if r >= '0' && r <= '9' {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }
 
 func extractRoles(claims jwt.MapClaims) []string {

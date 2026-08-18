@@ -62,6 +62,7 @@ import {
   useUpdatePhoneLineClassification
 } from '@/lib/phone-line-spec-api';
 import { useUpdatePhoneLineExceedance } from '@/lib/fidelity-api';
+import { useStateTransitions, usePhoneLine360 } from '@/lib/ops-api';
 import { cn } from '@/lib/utils';
 
 import { BillingProcessingPanel } from './billing-processing-panel';
@@ -82,28 +83,34 @@ function DetailSection({
   description: string;
   children: React.ReactNode;
 }) {
+  const headingId = title.replace(/\s+/g, '-').toLowerCase();
   return (
-    <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
+    <section className="grid grid-cols-1 gap-8 md:grid-cols-3" aria-labelledby={headingId}>
       <div>
-        <h2 className="text-foreground font-semibold">{title}</h2>
+        <h2 id={headingId} className="text-foreground font-semibold">
+          {title}
+        </h2>
         <p className="text-muted-foreground mt-1 text-sm leading-6">
           {description}
         </p>
       </div>
       <div className="sm:max-w-3xl md:col-span-2">{children}</div>
-    </div>
+    </section>
   );
 }
 
 function ReadOnlyField({
+  id,
   value,
   className
 }: {
+  id?: string;
   value: string;
   className?: string;
 }) {
   return (
     <Input
+      id={id}
       readOnly
       value={value}
       className={cn(
@@ -146,6 +153,8 @@ export function PhoneLineDetailView({
   );
 
   const customerLinksQuery = useGetV1PhoneLinesIdCustomerLinks(line.id);
+  const historyQuery = useStateTransitions('phone_line', line.id);
+  const line360Query = usePhoneLine360(line.id);
   const customersQuery = useGetV1Customers({
     page_index: 0,
     page_size: 100
@@ -275,23 +284,25 @@ export function PhoneLineDetailView({
         <FieldGroup className="gap-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field>
-              <FieldLabel>Número</FieldLabel>
-              <ReadOnlyField value={displayNumber} />
+              <FieldLabel htmlFor="line-number">Número</FieldLabel>
+              <ReadOnlyField id="line-number" value={displayNumber} />
             </Field>
             <Field>
-              <FieldLabel>Centro de custo</FieldLabel>
-              <ReadOnlyField value={line.cost_center_name ?? '—'} />
+              <FieldLabel htmlFor="line-cost-center">Centro de custo</FieldLabel>
+              <ReadOnlyField id="line-cost-center" value={line.cost_center_name ?? '—'} />
             </Field>
             <Field>
-              <FieldLabel>Plano</FieldLabel>
+              <FieldLabel htmlFor="line-plan">Plano</FieldLabel>
               <ReadOnlyField
+                id="line-plan"
                 value={line.provider_plan_name}
                 className="text-xs"
               />
             </Field>
             <Field>
-              <FieldLabel>Conta operadora</FieldLabel>
+              <FieldLabel htmlFor="line-account">Conta operadora</FieldLabel>
               <ReadOnlyField
+                id="line-account"
                 value={line.provider_account_number}
                 className="text-xs"
               />
@@ -455,6 +466,91 @@ export function PhoneLineDetailView({
             </div>
           )}
         </div>
+      </DetailSection>
+
+      <Separator />
+
+      <DetailSection
+        title="Visão 360 da linha"
+        description="Cliente ativo, fidelidade, multa estimada e memória de cálculo do faturamento."
+      >
+        {line360Query.isPending ? (
+          <p className="text-muted-foreground text-sm">Carregando visão 360…</p>
+        ) : line360Query.isError ? (
+          <p className="text-destructive text-sm">
+            {isApiHttpError(line360Query.error)
+              ? line360Query.error.message
+              : getErrorMessage(line360Query.error)}
+          </p>
+        ) : (
+          <div className="space-y-4">
+            <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <dt className="text-muted-foreground text-sm">Cliente ativo</dt>
+                <dd className="mt-1 font-medium">
+                  {line360Query.data?.active_customer_link?.customer_name ?? '—'}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground text-sm">Fidelidade</dt>
+                <dd className="mt-1 font-medium">
+                  {line360Query.data?.active_fidelity
+                    ? `${line360Query.data.active_fidelity.status ?? 'ativa'} · término previsto ${
+                        line360Query.data.active_fidelity.predicted_end_date
+                          ? new Date(line360Query.data.active_fidelity.predicted_end_date).toLocaleDateString('pt-BR')
+                          : '—'
+                      }`
+                    : 'Sem contrato ativo'}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground text-sm">Multa estimada</dt>
+                <dd className="mt-1 font-medium">
+                  {line360Query.data?.penalty_estimate?.penalty_amount != null
+                    ? formatMoney(line360Query.data.penalty_estimate.penalty_amount)
+                    : '—'}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground text-sm">Total da memória</dt>
+                <dd className="mt-1 font-medium">
+                  {line360Query.data?.billing_explanation
+                    ? formatMoney(line360Query.data.billing_explanation.total_amount)
+                    : '—'}
+                </dd>
+              </div>
+            </dl>
+            {line360Query.data?.billing_explanation ? (
+              <div className="space-y-2">
+                <p className="text-sm">{line360Query.data.billing_explanation.formula_text}</p>
+                <div className="overflow-x-auto rounded-lg border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Componente</TableHead>
+                        <TableHead>Descrição</TableHead>
+                        <TableHead className="text-right">Valor</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {line360Query.data.billing_explanation.components.map((c, i) => (
+                        <TableRow key={`${c.type}-${i}`}>
+                          <TableCell>{c.type}</TableCell>
+                          <TableCell>{c.description}</TableCell>
+                          <TableCell className="text-right">{formatMoney(c.amount)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            ) : (
+              <p className="text-muted-foreground text-sm">
+                Sem memória de cálculo para o mês corrente.
+              </p>
+            )}
+          </div>
+        )}
       </DetailSection>
 
       <Separator />
@@ -636,12 +732,13 @@ export function PhoneLineDetailView({
               </Select>
             </Field>
             <Field>
-              <FieldLabel>Status</FieldLabel>
-              <ReadOnlyField value={formatPhoneLineStatus(line.status)} />
+              <FieldLabel htmlFor="line-status">Status</FieldLabel>
+              <ReadOnlyField id="line-status" value={formatPhoneLineStatus(line.status)} />
             </Field>
             <Field>
-              <FieldLabel>Substatus transição</FieldLabel>
+              <FieldLabel htmlFor="line-substatus">Substatus transição</FieldLabel>
               <ReadOnlyField
+                id="line-substatus"
                 value={
                   line.transition_sub_status === null ||
                   line.transition_sub_status === undefined
@@ -740,6 +837,32 @@ export function PhoneLineDetailView({
             Registrar transição
           </Button>
         </FieldGroup>
+      </DetailSection>
+
+      <DetailSection
+        title="Histórico de estados"
+        description="Transições registradas pela máquina de estado (GET /v1/state-transitions)."
+      >
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>De</TableHead>
+              <TableHead>Para</TableHead>
+              <TableHead>Evento</TableHead>
+              <TableHead>Quando</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {(historyQuery.data ?? []).map((ev) => (
+              <TableRow key={ev.id}>
+                <TableCell>{ev.from_state}</TableCell>
+                <TableCell>{ev.to_state}</TableCell>
+                <TableCell>{ev.trigger_event}</TableCell>
+                <TableCell>{new Date(ev.created_at).toLocaleString('pt-BR')}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </DetailSection>
 
       <div className="flex flex-wrap items-center justify-end gap-2">

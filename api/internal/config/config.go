@@ -41,6 +41,12 @@ type Config struct {
 	SicrediPublicAPIURL       string
 	SicrediAutoRegisterWebhook bool
 	MonitoringTestEnabled    bool
+	ImportEnforceStateMachine bool
+	FinancialSFTPHost        string
+	FinancialSFTPPort        int
+	FinancialSFTPUser        string
+	FinancialSFTPPassword    string
+	FinancialSFTPPath        string
 }
 
 func Load() Config {
@@ -110,7 +116,17 @@ func Load() Config {
 		SicrediPublicAPIURL:       sicrediPublicURL,
 		SicrediAutoRegisterWebhook: strings.EqualFold(os.Getenv("SICREDI_AUTO_REGISTER_WEBHOOK"), "true"),
 		MonitoringTestEnabled:    strings.EqualFold(os.Getenv("MONITORING_TEST_ENABLED"), "true"),
+		ImportEnforceStateMachine: GetEnvBool("IMPORT_ENFORCE_STATE_MACHINE", true),
+		FinancialSFTPHost:        strings.TrimSpace(os.Getenv("FINANCIAL_SFTP_HOST")),
+		FinancialSFTPPort:        GetEnvInt("FINANCIAL_SFTP_PORT", 22),
+		FinancialSFTPUser:        strings.TrimSpace(os.Getenv("FINANCIAL_SFTP_USER")),
+		FinancialSFTPPassword:    os.Getenv("FINANCIAL_SFTP_PASSWORD"),
+		FinancialSFTPPath:        strings.TrimSpace(firstNonEmpty(os.Getenv("FINANCIAL_SFTP_PATH"), "/inbound")),
 	}
+}
+
+func (c Config) FinancialSFTPConfigured() bool {
+	return c.FinancialSFTPHost != "" && c.FinancialSFTPUser != "" && c.FinancialSFTPPassword != ""
 }
 
 func (c Config) IsProduction() bool {
@@ -182,4 +198,20 @@ func GetEnvInt(key string, def int) int {
 		return def
 	}
 	return n
+}
+
+// GetEnvBool lê um booleano de ambiente. Ausente = def. "false"/"0"/"no" desligam.
+func GetEnvBool(key string, def bool) bool {
+	v := strings.TrimSpace(os.Getenv(key))
+	if v == "" {
+		return def
+	}
+	switch strings.ToLower(v) {
+	case "1", "true", "yes", "on":
+		return true
+	case "0", "false", "no", "off":
+		return false
+	default:
+		return def
+	}
 }

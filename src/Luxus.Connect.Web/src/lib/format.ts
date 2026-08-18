@@ -90,7 +90,8 @@ const invoiceStatusWire: Record<string, string> = {
   pending: 'Pendente',
   paid: 'Paga',
   overdue: 'Vencida',
-  cancelled: 'Cancelada'
+  cancelled: 'Cancelada',
+  substituted: 'Substituída'
 };
 
 const invoiceStatusOrdinal: Record<number, string> = {
@@ -98,7 +99,8 @@ const invoiceStatusOrdinal: Record<number, string> = {
   1: 'Pendente',
   2: 'Paga',
   3: 'Vencida',
-  4: 'Cancelada'
+  4: 'Cancelada',
+  5: 'Substituída'
 };
 
 export function formatInvoiceStatus(

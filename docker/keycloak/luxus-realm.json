@@ -33,6 +33,18 @@
       {
         "name": "financial",
         "description": "Financeiro — controle financeiro completo"
+      },
+      {
+        "name": "operator",
+        "description": "Operador — operação de linhas, faturamento e divergências"
+      },
+      {
+        "name": "sales",
+        "description": "Comercial — vendas e contratos, sem financeiro"
+      },
+      {
+        "name": "viewer",
+        "description": "Consulta — leitura operacional sem mutações privilegiadas"
       }
     ]
   },
@@ -123,6 +135,69 @@
       }
     },
     {
+      "username": "operador",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Operador",
+      "lastName": "Luxus",
+      "email": "operador@luxus.local",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "operador",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["operator", "user"],
+      "attributes": {
+        "organization": [
+          "{\"luxus\":{\"id\":\"00000000-0000-0000-0000-000000000001\",\"name\":[\"Luxus Connect\"]}}"
+        ]
+      }
+    },
+    {
+      "username": "comercial",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Comercial",
+      "lastName": "Luxus",
+      "email": "comercial@luxus.local",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "comercial",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["sales", "user"],
+      "attributes": {
+        "organization": [
+          "{\"luxus\":{\"id\":\"00000000-0000-0000-0000-000000000001\",\"name\":[\"Luxus Connect\"]}}"
+        ]
+      }
+    },
+    {
+      "username": "consulta",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Consulta",
+      "lastName": "Luxus",
+      "email": "consulta@luxus.local",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "consulta",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["viewer", "user"],
+      "attributes": {
+        "organization": [
+          "{\"luxus\":{\"id\":\"00000000-0000-0000-0000-000000000001\",\"name\":[\"Luxus Connect\"]}}"
+        ]
+      }
+    },
+    {
       "username": "arturabel",
       "enabled": true,
       "emailVerified": true,
@@ -141,6 +216,28 @@
         "organization": [
           "{\"luxus\":{\"id\":\"00000000-0000-0000-0000-000000000001\",\"name\":[\"Luxus Connect\"]}}"
         ]
+      }
+    },
+    {
+      "username": "cliente",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Cliente",
+      "lastName": "Portal",
+      "email": "cliente@luxus.local",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "cliente",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["user"],
+      "attributes": {
+        "organization": [
+          "{\"luxus\":{\"id\":\"00000000-0000-0000-0000-000000000001\",\"name\":[\"Luxus Connect\"]}}"
+        ],
+        "cpf_cnpj": ["52998224725"]
       }
     }
   ],
@@ -243,8 +340,32 @@
             "claim.name": "roles",
             "jsonType.label": "String"
           }
+        },
+        {
+          "name": "cpf_cnpj",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "cpf_cnpj",
+            "claim.name": "cpf_cnpj",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
         }
       ]
+    }
+  ],
+  "requiredActions": [
+    {
+      "alias": "CONFIGURE_TOTP",
+      "name": "Configure OTP",
+      "providerId": "CONFIGURE_TOTP",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 10
     }
   ]
 }

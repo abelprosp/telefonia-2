@@ -1,5 +1,3 @@
-import { useEffect } from 'react';
-
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
@@ -8,12 +6,7 @@ import { toast } from 'sonner';
 import { withMask } from 'use-mask-input';
 import { z } from 'zod';
 
-import {
-  getV1CustomersQueryKey,
-  type ListProvidersResponse,
-  useGetV1Providers,
-  usePostV1Customers
-} from '@/api';
+import { getV1CustomersQueryKey, usePostV1Customers } from '@/api';
 import { Button } from '@/components/ui/button';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Field, FieldError, FieldLabel } from '@/components/ui/field';
@@ -21,7 +14,6 @@ import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue
@@ -38,11 +30,8 @@ import {
 import { getErrorMessage, isApiHttpError } from '@/lib/api-error';
 import { invalidateDashboardCaches } from '@/lib/query-utils';
 
-const PROVIDERS_PAGE_SIZE = 500;
-
 const formSchema = z
   .object({
-    providerId: z.string().min(1, 'Selecione a operadora inicial'),
     type: z.enum(['PF', 'PJ']),
     name: z.string().min(1, 'Informe o nome').max(256, 'Nome muito longo'),
     legal_name: z.string().optional(),
@@ -72,11 +61,9 @@ type FormValues = z.infer<typeof formSchema>;
 type CustomerCreateSheetProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  preferredProviderId?: string;
 };
 
 const defaultValues: FormValues = {
-  providerId: '',
   type: 'PJ',
   name: '',
   legal_name: '',
@@ -88,15 +75,9 @@ const defaultValues: FormValues = {
 
 export function CustomerCreateSheet({
   open,
-  onOpenChange,
-  preferredProviderId
+  onOpenChange
 }: CustomerCreateSheetProps) {
   const queryClient = useQueryClient();
-
-  const providersQuery = useGetV1Providers(
-    { page_index: 0, page_size: PROVIDERS_PAGE_SIZE },
-    { query: { enabled: open } }
-  );
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -104,12 +85,6 @@ export function CustomerCreateSheet({
   });
   const customerType =
     useWatch({ control: form.control, name: 'type' }) ?? 'PJ';
-
-  useEffect(() => {
-    if (open && preferredProviderId && preferredProviderId.length > 0) {
-      form.setValue('providerId', preferredProviderId);
-    }
-  }, [form, open, preferredProviderId]);
 
   const createMutation = usePostV1Customers({
     mutation: {
@@ -131,7 +106,6 @@ export function CustomerCreateSheet({
   const onSubmit = form.handleSubmit((values) => {
     createMutation.mutate({
       data: {
-        provider_id: values.providerId,
         type: values.type,
         name: values.name.trim(),
         legal_name: values.legal_name?.trim() || null,
@@ -159,51 +133,14 @@ export function CustomerCreateSheet({
         <SheetHeader>
           <SheetTitle>Novo cliente</SheetTitle>
           <SheetDescription>
-            Cadastre o cliente com operadora inicial, tipo e documento.
-            Opcional: identificador do vendedor responsável (ex.: sub do
-            Keycloak).
+            Cadastre o cliente com tipo e documento. A operadora pode ser
+            vinculada depois, ao associar uma linha. Opcional: identificador do
+            vendedor responsável (ex.: sub do Keycloak).
           </SheetDescription>
         </SheetHeader>
 
         <form className="flex min-h-0 flex-1 flex-col" onSubmit={onSubmit}>
           <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6">
-            <Controller
-              control={form.control}
-              name="providerId"
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel>Operadora inicial</FieldLabel>
-                  <Select
-                    value={field.value || ''}
-                    onValueChange={(value) => field.onChange(value ?? '')}
-                    disabled={providersQuery.isPending}
-                  >
-                    <SelectTrigger className="border-input bg-background w-full max-w-none rounded-xl border">
-                      <SelectValue placeholder="Selecione">
-                        {(providersQuery.data?.items ?? []).find(
-                          (p: ListProvidersResponse) => p.id === field.value
-                        )?.name ?? 'Selecione'}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {(providersQuery.data?.items ?? []).map(
-                          (p: ListProvidersResponse) => (
-                            <SelectItem key={p.id} value={p.id}>
-                              {p.name}
-                            </SelectItem>
-                          )
-                        )}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                  {fieldState.invalid ? (
-                    <FieldError errors={[fieldState.error]} />
-                  ) : null}
-                </Field>
-              )}
-            />
-
             <Controller
               control={form.control}
               name="type"

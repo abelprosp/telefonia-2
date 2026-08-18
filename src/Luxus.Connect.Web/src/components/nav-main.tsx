@@ -12,7 +12,6 @@ import {
   SidebarGroup,
   SidebarGroupLabel,
   SidebarMenu,
-  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSub,
@@ -71,9 +70,9 @@ export const NavMain = ({
                 {item.icon}
                 <span>{item.title}</span>
                 {item.badge ? (
-                  <SidebarMenuBadge className="bg-primary text-primary-foreground">
+                  <span className="bg-primary text-primary-foreground inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold">
                     {item.badge}
-                  </SidebarMenuBadge>
+                  </span>
                 ) : null}
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -126,9 +125,9 @@ function NavCollapsibleItem({
         {item.icon}
         <span>{item.title}</span>
         {item.badge ? (
-          <SidebarMenuBadge className="bg-primary text-primary-foreground">
+          <span className="bg-primary text-primary-foreground inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold">
             {item.badge}
-          </SidebarMenuBadge>
+          </span>
         ) : null}
         <ChevronRight className="ml-auto transition-transform duration-200 group-data-open/collapsible:rotate-90" />
       </CollapsibleTrigger>

@@ -2,14 +2,18 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 	"unicode/utf8"
 
 	"github.com/google/uuid"
+	"github.com/luxus-connect/telefonia/api/internal/auth"
+	"github.com/luxus-connect/telefonia/api/internal/billingcalc"
 	"github.com/luxus-connect/telefonia/api/internal/httputil"
 	"github.com/luxus-connect/telefonia/api/internal/models"
 	"github.com/luxus-connect/telefonia/api/internal/notifications"
+	"github.com/luxus-connect/telefonia/api/internal/statemachine"
 	"github.com/luxus-connect/telefonia/api/internal/store"
 )
 
@@ -140,7 +144,11 @@ func (s *Service) AssignPhoneLineCustomer(ctx context.Context, phoneLineID strin
 		}
 		start = parsed
 	}
-	if _, err := s.GetPhoneLine(ctx, phoneLineID); err != nil {
+	line, err := s.GetPhoneLine(ctx, phoneLineID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.SM().ValidateTransition(statemachine.EntityPhoneLine, line.Status, "active", userRoles(ctx)); err != nil {
 		return nil, err
 	}
 	if err := s.blockRetroactiveIfClosed(ctx, orgID, phoneLineID, start); err != nil {
@@ -177,6 +185,13 @@ func (s *Service) AssignPhoneLineCustomer(ctx context.Context, phoneLineID strin
 	}
 	_ = s.Store.UpdatePhoneLineStatus(ctx, phoneLineID, "active")
 	_ = s.Store.ReactivateCustomer(ctx, input.CustomerID)
+
+	var actorUserID *string
+	if u := auth.UserFromContext(ctx); u != nil && u.ID != "" {
+		actorUserID = &u.ID
+	}
+	_ = s.SM().RecordTransition(ctx, orgID, statemachine.EntityPhoneLine, phoneLineID, line.Status, "active", "assign_customer", nil, actorUserID, nil)
+
 	s.auditLog(ctx, "Assign", "PhoneLineCustomerLink", phoneLineID, map[string]any{"previous_customer_id": prevCustomerID},
 		map[string]any{"customer_id": input.CustomerID, "start_date": start.Format("2006-01-02")})
 	if prevCustomerID != "" && prevCustomerID != input.CustomerID {
@@ -280,6 +295,13 @@ func (s *Service) UnassignPhoneLineCustomer(ctx context.Context, phoneLineID str
 	if activeCustomerID == "" {
 		return httputil.BusinessError(notifications.PhoneLineActiveCustomerLinkNotFound)
 	}
+	line, err := s.GetPhoneLine(ctx, phoneLineID)
+	if err != nil {
+		return err
+	}
+	if err := s.SM().ValidateTransition(statemachine.EntityPhoneLine, line.Status, "in_stock", userRoles(ctx)); err != nil {
+		return err
+	}
 	if err := s.blockRetroactiveIfClosed(ctx, orgID, phoneLineID, end); err != nil {
 		return err
 	}
@@ -294,6 +316,13 @@ func (s *Service) UnassignPhoneLineCustomer(ctx context.Context, phoneLineID str
 		return httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
 	_ = s.Store.UpdatePhoneLineStatus(ctx, phoneLineID, "in_stock")
+
+	var actorUserID *string
+	if u := auth.UserFromContext(ctx); u != nil && u.ID != "" {
+		actorUserID = &u.ID
+	}
+	_ = s.SM().RecordTransition(ctx, orgID, statemachine.EntityPhoneLine, phoneLineID, line.Status, "in_stock", "unassign_customer", nil, actorUserID, nil)
+
 	s.auditLog(ctx, "Unassign", "PhoneLineCustomerLink", phoneLineID,
 		map[string]any{"customer_id": activeCustomerID}, map[string]any{"end_date": end.Format("2006-01-02")})
 	hasOther, _ := s.Store.CustomerHasOtherActivePhoneLines(ctx, orgID, activeCustomerID, phoneLineID)
@@ -392,6 +421,11 @@ func (s *Service) UpdateBillingCycle(ctx context.Context, id string, input model
 	if existing.Status == "closed" {
 		return httputil.BusinessError(notifications.BillingCycleConsolidated)
 	}
+	if err := s.queueTwoLevel(ctx, "cycle_impact", "billing_cycle", id, "Alteração com impacto no ciclo", map[string]any{
+		"id": id, "input": input,
+	}); err != nil {
+		return err
+	}
 	blocked, err := s.Store.ExistsClosedProcessingMonthIntersecting(ctx, orgID, input.ProviderID, input.StartDate.Time, input.EndDate.Time)
 	if err != nil {
 		return httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
@@ -471,28 +505,9 @@ func (s *Service) CreateProcessingMonth(ctx context.Context, input models.Create
 }
 
 func (s *Service) CloseProcessingMonth(ctx context.Context, id string) (*models.GetProcessingMonthResponse, error) {
-	orgID, err := orgFrom(ctx)
-	if err != nil {
+	if err := s.queueTwoLevel(ctx, "consolidation", "processing_month", id, "Consolidação e fechamento da competência", map[string]any{"processing_month_id": id}); err != nil {
 		return nil, err
 	}
-	user, err := userFrom(ctx)
-	if err != nil {
-		return nil, err
-	}
-	m, err := s.Store.GetProcessingMonth(ctx, orgID, id)
-	if err != nil {
-		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
-	}
-	if m == nil {
-		return nil, httputil.NotFoundError(notifications.ProcessingMonthNotFound)
-	}
-	if m.Status == "closed" {
-		return nil, httputil.BusinessError(notifications.ProcessingMonthAlreadyClosed)
-	}
-	if err := s.Store.CloseProcessingMonth(ctx, orgID, id, user.ID, false, nil); err != nil {
-		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
-	}
-	s.auditLog(ctx, "Close", "ProcessingMonth", id, map[string]any{"status": "open"}, map[string]any{"status": "closed", "closed_by": user.ID})
 	return s.GetProcessingMonth(ctx, id)
 }
 
@@ -519,13 +534,17 @@ func (s *Service) CloseProcessingMonthContingency(ctx context.Context, id string
 	if m == nil {
 		return nil, httputil.NotFoundError(notifications.ProcessingMonthNotFound)
 	}
-	if m.Status == "closed" {
-		return nil, httputil.BusinessError(notifications.ProcessingMonthAlreadyClosed)
+	if err := s.SM().ValidateTransition(statemachine.EntityProcessingMonth, m.Status, "closed", userRoles(ctx)); err != nil {
+		return nil, err
 	}
 	if err := s.Store.CloseProcessingMonth(ctx, orgID, id, user.ID, true, &j); err != nil {
 		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
+	_ = s.SM().RecordTransition(ctx, orgID, statemachine.EntityProcessingMonth, id, m.Status, "closed", "close_month_contingency", &j, &user.ID, nil)
 	s.auditLog(ctx, "CloseContingency", "ProcessingMonth", id, nil, map[string]any{"justification": j, "closed_by": user.ID})
+	s.DispatchWebhookEvent(orgID, WebhookEventBillingClosed, map[string]any{
+		"processing_month_id": id, "contingency": true,
+	})
 	return s.GetProcessingMonth(ctx, id)
 }
 
@@ -535,6 +554,148 @@ func (s *Service) ListProviderInvoices(ctx context.Context, processingMonthID *s
 		return nil, 0, err
 	}
 	return s.Store.ListProviderInvoices(ctx, orgID, processingMonthID, page)
+}
+
+func (s *Service) ListStateTransitionLogs(ctx context.Context, entityType, entityID string, limit int) ([]models.StateTransitionLogResponse, error) {
+	orgID, err := orgFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.Store.ListStateTransitionLogs(ctx, orgID, entityType, entityID, limit)
+	if err != nil {
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+	var res []models.StateTransitionLogResponse
+	for _, r := range rows {
+		res = append(res, models.StateTransitionLogResponse{
+			ID:             r.ID,
+			OrganizationID: r.OrganizationID,
+			EntityType:     r.EntityType,
+			EntityID:       r.EntityID,
+			FromState:      r.FromState,
+			ToState:        r.ToState,
+			TriggerEvent:   r.TriggerEvent,
+			Justification:  r.Justification,
+			ActorUserID:    r.ActorUserID,
+			MetadataJSON:   r.MetadataJSON,
+			CreatedAt:      r.CreatedAt,
+		})
+	}
+	if res == nil {
+		res = []models.StateTransitionLogResponse{}
+	}
+	return res, nil
+}
+
+func (s *Service) ApportionProviderInvoiceDiscount(ctx context.Context, invoiceID string, input models.ApportionGlobalDiscountInput) (*models.ApportionGlobalDiscountResponse, error) {
+	orgID, err := orgFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if input.GlobalDiscountAmount <= 0 {
+		return nil, httputil.ValidationError(notifications.N("INVALID_DISCOUNT_AMOUNT", "O valor do desconto global deve ser maior que zero."))
+	}
+
+	inv, err := s.Store.GetProviderInvoice(ctx, orgID, invoiceID)
+	if err != nil {
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+	if inv == nil {
+		return nil, httputil.NotFoundError(notifications.InvoiceNotFound)
+	}
+
+	if len(inv.PhoneLines) == 0 {
+		return nil, httputil.BusinessError(notifications.N("NO_LINES_IN_INVOICE", "Nenhuma linha vinculada a esta fatura da operadora."))
+	}
+
+	// Coleta os alvos de rateio com base no processamento ativo de cada linha
+	targets := make([]billingcalc.ApportionmentTarget, 0, len(inv.PhoneLines))
+	lineProcessingMap := make(map[string]string) // phoneLineID -> processingID
+	lineObjMap := make(map[string]models.GetProviderPhoneLineResponse)
+
+	for _, line := range inv.PhoneLines {
+		lineObjMap[line.ID] = line
+		linkID, err := s.Store.GetActiveLinkIDForPhoneLine(ctx, orgID, line.ID)
+		if err != nil || linkID == "" {
+			continue
+		}
+		processings, err := s.Store.ListBillingProcessingsForLink(ctx, linkID)
+		if err != nil {
+			continue
+		}
+		for _, p := range processings {
+			if p.Perspective == perspectiveLuxusCustomer {
+				tot, err := s.Store.SumBillingProcessingTotal(ctx, p.ID)
+				if err == nil && tot > 0 {
+					targets = append(targets, billingcalc.ApportionmentTarget{
+						ID:     line.ID,
+						Amount: tot,
+					})
+					lineProcessingMap[line.ID] = p.ID
+				}
+				break
+			}
+		}
+	}
+
+	if len(targets) == 0 {
+		return nil, httputil.BusinessError(notifications.N("NO_ELIGIBLE_LINES", "Nenhuma linha com processamento de faturamento ativo e valor positivo nesta fatura."))
+	}
+
+	apportioned, err := billingcalc.ApportionGlobalDiscount(input.GlobalDiscountAmount, targets)
+	if err != nil {
+		return nil, httputil.BusinessError(notifications.N("APPORTIONMENT_FAILED", err.Error()))
+	}
+
+	desc := strings.TrimSpace(input.Description)
+	if desc == "" {
+		desc = fmt.Sprintf("Rateio de desconto da fatura %s", inv.Number)
+	}
+
+	now := time.Now().UTC()
+	var outItems []models.ApportionedLineItem
+
+	for _, app := range apportioned {
+		procID := lineProcessingMap[app.ID]
+		lineObj := lineObjMap[app.ID]
+
+		if app.AllocatedDiscount > 0 && procID != "" {
+			row := store.BillingCompositionItemRow{
+				ID:           uuid.New().String(),
+				ProcessingID: procID,
+				ItemType:     "discount",
+				Description:  desc,
+				Amount:       app.AllocatedDiscount,
+				Quantity:     1,
+				Active:       true,
+				CreatedAt:    now,
+				UpdatedAt:    now,
+				Proportional: true,
+			}
+			if err := s.Store.CreateBillingCompositionItem(ctx, row); err == nil {
+				s.auditLog(ctx, "ApportionDiscount", "LineBillingCompositionItem", row.ID, nil, map[string]any{
+					"invoice_id":         invoiceID,
+					"phone_line_id":      app.ID,
+					"allocated_discount": app.AllocatedDiscount,
+				})
+			}
+		}
+
+		outItems = append(outItems, models.ApportionedLineItem{
+			PhoneLineID:       app.ID,
+			PhoneNumber:       lineObj.Number,
+			OriginalAmount:    app.OriginalAmount,
+			AllocatedDiscount: app.AllocatedDiscount,
+			FinalAmount:       app.FinalAmount,
+		})
+	}
+
+	return &models.ApportionGlobalDiscountResponse{
+		InvoiceID:            invoiceID,
+		GlobalDiscountAmount: input.GlobalDiscountAmount,
+		LinesCount:           len(outItems),
+		Items:                outItems,
+	}, nil
 }
 
 func (s *Service) GetImportRequestStatus(ctx context.Context, id string) (*models.RequestProviderInvoiceImportResponse, error) {
@@ -564,7 +725,6 @@ func (s *Service) GetImportRequestStatus(ctx context.Context, id string) (*model
 		CompletedAt:       row.CompletedAt,
 	}, nil
 }
-
 
 func (s *Service) GetProviderInvoice(ctx context.Context, id string) (*models.GetProviderInvoiceResponse, error) {
 	orgID, err := orgFrom(ctx)
@@ -627,7 +787,7 @@ func (s *Service) RequestProviderInvoiceImport(ctx context.Context, input models
 		ID: id, OrganizationID: orgID, ProviderID: input.ProviderID,
 		ProcessingMonthID: input.ProcessingMonthID, StorageBucket: input.StorageBucket,
 		StorageObjectKey: input.StorageObjectKey, OriginalFileName: input.OriginalFileName,
-		CreatedBy: user.ID,
+		CreatedBy: user.ID, AllowSubstitute: input.AllowSubstitute,
 	}
 	if err := s.Store.CreateImportRequest(ctx, row); err != nil {
 		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
@@ -656,6 +816,41 @@ func (s *Service) RequestProviderInvoiceImport(ctx context.Context, input models
 	}, nil
 }
 
+type InvoicePreviewer interface {
+	PreviewImport(ctx context.Context, orgID string, input models.ProviderInvoiceImportRequestInput) (*models.ImportPreviewResponse, error)
+}
+
+func (s *Service) PreviewProviderInvoiceImport(ctx context.Context, input models.ProviderInvoiceImportRequestInput) (*models.ImportPreviewResponse, error) {
+	orgID, err := orgFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(input.ProviderID) == "" {
+		return nil, httputil.ValidationError(notifications.ImportProviderIDRequired)
+	}
+	if strings.TrimSpace(input.ProcessingMonthID) == "" {
+		return nil, httputil.ValidationError(notifications.ImportProcessingMonthIDRequired)
+	}
+	if strings.TrimSpace(input.StorageBucket) == "" {
+		return nil, httputil.ValidationError(notifications.ImportStorageBucketRequired)
+	}
+	if strings.TrimSpace(input.StorageObjectKey) == "" {
+		return nil, httputil.ValidationError(notifications.ImportStorageObjectKeyRequired)
+	}
+	ok, err := s.Store.ProviderExists(ctx, orgID, input.ProviderID)
+	if err != nil {
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+	if !ok {
+		return nil, httputil.BusinessError(notifications.ProviderNotFound)
+	}
+	previewer, ok := s.Processor.(InvoicePreviewer)
+	if !ok || previewer == nil {
+		return nil, httputil.BusinessError(notifications.ObjectStorageUnavailable)
+	}
+	return previewer.PreviewImport(ctx, orgID, input)
+}
+
 func (s *Service) ListCostCenters(ctx context.Context, page httputil.PageSearch) ([]models.ListCostCenterResponse, int64, error) {
 	orgID, err := orgFrom(ctx)
 	if err != nil {
@@ -670,4 +865,220 @@ func (s *Service) GetDashboardStats(ctx context.Context) (*models.DashboardStats
 		return nil, err
 	}
 	return s.Store.GetDashboardStats(ctx, orgID)
+}
+
+func (s *Service) ListExpiringContracts(ctx context.Context, daysAhead int) ([]models.ExpiringContractResponse, error) {
+	orgID, err := orgFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if daysAhead <= 0 {
+		daysAhead = 30
+	}
+	return s.Store.ListExpiringContracts(ctx, orgID, daysAhead)
+}
+
+func (s *Service) GetPreClosingAlerts(ctx context.Context, processingMonthID string) (*models.PreClosingAlertsResponse, error) {
+	orgID, err := orgFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+	month, err := s.Store.GetProcessingMonth(ctx, orgID, processingMonthID)
+	if err != nil {
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+	if month == nil {
+		return nil, httputil.NotFoundError(notifications.ProcessingMonthNotFound)
+	}
+
+	var alerts []PreClosingAlert
+	canClose := true
+
+	// 1. Checa faturas de provedor vinculadas ao mês de processamento
+	invoices, _, err := s.Store.ListProviderInvoices(ctx, orgID, &processingMonthID, httputil.PageSearch{PageSize: 100})
+	if err == nil {
+		for _, inv := range invoices {
+			if inv.Status != "processed" && inv.Status != "paid" {
+				alerts = append(alerts, PreClosingAlert{
+					Code:        "INVOICE_PENDING_CONCILIATION",
+					Severity:    "WARNING",
+					Category:    "INVOICES",
+					Message:     fmt.Sprintf("Fatura de operadora %s pendente de conciliação (status: %s).", inv.ProviderAccountNumber, inv.Status),
+					EntityID:    inv.ID,
+					EntityLabel: inv.ProviderAccountNumber,
+				})
+			}
+		}
+	}
+
+	// 2. Checa contratos de fidelidade expirando ou expirados nesta competência
+	expiring, err := s.Store.ListExpiringContracts(ctx, orgID, 30)
+	if err == nil {
+		for _, exp := range expiring {
+			phoneNum := ""
+			if exp.PhoneNumber != nil {
+				phoneNum = *exp.PhoneNumber
+			}
+			alerts = append(alerts, PreClosingAlert{
+				Code:        "FIDELITY_EXPIRING",
+				Severity:    "WARNING",
+				Category:    "FIDELITY",
+				Message:     fmt.Sprintf("Contrato de fidelidade da linha %s vence em %d dias (%s).", phoneNum, exp.DaysRemaining, exp.PredictedEndDate.Format("02/01/2006")),
+				EntityID:    exp.ContractID,
+				EntityLabel: phoneNum,
+			})
+		}
+	}
+
+	criticalCount := 0
+	warningCount := 0
+	for _, a := range alerts {
+		if a.Severity == "CRITICAL" {
+			criticalCount++
+			canClose = false
+		} else if a.Severity == "WARNING" {
+			warningCount++
+		}
+	}
+
+	if alerts == nil {
+		alerts = []PreClosingAlert{}
+	}
+
+	var alertDtos []models.PreClosingAlert
+	for _, a := range alerts {
+		alertDtos = append(alertDtos, models.PreClosingAlert{
+			Code:        a.Code,
+			Severity:    a.Severity,
+			Category:    a.Category,
+			Message:     a.Message,
+			EntityID:    a.EntityID,
+			EntityLabel: a.EntityLabel,
+		})
+	}
+
+	return &models.PreClosingAlertsResponse{
+		ProcessingMonthID: processingMonthID,
+		CanClose:          canClose,
+		CriticalCount:     criticalCount,
+		WarningCount:      warningCount,
+		Alerts:            alertDtos,
+	}, nil
+}
+
+type PreClosingAlert struct {
+	Code        string
+	Severity    string
+	Category    string
+	Message     string
+	EntityID    string
+	EntityLabel string
+}
+
+func (s *Service) GetPhoneLineTimeline(ctx context.Context, phoneLineID string) (*models.PhoneLineTimelineResponse, error) {
+	orgID, err := orgFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+	line, err := s.GetPhoneLine(ctx, phoneLineID)
+	if err != nil {
+		return nil, err
+	}
+
+	var events []models.PhoneLineTimelineEvent
+
+	// 1. Transições de Máquina de Estado
+	transitions, err := s.Store.ListStateTransitionLogs(ctx, orgID, "PhoneLine", phoneLineID, 100)
+	if err == nil {
+		for _, t := range transitions {
+			desc := fmt.Sprintf("Estado alterado de '%s' para '%s'", t.FromState, t.ToState)
+			if t.Justification != nil && *t.Justification != "" {
+				desc += ": " + *t.Justification
+			}
+			events = append(events, models.PhoneLineTimelineEvent{
+				EventID:     t.ID,
+				EventType:   "STATE_TRANSITION",
+				Title:       fmt.Sprintf("Transição de Estado: %s -> %s", t.FromState, t.ToState),
+				Description: desc,
+				ActorUserID: t.ActorUserID,
+				Timestamp:   t.CreatedAt,
+			})
+		}
+	}
+
+	// 2. Histórico de Vínculos com Cliente
+	customerLinks, err := s.Store.ListPhoneLineCustomerLinks(ctx, orgID, phoneLineID)
+	if err == nil {
+		for _, cl := range customerLinks {
+			statusStr := "Ativo"
+			if !cl.IsActive {
+				statusStr = "Encerrado"
+			}
+			amtStr := "R$ 0,00"
+			if cl.MonthlyAmount != nil {
+				amtStr = fmt.Sprintf("R$ %.2f", *cl.MonthlyAmount)
+			}
+			events = append(events, models.PhoneLineTimelineEvent{
+				EventID:     cl.ID,
+				EventType:   "CUSTOMER_LINK",
+				Title:       fmt.Sprintf("Vínculo de Cliente: %s (%s)", cl.CustomerName, statusStr),
+				Description: fmt.Sprintf("Cliente: %s | Mensalidade: %s | Início: %s", cl.CustomerName, amtStr, cl.StartDate.Format("02/01/2006")),
+				Timestamp:   cl.StartDate,
+			})
+		}
+	}
+
+	// 3. Eventos de Fidelidade
+	fid, err := s.Store.GetLineFidelity(ctx, phoneLineID)
+	if err == nil && fid != nil {
+		fidEvents, err := s.Store.ListLineFidelityEvents(ctx, fid.ID)
+		if err == nil {
+			for _, fe := range fidEvents {
+				desc := fe.EventType
+				if fe.Notes != nil && *fe.Notes != "" {
+					desc += " — " + *fe.Notes
+				}
+				events = append(events, models.PhoneLineTimelineEvent{
+					EventID:     fe.ID,
+					EventType:   "FIDELITY",
+					Title:       fmt.Sprintf("Evento de Fidelidade: %s", fe.EventType),
+					Description: desc,
+					ActorUserID: fe.UserID,
+					Timestamp:   fe.OccurredAt,
+				})
+			}
+		}
+	}
+
+	// 4. Criação da Linha
+	actDate := time.Now().UTC()
+	if line.ActivationDate != nil {
+		actDate = *line.ActivationDate
+	}
+	events = append(events, models.PhoneLineTimelineEvent{
+		EventID:     line.ID,
+		EventType:   "AUDIT",
+		Title:       "Linha Telefônica Cadastrada",
+		Description: fmt.Sprintf("Linha %s cadastrada com operadora %s e plano %s", line.Number, line.ProviderName, line.ProviderPlanName),
+		Timestamp:   actDate,
+	})
+
+	// Ordena por data decrescente
+	for i := 0; i < len(events)-1; i++ {
+		for j := i + 1; j < len(events); j++ {
+			if events[i].Timestamp.Before(events[j].Timestamp) {
+				events[i], events[j] = events[j], events[i]
+			}
+		}
+	}
+
+	if events == nil {
+		events = []models.PhoneLineTimelineEvent{}
+	}
+
+	return &models.PhoneLineTimelineResponse{
+		PhoneLineID: line.ID,
+		PhoneNumber: line.Number,
+		Events:      events,
+	}, nil
 }

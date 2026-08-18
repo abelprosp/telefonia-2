@@ -2417,7 +2417,6 @@ components:
           default: Brasil
     CreateCustomerCommand:
       required:
-        - provider_id
         - type
         - name
         - document

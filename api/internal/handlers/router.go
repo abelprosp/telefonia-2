@@ -1,14 +1,9 @@
 package handlers
 
-
-
 import (
-
 	"encoding/json"
 
 	"net/http"
-
-
 
 	"github.com/go-chi/chi/v5"
 
@@ -19,20 +14,13 @@ import (
 	"github.com/luxus-connect/telefonia/api/internal/notifications"
 
 	"github.com/luxus-connect/telefonia/api/internal/services"
-
 )
 
-
-
 type Handler struct {
-
-	Svc       *services.Service
+	Svc *services.Service
 
 	Presigned *services.PresignedService
-
 }
-
-
 
 func decodeJSON(r *http.Request, v any) error {
 
@@ -45,8 +33,6 @@ func decodeJSON(r *http.Request, v any) error {
 	return dec.Decode(v)
 
 }
-
-
 
 func (h *Handler) RegisterRoutes(
 
@@ -70,6 +56,12 @@ func (h *Handler) RegisterRoutes(
 
 		r.Post("/webhooks/sicredi", h.sicrediWebhook)
 
+		// Configurações visuais e de marca com leitura pública para login/whitelabel
+		r.Get("/organization-settings", h.getOrganizationSettings)
+		r.Get("/company-settings", h.getOrganizationSettings)
+		r.Get("/whitelabel-settings", h.getOrganizationSettings)
+		r.Get("/system-settings", h.getOrganizationSettings)
+
 		r.Group(func(r chi.Router) {
 
 			r.Use(auth)
@@ -77,29 +69,39 @@ func (h *Handler) RegisterRoutes(
 			r.Get("/me", h.getCurrentUserProfile)
 			r.Patch("/me", h.updateCurrentUserProfile)
 
-			r.Get("/organization-settings", h.getOrganizationSettings)
-			r.Get("/company-settings", h.getOrganizationSettings)
-			r.Get("/whitelabel-settings", h.getOrganizationSettings)
-			r.Get("/system-settings", h.getOrganizationSettings)
-
 			r.Post("/pre-signed-urls/upload", h.postPresignedUpload)
 
 			r.Post("/pre-signed-urls/download", h.postPresignedDownload)
 
+			r.Route("/portal", func(r chi.Router) {
+				r.Get("/me", h.portalGetMe)
+				r.Patch("/me", h.portalUpdateProfile)
+				r.Get("/lines", h.portalListLines)
+				r.Get("/invoices", h.portalListInvoices)
+				r.Get("/invoices/{id}/download", h.portalDownloadInvoice)
+				r.Get("/contracts", h.portalListContracts)
+				r.Get("/tickets", h.portalListTickets)
+				r.Post("/tickets", h.portalCreateTicket)
+				r.Get("/tickets/{id}", h.portalGetTicket)
+				r.Post("/tickets/{id}/messages", h.portalAddTicketMessage)
+				r.Post("/tickets/{id}/attachments/upload-url", h.portalTicketAttachmentUploadURL)
+				r.Get("/tickets/{id}/messages/{messageId}/attachment", h.portalTicketAttachmentDownload)
+			})
+
 		})
-
-
-
 
 		r.Group(func(r chi.Router) {
 
 			r.Use(auth, operational)
 
-
-
 			r.Get("/stats/dashboard", h.getDashboardStats)
+			r.Get("/stats/operational-dashboard", h.getOperationalDashboard)
 
-
+			r.Route("/inapp-notifications", func(r chi.Router) {
+				r.Get("/", h.ListInAppNotifications)
+				r.Post("/read-all", h.MarkAllNotificationsAsRead)
+				r.Post("/{id}/read", h.MarkNotificationAsRead)
+			})
 
 			r.Route("/providers", func(r chi.Router) {
 
@@ -129,21 +131,18 @@ func (h *Handler) RegisterRoutes(
 
 			})
 
-
-
 			r.Route("/provider-invoices", func(r chi.Router) {
 
 				r.Get("/", h.listProviderInvoices)
 
 				r.Post("/", h.requestProviderInvoiceImport)
-
+				r.Post("/preview", h.previewProviderInvoiceImport)
 				r.Get("/import-requests/{id}", h.getImportRequestStatus)
 
 				r.Get("/{id}", h.getProviderInvoice)
+				r.Post("/{id}/apportion-discount", h.apportionProviderInvoiceDiscount)
 
 			})
-
-
 
 			r.Route("/customers", func(r chi.Router) {
 
@@ -183,12 +182,13 @@ func (h *Handler) RegisterRoutes(
 
 					r.Post("/generate-billing-document", h.generateCustomerBillingDocument)
 					r.Get("/generated-contracts", h.listCustomerGeneratedContracts)
+					r.Post("/anonymize", h.anonymizeCustomer)
+					r.Get("/personal-data", h.exportCustomerPersonalData)
+					r.Get("/full-360", h.getCustomer360)
 
 				})
 
 			})
-
-
 
 			r.Route("/phone-lines", func(r chi.Router) {
 
@@ -199,6 +199,7 @@ func (h *Handler) RegisterRoutes(
 				r.Route("/{id}", func(r chi.Router) {
 
 					r.Get("/", h.getPhoneLine)
+					r.Get("/full-360", h.getPhoneLine360)
 
 					r.Get("/customer-links", h.listPhoneLineCustomerLinks)
 
@@ -218,7 +219,11 @@ func (h *Handler) RegisterRoutes(
 					r.Get("/fidelity", h.getLineFidelity)
 					r.Put("/fidelity", h.upsertLineFidelity)
 					r.Post("/fidelity/renewal-decision", h.decideLineFidelityRenewal)
+					r.Get("/fidelity/penalty-estimate", h.estimateLineFidelityPenalty)
+					r.Post("/fidelity/apply-penalty", h.applyLineFidelityPenalty)
 					r.Get("/generated-contracts", h.listPhoneLineGeneratedContracts)
+					r.Get("/timeline", h.getPhoneLineTimeline)
+					r.Get("/billing-explanation", h.getLineBillingExplanation)
 					r.Get("/billing-processings", h.listLineBillingProcessings)
 					r.Post("/billing-processings/end-user", h.enableEndUserBillingProcessing)
 					r.Route("/billing-processings/{processingId}", func(r chi.Router) {
@@ -228,13 +233,12 @@ func (h *Handler) RegisterRoutes(
 						r.Post("/items", h.createLineBillingCompositionItem)
 						r.Patch("/items/{itemId}", h.updateLineBillingCompositionItem)
 						r.Delete("/items/{itemId}", h.deleteLineBillingCompositionItem)
+						r.Post("/items/{itemId}/payoff", h.payoffLineBillingCompositionItem)
 					})
 
 				})
 
 			})
-
-
 
 			r.Route("/device-stock", func(r chi.Router) {
 
@@ -252,8 +256,6 @@ func (h *Handler) RegisterRoutes(
 
 			})
 
-
-
 			r.Route("/billing-cycles", func(r chi.Router) {
 
 				r.Get("/", h.listBillingCycles)
@@ -270,8 +272,6 @@ func (h *Handler) RegisterRoutes(
 
 			})
 
-
-
 			r.Route("/processing-months", func(r chi.Router) {
 
 				r.Get("/", h.listProcessingMonths)
@@ -285,17 +285,28 @@ func (h *Handler) RegisterRoutes(
 					r.Post("/close", h.closeProcessingMonth)
 
 					r.Post("/close-contingency", h.closeProcessingMonthContingency)
+					r.Post("/reopen", h.reopenProcessingMonth)
 					r.Get("/financial-export", h.getFinancialExport)
+					r.Post("/financial-export/sftp", h.pushFinancialExportSFTP)
+					r.Post("/pipeline", h.runProcessingMonthPipeline)
+					r.Get("/pipeline", h.listProcessingMonthRuns)
+					r.Get("/preclosing-alerts", h.getPreClosingAlerts)
+					r.Post("/simulate-impact", h.simulateBillingImpact)
+					r.Get("/line-readiness", h.getProcessingMonthLineReadiness)
+					r.Post("/close-with-hash", h.closeProcessingMonthWithHash)
 
 				})
 
 			})
 
-
+			r.Get("/contracts/expiring", h.listExpiringContracts)
+			r.Get("/state-transitions", h.listStateTransitionLogs)
 
 			r.Get("/cost-centers", h.listCostCenters)
 
 			r.Get("/reports/line-movements", h.getMovementReports)
+			r.Get("/reports/financial-summary", h.getFinancialSummaryReport)
+			r.Get("/reports/customer-profitability", h.getCustomerProfitabilityReport)
 
 			r.Route("/exceedance-terms", func(r chi.Router) {
 				r.Get("/", h.listExceedanceTerms)
@@ -306,7 +317,45 @@ func (h *Handler) RegisterRoutes(
 			r.Get("/fidelity-renewal-triggers", h.listFidelityRenewalTriggers)
 			r.Patch("/fidelity-renewal-triggers/{id}", h.updateFidelityRenewalTrigger)
 
+			r.Route("/divergences", func(r chi.Router) {
+				r.Get("/", h.listDivergences)
+				r.Get("/{id}", h.getDivergence)
+				r.Post("/{id}/resolve", h.resolveDivergence)
+				r.Post("/{id}/assign", h.assignDivergence)
+				r.Post("/{id}/comments", h.commentDivergence)
+			})
 
+			r.Route("/tickets", func(r chi.Router) {
+				r.Get("/", h.listSupportTickets)
+				r.Post("/", h.createSupportTicket)
+				r.Get("/{id}", h.getSupportTicket)
+				r.Patch("/{id}", h.updateSupportTicket)
+				r.Post("/{id}/messages", h.addSupportTicketMessage)
+				r.Post("/{id}/attachments/upload-url", h.ticketAttachmentUploadURL)
+				r.Get("/{id}/messages/{messageId}/attachment", h.ticketAttachmentDownload)
+			})
+
+			r.Route("/approvals", func(r chi.Router) {
+				r.Get("/", h.listApprovals)
+				r.Post("/", h.createApproval)
+				r.Post("/{id}/approve", h.approveApproval)
+				r.Post("/{id}/reject", h.rejectApproval)
+			})
+
+			r.Route("/webhooks", func(r chi.Router) {
+				r.Get("/", h.listWebhooks)
+				r.Post("/", h.createWebhook)
+				r.Delete("/{id}", h.deleteWebhook)
+				r.Post("/{id}/test", h.testWebhook)
+			})
+
+			r.Route("/inventory/devices", func(r chi.Router) {
+				r.Get("/", h.listInventoryDevices)
+				r.Post("/", h.createInventoryDevice)
+				r.Patch("/{id}", h.updateInventoryDevice)
+			})
+
+			r.Post("/organization/data-export", h.exportOrganizationData)
 
 			r.Route("/phone-line-operation-requests", func(r chi.Router) {
 
@@ -315,8 +364,6 @@ func (h *Handler) RegisterRoutes(
 				r.Patch("/{id}", h.reviewLineOperationRequest)
 
 			})
-
-
 
 			r.Route("/contract-templates", func(r chi.Router) {
 
@@ -333,8 +380,6 @@ func (h *Handler) RegisterRoutes(
 				})
 
 			})
-
-
 
 			r.Route("/sales", func(r chi.Router) {
 
@@ -362,17 +407,11 @@ func (h *Handler) RegisterRoutes(
 
 		})
 
-
-
 		r.Group(func(r chi.Router) {
 
 			r.Use(auth, financial)
 
-
-
 			r.Get("/financial/summary", h.getFinancialSummary)
-
-
 
 			r.Route("/accounts-payable", func(r chi.Router) {
 
@@ -392,8 +431,6 @@ func (h *Handler) RegisterRoutes(
 
 			})
 
-
-
 			r.Route("/accounts-receivable", func(r chi.Router) {
 
 				r.Get("/", h.listAccountsReceivable)
@@ -410,8 +447,6 @@ func (h *Handler) RegisterRoutes(
 
 			})
 
-
-
 			r.Route("/partner-sales", func(r chi.Router) {
 
 				r.Get("/", h.listPartnerSales)
@@ -422,8 +457,6 @@ func (h *Handler) RegisterRoutes(
 
 			})
 
-
-
 			r.Route("/partner-commission-settings", func(r chi.Router) {
 
 				r.Get("/", h.getPartnerCommissionSettings)
@@ -431,8 +464,6 @@ func (h *Handler) RegisterRoutes(
 				r.Put("/", h.updatePartnerCommissionSettings)
 
 			})
-
-
 
 			r.Route("/invoice-email-templates", func(r chi.Router) {
 
@@ -449,8 +480,6 @@ func (h *Handler) RegisterRoutes(
 				})
 
 			})
-
-
 
 			r.Route("/invoice-layout-templates", func(r chi.Router) {
 
@@ -469,8 +498,6 @@ func (h *Handler) RegisterRoutes(
 				})
 
 			})
-
-
 
 			r.Route("/customer-billing-documents", func(r chi.Router) {
 
@@ -505,16 +532,13 @@ func (h *Handler) RegisterRoutes(
 					r.Patch("/boleto-due-date", h.alterSicrediBoletoDueDate)
 
 					r.Post("/sync-payment", h.syncSicrediPayment)
-
+					r.Post("/generate-pix", h.generateSicrediPix)
 					r.Post("/send", h.sendCustomerBillingDocument)
-
 					r.Get("/send-log", h.listCustomerBillingSendLog)
 
 				})
 
 			})
-
-
 
 			r.Route("/collections", func(r chi.Router) {
 
@@ -535,8 +559,6 @@ func (h *Handler) RegisterRoutes(
 			})
 
 		})
-
-
 
 		r.Group(func(r chi.Router) {
 
@@ -561,26 +583,17 @@ func (h *Handler) RegisterRoutes(
 
 		})
 
-
-
-
 		r.Group(func(r chi.Router) {
 
 			r.Use(auth, partner)
 
-
-
 			r.Get("/partner/stats/dashboard", h.partnerGetDashboardStats)
-
-
 
 			r.Route("/partner/providers", func(r chi.Router) {
 
 				r.Get("/", h.partnerListProviders)
 
 			})
-
-
 
 			r.Route("/partner/customers", func(r chi.Router) {
 
@@ -600,15 +613,11 @@ func (h *Handler) RegisterRoutes(
 
 			})
 
-
-
 			r.Route("/partner/phone-lines", func(r chi.Router) {
 
 				r.Get("/", h.partnerListPhoneLines)
 
 			})
-
-
 
 			r.Route("/partner/phone-line-operation-requests", func(r chi.Router) {
 
@@ -618,17 +627,11 @@ func (h *Handler) RegisterRoutes(
 
 			})
 
-
-
 			r.Get("/partner/financial/summary", h.partnerGetFinancialSummary)
 
 			r.Get("/partner/sales", h.partnerListSales)
 
-
-
 			r.Get("/partner/contract-templates", h.partnerListContractTemplates)
-
-
 
 			r.Route("/partner/commercial-sales", func(r chi.Router) {
 
@@ -660,8 +663,6 @@ func (h *Handler) RegisterRoutes(
 
 }
 
-
-
 func (h *Handler) getDashboardStats(w http.ResponseWriter, r *http.Request) {
 
 	stats, err := h.Svc.GetDashboardStats(r.Context())
@@ -677,8 +678,6 @@ func (h *Handler) getDashboardStats(w http.ResponseWriter, r *http.Request) {
 	httputil.WriteJSON(w, http.StatusOK, stats)
 
 }
-
-
 
 func (h *Handler) postPresignedUpload(w http.ResponseWriter, r *http.Request) {
 
@@ -714,8 +713,6 @@ func (h *Handler) postPresignedUpload(w http.ResponseWriter, r *http.Request) {
 
 }
 
-
-
 func (h *Handler) postPresignedDownload(w http.ResponseWriter, r *http.Request) {
 
 	if h.Presigned == nil {
@@ -750,8 +747,6 @@ func (h *Handler) postPresignedDownload(w http.ResponseWriter, r *http.Request) 
 
 }
 
-
-
 func queryParam(r *http.Request, key string) *string {
 
 	v := r.URL.Query().Get(key)
@@ -765,5 +760,3 @@ func queryParam(r *http.Request, key string) *string {
 	return &v
 
 }
-
-

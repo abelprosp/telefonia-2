@@ -276,3 +276,27 @@ func (h *Handler) listCostCenters(w http.ResponseWriter, r *http.Request) {
 	}
 	httputil.WritePaged(w, items, total)
 }
+
+func (h *Handler) reopenProcessingMonth(w http.ResponseWriter, r *http.Request) {
+	item, err := h.Svc.ReopenProcessingMonth(r.Context(), chi.URLParam(r, "id"))
+	if err != nil {
+		httputil.HandleServiceError(w, err)
+		return
+	}
+	httputil.WriteJSON(w, http.StatusOK, item)
+}
+
+func (h *Handler) listStateTransitionLogs(w http.ResponseWriter, r *http.Request) {
+	entityType := r.URL.Query().Get("entity_type")
+	entityID := r.URL.Query().Get("entity_id")
+	if entityType == "" || entityID == "" {
+		httputil.WriteFail(w, http.StatusBadRequest, notifications.N("REQUEST_VALIDATION", "entity_type and entity_id query params are required"))
+		return
+	}
+	items, err := h.Svc.ListStateTransitionLogs(r.Context(), entityType, entityID, 50)
+	if err != nil {
+		httputil.HandleServiceError(w, err)
+		return
+	}
+	httputil.WriteJSON(w, http.StatusOK, items)
+}

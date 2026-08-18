@@ -185,7 +185,8 @@ func (s *Store) InvoiceDuplicateExists(ctx context.Context, accountID, companyID
 		SELECT EXISTS(
 			SELECT 1 FROM "ProviderInvoices"
 			WHERE "ProviderAccountId" = $1 AND "ContractingCompanyId" = $2
-				AND "ProcessingMonthId" = $3 AND "DueDate" = $4)`,
+				AND "ProcessingMonthId" = $3 AND "DueDate" = $4
+				AND "Status" <> 'substituted'::provider_invoice_status)`,
 		accountID, companyID, processingMonthID, dueDate).Scan(&exists)
 	return exists, err
 }
@@ -196,7 +197,8 @@ func (s *Store) InvoiceExistsInOtherProcessingMonth(ctx context.Context, account
 		SELECT EXISTS(
 			SELECT 1 FROM "ProviderInvoices"
 			WHERE "ProviderAccountId" = $1 AND "ContractingCompanyId" = $2
-				AND "DueDate" = $3 AND "ProcessingMonthId" != $4)`,
+				AND "DueDate" = $3 AND "ProcessingMonthId" != $4
+				AND "Status" <> 'substituted'::provider_invoice_status)`,
 		accountID, companyID, dueDate, processingMonthID).Scan(&exists)
 	return exists, err
 }
@@ -205,12 +207,14 @@ func (s *Store) CreateProviderInvoice(ctx context.Context, inv ProviderInvoiceIn
 	_, err := s.q(ctx).Exec(ctx, `
 		INSERT INTO "ProviderInvoices" ("Id", "Number", "ProviderAccountId", "ContractingCompanyId",
 			"BillingCycleId", "ProcessingMonthId", "IssueDate", "DueDate", "TotalAmount", "Status",
-			"SubtotalServices", "SubtotalUsage", "SubtotalTaxes", "SubtotalDiscounts", "SubtotalInstallments")
+			"SubtotalServices", "SubtotalUsage", "SubtotalTaxes", "SubtotalDiscounts", "SubtotalInstallments",
+			"ParentInvoiceId", "ContentSHA256", "SubstitutionImpact")
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending'::provider_invoice_status,
-			$10, $11, $12, $13, $14)`,
+			$10, $11, $12, $13, $14, $15, $16, $17)`,
 		inv.ID, inv.Number, inv.ProviderAccountID, inv.ContractingCompanyID,
 		inv.BillingCycleID, inv.ProcessingMonthID, inv.IssueDate, inv.DueDate, inv.TotalAmount,
-		inv.SubtotalServices, inv.SubtotalUsage, inv.SubtotalTaxes, inv.SubtotalDiscounts, inv.SubtotalInstallments)
+		inv.SubtotalServices, inv.SubtotalUsage, inv.SubtotalTaxes, inv.SubtotalDiscounts, inv.SubtotalInstallments,
+		inv.ParentInvoiceID, inv.ContentSHA256, inv.SubstitutionImpact)
 	return err
 }
 
@@ -256,6 +260,9 @@ type ProviderInvoiceInsert struct {
 	SubtotalTaxes         float64
 	SubtotalDiscounts     float64
 	SubtotalInstallments  float64
+	ParentInvoiceID       *string
+	ContentSHA256         *string
+	SubstitutionImpact    *float64
 }
 
 type InvoiceItemInsert struct {
@@ -292,4 +299,72 @@ func (s *Store) CountDashboardProviderInvoices(ctx context.Context, orgID string
 		JOIN "Providers" p ON p."Id" = cc."ProviderId"
 		WHERE p."OrganizationId" = $1`, orgID).Scan(&n)
 	return n, err
+}
+
+func (s *Store) SumProviderInvoiceTotalsForMonth(ctx context.Context, orgID, processingMonthID string) (float64, error) {
+	var total float64
+	err := s.q(ctx).QueryRow(ctx, `
+		SELECT COALESCE(SUM(i."TotalAmount"), 0)
+		FROM "ProviderInvoices" i
+		JOIN "ProviderAccounts" pa ON pa."Id" = i."ProviderAccountId"
+		JOIN "ContractingCompanies" cc ON cc."Id" = pa."ContractingCompanyId"
+		JOIN "Providers" p ON p."Id" = cc."ProviderId"
+		WHERE p."OrganizationId" = $1 AND i."ProcessingMonthId" = $2
+			AND i."Status" <> 'substituted'::provider_invoice_status
+			AND i."Status" <> 'cancelled'::provider_invoice_status`, orgID, processingMonthID).Scan(&total)
+	return total, err
+}
+
+type ProviderInvoiceIdentity struct {
+	ID                    string
+	TotalAmount           float64
+	ProviderAccountID     string
+	ProcessingMonthID     *string
+	DueDate               time.Time
+	Status                string
+}
+
+func (s *Store) FindActiveInvoiceByContentSHA256(ctx context.Context, hash string) (*ProviderInvoiceIdentity, error) {
+	if hash == "" {
+		return nil, nil
+	}
+	var row ProviderInvoiceIdentity
+	err := s.q(ctx).QueryRow(ctx, `
+		SELECT "Id", "TotalAmount", "ProviderAccountId", "ProcessingMonthId", "DueDate", "Status"::text
+		FROM "ProviderInvoices"
+		WHERE "ContentSHA256" = $1 AND "Status" <> 'substituted'::provider_invoice_status
+		LIMIT 1`, hash).Scan(&row.ID, &row.TotalAmount, &row.ProviderAccountID, &row.ProcessingMonthID, &row.DueDate, &row.Status)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &row, nil
+}
+
+func (s *Store) FindActiveInvoiceByBusinessKey(ctx context.Context, accountID, processingMonthID string, dueDate time.Time) (*ProviderInvoiceIdentity, error) {
+	var row ProviderInvoiceIdentity
+	err := s.q(ctx).QueryRow(ctx, `
+		SELECT "Id", "TotalAmount", "ProviderAccountId", "ProcessingMonthId", "DueDate", "Status"::text
+		FROM "ProviderInvoices"
+		WHERE "ProviderAccountId" = $1 AND "ProcessingMonthId" = $2 AND "DueDate" = $3
+			AND "Status" <> 'substituted'::provider_invoice_status
+		LIMIT 1`, accountID, processingMonthID, dueDate).
+		Scan(&row.ID, &row.TotalAmount, &row.ProviderAccountID, &row.ProcessingMonthID, &row.DueDate, &row.Status)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &row, nil
+}
+
+func (s *Store) MarkInvoiceSubstituted(ctx context.Context, id string) error {
+	_, err := s.q(ctx).Exec(ctx, `
+		UPDATE "ProviderInvoices"
+		SET "Status" = 'substituted'::provider_invoice_status
+		WHERE "Id" = $1 AND "Status" <> 'substituted'::provider_invoice_status`, id)
+	return err
 }

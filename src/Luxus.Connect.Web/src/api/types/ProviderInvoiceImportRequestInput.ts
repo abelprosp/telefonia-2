@@ -24,4 +24,5 @@ export type ProviderInvoiceImportRequestInput = {
    * @type null,string
    */
   original_file_name: string | null;
+  allow_substitute?: boolean;
 };

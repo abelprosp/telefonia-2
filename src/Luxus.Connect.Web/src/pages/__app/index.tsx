@@ -5,7 +5,11 @@ import { useAuthRoles } from '@/lib/auth-roles';
 import { DashboardView } from './-components/dashboard/dashboard-view';
 
 const RouteComponent = () => {
-  const { isPartnerOnly, canAccessOperations, canAccessFinance } = useAuthRoles();
+  const { isPartnerOnly, isCustomerPortal, canAccessOperations, canAccessFinance } = useAuthRoles();
+
+  if (isCustomerPortal) {
+    return <Navigate to="/portal" />;
+  }
 
   if (isPartnerOnly) {
     return <Navigate to="/partner" />;

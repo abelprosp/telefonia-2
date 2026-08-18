@@ -155,10 +155,57 @@
   html {
     @apply font-sans;
   }
+  :focus-visible {
+    outline: 3px solid #1d4ed8;
+    outline-offset: 2px;
+  }
+  .skip-link {
+    position: absolute;
+    left: 0.75rem;
+    top: -3rem;
+    z-index: 100;
+    border-radius: 0.5rem;
+    background: #0f172a;
+    color: #ffffff;
+    padding: 0.5rem 0.75rem;
+    font-weight: 600;
+  }
+  .skip-link:focus {
+    top: 0.75rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 @layer components {
   .dashboard-card {
-    @apply rounded-2xl border border-border/70 bg-card shadow-[0_8px_30px_rgba(15,23,42,0.06)];
+    @apply rounded-3xl border border-border/60 bg-card shadow-[0_10px_30px_-5px_rgba(0,0,0,0.04)];
+  }
+  .bento-card {
+    @apply rounded-3xl border border-black/5 bg-white p-6 shadow-[0_12px_36px_-6px_rgba(0,0,0,0.04)] transition-all duration-200;
+  }
+  .bento-card-dark {
+    @apply rounded-3xl border border-white/5 bg-[#17181D] text-white p-6 shadow-[0_16px_40px_-8px_rgba(0,0,0,0.25)] transition-all duration-200;
+  }
+  .bento-pill {
+    @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold;
+  }
+  .bento-pill-lime {
+    @apply bg-[#D4F63D] text-[#16171B];
+  }
+  .bento-pill-purple {
+    @apply bg-[#B5ACF8] text-[#16171B];
+  }
+  .bento-pill-dark {
+    @apply bg-[#212329] text-white/90;
   }
 }

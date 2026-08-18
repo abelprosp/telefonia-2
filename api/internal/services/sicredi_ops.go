@@ -56,6 +56,17 @@ func (s *Service) CancelSicrediBoleto(ctx context.Context, documentID string) (*
 	if doc.SicrediNossoNumero == nil || strings.TrimSpace(*doc.SicrediNossoNumero) == "" {
 		return nil, httputil.ValidationError(notifications.N("SICREDI_BOLETO_NOT_ISSUED", "Esta fatura ainda não possui boleto Sicredi."))
 	}
+	retro := time.Now().UTC().After(doc.DueDate)
+	if doc.ProcessingMonthID != nil {
+		if m, err := s.Store.GetProcessingMonth(ctx, orgID, *doc.ProcessingMonthID); err == nil && m != nil && m.Status == "closed" {
+			retro = true
+		}
+	}
+	if retro {
+		if err := s.queueTwoLevel(ctx, "retroactive_cancel", "billing_document", documentID, "Cancelamento retroativo de boleto", map[string]any{"document_id": documentID}); err != nil {
+			return nil, err
+		}
+	}
 	nossoNumero := strings.TrimSpace(*doc.SicrediNossoNumero)
 	if err := s.Sicredi.CancelBoleto(ctx, nossoNumero); err != nil {
 		return nil, httputil.BusinessError(notifications.N("SICREDI_CANCEL_FAILED", err.Error()))

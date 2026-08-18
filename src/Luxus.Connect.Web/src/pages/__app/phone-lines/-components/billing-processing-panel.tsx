@@ -28,6 +28,7 @@ import {
   useEnableEndUserProcessing,
   useLineBillingProcessings,
   useMirrorBillingProcessing,
+  usePayoffBillingCompositionItem,
   useUpdateBillingProcessing
 } from '@/lib/billing-processing-api';
 import { formatMoney } from '@/lib/financial-api';
@@ -51,11 +52,13 @@ export function BillingProcessingPanel({
   const [endDate, setEndDate] = useState('');
   const [serviceType, setServiceType] = useState('subscription');
   const [proportional, setProportional] = useState(true);
+  const [installmentCount, setInstallmentCount] = useState('12');
 
   const processingId =
     activeProcessingId || query.data?.processings[0]?.id || '';
   const createItem = useCreateBillingCompositionItem(phoneLineId, processingId);
   const deleteItem = useDeleteBillingCompositionItem(phoneLineId, processingId);
+  const payoffItem = usePayoffBillingCompositionItem(phoneLineId, processingId);
   const mirror = useMirrorBillingProcessing(phoneLineId, processingId);
   const updateProcessing = useUpdateBillingProcessing(phoneLineId, processingId);
   const [label, setLabel] = useState('');
@@ -256,8 +259,28 @@ export function BillingProcessingPanel({
                       <TableCell className="text-right">
                         {item.item_type === 'discount' ? '−' : ''}
                         {formatMoney(item.amount * (item.quantity || 1))}
+                        {item.item_type === 'installment' && item.installment_count
+                          ? ` · ${item.installment_current ?? 1}/${item.installment_count}`
+                          : ''}
                       </TableCell>
                       <TableCell className="text-right">
+                        {item.item_type === 'installment' ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={payoffItem.isPending}
+                            onClick={() =>
+                              payoffItem.mutate(item.id, {
+                                onSuccess: () => toast.success('Quitação das parcelas restantes.'),
+                                onError: (e) =>
+                                  toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+                              })
+                            }
+                          >
+                            Quitar
+                          </Button>
+                        ) : null}
                         <Button
                           type="button"
                           size="sm"
@@ -308,6 +331,16 @@ export function BillingProcessingPanel({
                 onChange={(e) => setAmount(e.target.value)}
               />
             </Field>
+            {itemType === 'installment' ? (
+              <Field>
+                <FieldLabel>Parcelas</FieldLabel>
+                <Input
+                  inputMode="numeric"
+                  value={installmentCount}
+                  onChange={(e) => setInstallmentCount(e.target.value)}
+                />
+              </Field>
+            ) : null}
             {itemType === 'service' ? (
               <Field>
                 <FieldLabel>Tipo de serviço</FieldLabel>
@@ -362,6 +395,9 @@ export function BillingProcessingPanel({
                   amount: parsed,
                   proportional,
                   ...(itemType === 'service' ? { service_type: serviceType } : {}),
+                  ...(itemType === 'installment'
+                    ? { installment_count: Number(installmentCount) || 1, installment_current: 1 }
+                    : {}),
                   ...(startDate ? { start_date: startDate } : {}),
                   ...(endDate ? { end_date: endDate } : {})
                 },
