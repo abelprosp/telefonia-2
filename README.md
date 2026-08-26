@@ -132,7 +132,7 @@ O schema deve existir antes da API subir (bases criadas pelo `docker/postgres/in
 cd api
 export DATABASE_URL="Host=localhost;Username=postgres;Password=postgres;Database=luxus_connect_dev"
 export KEYCLOAK_REALM=luxus
-export KEYCLOAK_AUTH_SERVER_URL=http://localhost:8081
+export KEYCLOAK_AUTH_SERVER_URL=http://localhost:8081/auth
 export KEYCLOAK_RESOURCE=connect-cli
 go run ./cmd/api
 ```
@@ -163,7 +163,7 @@ go run ./cmd/api
 | Health              | `http://localhost:8002/health`                                        |
 | Seq                 | `http://localhost:81`                                                 |
 | RabbitMQ Management | `http://localhost:15672` (credenciais do `.env`)                      |
-| Keycloak Admin      | `http://localhost:8081` — utilizador `admin`, password `KC_ADMIN_PWD` |
+| Keycloak Admin      | `http://localhost:8081/auth` — utilizador `admin`, password `KC_ADMIN_PWD` |
 | Vite (perfil dev)   | `http://localhost:5173`                                               |
 
 **Importação de faturas (async):** upload para storage S3-compatível (URL pré-assinada), depois `POST /v1/provider-invoices` com `storage_bucket` e `storage_object_key`; estado em `GET /v1/provider-invoices/{id}`.

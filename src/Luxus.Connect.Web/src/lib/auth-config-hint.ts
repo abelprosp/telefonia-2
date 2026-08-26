@@ -5,10 +5,13 @@ function isLocalHost(url: string) {
 }
 
 export function getAuthConfigHint(): string {
-  const authUrl = env.VITE_AUTH_URL;
+  const authUrl = env.VITE_AUTH_URL.replace(/\/+$/, '');
   const apiUrl = env.VITE_API_URL;
   const pageIsLocal = isLocalHost(window.location.hostname);
   const authIsLocal = isLocalHost(authUrl);
+  const oidc = `${authUrl}/realms/luxus/.well-known/openid-configuration`;
+  const sameOriginAuth =
+    !pageIsLocal && authUrl.startsWith(window.location.origin);
 
   if (authIsLocal && !pageIsLocal) {
     return [
@@ -16,22 +19,39 @@ export function getAuthConfigHint(): string {
       `VITE_AUTH_URL atual: ${authUrl}`,
       `VITE_API_URL atual: ${apiUrl}`,
       '',
-      'No Railway (serviço connect-web):',
-      '1. Variables → marque VITE_AUTH_URL, VITE_API_URL, VITE_CLIENT_ID e VITE_CLIENT_SECRET como disponíveis no build',
-      '2. VITE_AUTH_URL = URL pública do Keycloak (ex.: https://seu-keycloak.up.railway.app)',
-      '3. VITE_API_URL = URL pública da API (ex.: https://sua-api.up.railway.app)',
-      '4. Faça redeploy do connect-web após guardar',
+      'Recompile o connect-web com:',
+      'VITE_AUTH_URL=https://telefonia.redobrai.online/auth',
+      'VITE_API_URL=https://telefonia.redobrai.online/api',
       '',
-      `No Keycloak, adicione redirect URI: ${window.location.origin}/*`
+      `No Keycloak, redirect URI: ${window.location.origin}/*`
     ].join('\n');
   }
 
   if (pageIsLocal) {
     return [
       'Confirme no ficheiro src/Luxus.Connect.Web/.env:',
-      'VITE_AUTH_URL=http://localhost:8081',
+      'VITE_AUTH_URL=http://localhost:8081/auth',
       'VITE_API_URL=http://localhost:8002',
-      'Keycloak deve estar a correr (docker compose).'
+      'Keycloak deve estar a correr (docker compose) com KC_HTTP_RELATIVE_PATH=/auth.'
+    ].join('\n');
+  }
+
+  if (sameOriginAuth) {
+    return [
+      'O browser pediu o OpenID do Keycloak neste domínio e recebeu HTML do frontend.',
+      'Isso acontece quando /auth não é proxied para o Keycloak.',
+      '',
+      `VITE_AUTH_URL=${authUrl}`,
+      `VITE_API_URL=${apiUrl}`,
+      `Endpoint OIDC: ${oidc}`,
+      '',
+      'Na VPS:',
+      '1. Keycloak com KC_HTTP_RELATIVE_PATH=/auth (reinicie o container)',
+      '2. sudo bash scripts/setup-vps-nginx.sh',
+      '3. curl -sI "' + oidc + '"  → Content-Type: application/json',
+      '4. Rebuild do connect-web se VITE_* mudou',
+      '',
+      `Redirect URI no Keycloak: ${window.location.origin}/*`
     ].join('\n');
   }
 
@@ -39,9 +59,9 @@ export function getAuthConfigHint(): string {
     'Verifique se o Keycloak está acessível a partir do browser:',
     `VITE_AUTH_URL=${authUrl}`,
     `VITE_API_URL=${apiUrl}`,
-    `Endpoint OIDC: ${authUrl}/realms/luxus/.well-known/openid-configuration`,
+    `Endpoint OIDC: ${oidc}`,
     '',
     `Redirect URI no Keycloak: ${window.location.origin}/*`,
-    'Após alterar VITE_* no Railway, é obrigatório redeploy do connect-web.'
+    'Após alterar VITE_*, é obrigatório rebuild/redeploy do connect-web.'
   ].join('\n');
 }

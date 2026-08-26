@@ -39,7 +39,8 @@ services:
       - DATABASE_URL=Host=postgres;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};Database=luxus_connect_dev;
       - RABBITMQ_URL=amqp://${RMQ_USER}:${RMQ_PWD}@rabbitmq:5672
       - KEYCLOAK_REALM=luxus
-      - KEYCLOAK_AUTH_SERVER_URL=https://telefonia.redobrai.online/auth
+      - KEYCLOAK_AUTH_SERVER_URL=http://keycloak:8080/auth
+      - KEYCLOAK_PUBLIC_AUTH_SERVER_URL=https://telefonia.redobrai.online/auth
       - KEYCLOAK_RESOURCE=connect-cli
       - OBJECT_STORAGE_SERVICE_URL=${OBJECT_STORAGE_SERVICE_URL}
       - OBJECT_STORAGE_ACCESS_KEY_ID=${OBJECT_STORAGE_ACCESS_KEY_ID}

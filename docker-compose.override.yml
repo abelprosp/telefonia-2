@@ -12,6 +12,12 @@ services:
 
       - '3005:80'
 
+    environment:
+
+      - AUTH_PROXY_PASS=http://keycloak:8080/auth/
+
+      - API_PROXY_PASS=http://connect-api:80/
+
     build:
 
       context: ./src/Luxus.Connect.Web
@@ -32,8 +38,10 @@ services:
 
   keycloak:
     environment:
-      - KC_HOSTNAME_URL=https://telefonia.redobrai.online
-      - KC_HOSTNAME_ADMIN_URL=https://telefonia.redobrai.online
+      - KC_HTTP_RELATIVE_PATH=/auth
+      - KC_HOSTNAME=telefonia.redobrai.online
+      - KC_HOSTNAME_URL=https://telefonia.redobrai.online/auth
+      - KC_HOSTNAME_ADMIN_URL=https://telefonia.redobrai.online/auth
       - KC_HOSTNAME_STRICT=false
       - KC_HOSTNAME_STRICT_HTTPS=false
       - KC_PROXY_HEADERS=xforwarded
@@ -141,9 +149,9 @@ services:
 
       - KEYCLOAK_REALM=luxus
 
-      - KEYCLOAK_AUTH_SERVER_URL=http://keycloak:8080
+      - KEYCLOAK_AUTH_SERVER_URL=http://keycloak:8080/auth
 
-      - KEYCLOAK_PUBLIC_AUTH_SERVER_URL=${KEYCLOAK_PUBLIC_AUTH_SERVER_URL:-http://host.docker.internal:8081}
+      - KEYCLOAK_PUBLIC_AUTH_SERVER_URL=${KEYCLOAK_PUBLIC_AUTH_SERVER_URL:-https://telefonia.redobrai.online/auth}
 
       - KEYCLOAK_RESOURCE=connect-cli
 
