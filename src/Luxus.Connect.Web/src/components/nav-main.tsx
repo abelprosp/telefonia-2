@@ -65,7 +65,7 @@ export const NavMain = ({
               <SidebarMenuButton
                 isActive={active}
                 className={cn(active && 'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground')}
-                render={<Link to={item.url} />}
+                render={<Link to={item.url} activeOptions={{ exact: item.url === '/' }} />}
               >
                 {item.icon}
                 <span>{item.title}</span>
@@ -137,7 +137,7 @@ function NavCollapsibleItem({
             <SidebarMenuSubItem key={subItem.title}>
               <SidebarMenuSubButton
                 isActive={isPathActive(subItem.url)}
-                render={<Link to={subItem.url} />}
+                render={<Link to={subItem.url} activeOptions={{ exact: subItem.url === '/' }} />}
               >
                 <span>{subItem.title}</span>
               </SidebarMenuSubButton>

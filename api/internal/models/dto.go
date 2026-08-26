@@ -1866,6 +1866,15 @@ type OperationalDashboardMonthStatus struct {
 	Status            string `json:"status"`
 	CriticalAlerts    int    `json:"critical_alerts"`
 	WarningAlerts     int    `json:"warning_alerts"`
+	InvoiceCount      int    `json:"invoice_count"`
+}
+
+type OperationalDashboardMonthTrend struct {
+	ProcessingMonthID string  `json:"processing_month_id"`
+	DisplayName       string  `json:"display_name"`
+	Year              int     `json:"year"`
+	Month             int     `json:"month"`
+	Revenue           float64 `json:"revenue"`
 }
 
 type OperationalDashboardResponse struct {
@@ -1874,6 +1883,7 @@ type OperationalDashboardResponse struct {
 	FinancialSummary   OperationalDashboardFinancialSummary `json:"financial_summary"`
 	CurrentMonthStatus *OperationalDashboardMonthStatus     `json:"current_month_status,omitempty"`
 	PendingDivergences int                                  `json:"pending_divergences"`
+	MonthlyTrend       []OperationalDashboardMonthTrend     `json:"monthly_trend"`
 }
 
 type PhoneLine360Response struct {

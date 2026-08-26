@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, Navigate } from '@tanstack/react-router';
 import { toast } from 'sonner';
 
 import { ListPageHeader } from '@/components/list-page';
@@ -17,6 +17,7 @@ import {
   TableRow
 } from '@/components/ui/table';
 import { getErrorMessage, isApiHttpError } from '@/lib/api-error';
+import { useAuthRoles } from '@/lib/auth-roles';
 import { client } from '@/lib/client';
 import { formatMoney } from '@/lib/financial-api';
 import { formatCpfCnpj, formatPhoneNumber } from '@/lib/format';
@@ -44,6 +45,20 @@ export const Route = createFileRoute('/__app/portal/')({
 });
 
 function PortalPage() {
+  const { isInternalStaff, isPartnerOnly } = useAuthRoles();
+
+  if (isInternalStaff) {
+    return <Navigate to="/" />;
+  }
+
+  if (isPartnerOnly) {
+    return <Navigate to="/partner" />;
+  }
+
+  return <PortalCustomerContent />;
+}
+
+function PortalCustomerContent() {
   const me = usePortalMe();
   const lines = usePortalLines();
   const invoices = usePortalInvoices();

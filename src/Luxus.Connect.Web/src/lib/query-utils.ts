@@ -19,6 +19,8 @@ export function invalidateDashboardCaches(queryClient: QueryClient) {
   return Promise.all([
     queryClient.invalidateQueries({ queryKey: getV1StatsDashboardQueryKey() }),
     queryClient.invalidateQueries({ queryKey: getV1CustomersQueryKey() }),
-    queryClient.invalidateQueries({ queryKey: getV1PhoneLinesQueryKey() })
+    queryClient.invalidateQueries({ queryKey: getV1PhoneLinesQueryKey() }),
+    queryClient.invalidateQueries({ queryKey: ['operational-dashboard'] }),
+    queryClient.invalidateQueries({ queryKey: ['line-readiness'] })
   ]);
 }

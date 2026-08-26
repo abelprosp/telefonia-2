@@ -49,7 +49,48 @@ function rolesFromAccessToken(token: string | undefined): string[] {
     (entry) => entry.roles ?? []
   );
 
-  return [...new Set([...fromClaim, ...fromRealm, ...fromClient])];
+  return [
+    ...new Set(
+      [...fromClaim, ...fromRealm, ...fromClient]
+        .map((role) => role.trim().toLowerCase())
+        .filter(Boolean)
+    )
+  ];
+}
+
+export function resolveAuthRoleState(token: string | undefined): AuthRoleState {
+  const roles = rolesFromAccessToken(token);
+  const isMaster = roles.includes('master') || roles.includes('admin');
+  const isEmployee = roles.includes('employee');
+  const isOperator = roles.includes('operator');
+  const isFinancial = roles.includes('financial');
+  const isSales = roles.includes('sales');
+  const isViewer = roles.includes('viewer');
+  const isPartner = roles.includes('partner');
+  const isInternalStaff =
+    isMaster || isEmployee || isOperator || isFinancial || isSales || isViewer;
+  // Sem token ainda não dá para classificar. Tratar papéis vazios como
+  // cliente nesse intervalo manda o Master para /portal e ele fica preso lá.
+  const isCustomerPortal = Boolean(token) && !isInternalStaff && !isPartner;
+  const profile = resolveProfile(roles);
+
+  return {
+    roles,
+    isMaster,
+    isEmployee,
+    isOperator,
+    isFinancial,
+    isSales,
+    isViewer,
+    isPartner,
+    isCustomerPortal,
+    isInternalStaff,
+    isPartnerOnly: isPartner && !isInternalStaff,
+    canAccessOperations: isMaster || isEmployee || isOperator || isSales,
+    canAccessFinance: isMaster || isFinancial,
+    canManageUsers: isMaster,
+    profile
+  };
 }
 
 export function resolveProfile(roles: string[]): UserProfile {
@@ -80,37 +121,10 @@ export function profileLabel(profile: UserProfile): string {
 export function useAuthRoles(): AuthRoleState {
   const { user } = useAuth();
 
-  return useMemo(() => {
-    const roles = rolesFromAccessToken(user?.access_token);
-    const isMaster = roles.includes('master') || roles.includes('admin');
-    const isEmployee = roles.includes('employee');
-    const isOperator = roles.includes('operator');
-    const isFinancial = roles.includes('financial');
-    const isSales = roles.includes('sales');
-    const isViewer = roles.includes('viewer');
-    const isPartner = roles.includes('partner');
-    const isInternalStaff = isMaster || isEmployee || isOperator || isFinancial || isSales || isViewer;
-    const isCustomerPortal = !isInternalStaff && !isPartner;
-    const profile = resolveProfile(roles);
-
-    return {
-      roles,
-      isMaster,
-      isEmployee,
-      isOperator,
-      isFinancial,
-      isSales,
-      isViewer,
-      isPartner,
-      isCustomerPortal,
-      isInternalStaff,
-      isPartnerOnly: isPartner && !isInternalStaff,
-      canAccessOperations: isMaster || isEmployee || isOperator || isSales,
-      canAccessFinance: isMaster || isFinancial,
-      canManageUsers: isMaster,
-      profile
-    };
-  }, [user?.access_token]);
+  return useMemo(
+    () => resolveAuthRoleState(user?.access_token),
+    [user?.access_token]
+  );
 }
 
 export function roleLabel(roles: Pick<AuthRoleState, 'profile'>) {

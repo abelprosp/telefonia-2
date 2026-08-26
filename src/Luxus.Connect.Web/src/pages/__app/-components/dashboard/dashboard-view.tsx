@@ -1,7 +1,8 @@
+import { useMemo, useState } from 'react';
+
 import { Link } from '@tanstack/react-router';
 import {
   Activity,
-  ChevronDown,
   FilePenLine,
   Heart,
   Moon,
@@ -12,12 +13,21 @@ import {
   Zap
 } from 'lucide-react';
 
+import type { ListProcessingMonthResponse } from '@/api';
 import {
   useGetV1Customers,
   useGetV1PhoneLines,
+  useGetV1ProcessingMonths,
   useGetV1StatsDashboard
 } from '@/api';
 import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select';
 import {
   Empty,
   EmptyDescription,
@@ -41,15 +51,51 @@ import {
   formatPhoneLineStatus,
   formatPhoneNumber
 } from '@/lib/format';
-import { useOperationalDashboard } from '@/lib/ops-api';
+import { useOperationalDashboard, useProcessingMonthLineReadiness } from '@/lib/ops-api';
 import { parseTotalCount } from '@/lib/query-utils';
 
 const formatCount = (value: number) =>
   new Intl.NumberFormat('pt-BR').format(value);
 
+const MONTH_SHORT = [
+  'Jan',
+  'Fev',
+  'Mar',
+  'Abr',
+  'Mai',
+  'Jun',
+  'Jul',
+  'Ago',
+  'Set',
+  'Out',
+  'Nov',
+  'Dez'
+] as const;
+
+function shortMonthLabel(month: number) {
+  return MONTH_SHORT[month - 1] ?? String(month).padStart(2, '0');
+}
+
 export const DashboardView = () => {
+  const [monthId, setMonthId] = useState('');
   const statsQuery = useGetV1StatsDashboard();
-  const operationalQuery = useOperationalDashboard();
+  const monthsQuery = useGetV1ProcessingMonths({
+    page_index: 0,
+    page_size: 24
+  });
+  const months = monthsQuery.data?.items ?? [];
+  const selectedMonthId = monthId || months[0]?.id || '';
+  const operationalQuery = useOperationalDashboard(selectedMonthId);
+  const readinessQuery = useProcessingMonthLineReadiness(selectedMonthId, Boolean(selectedMonthId));
+  const previousMonthId = useMemo(() => {
+    const ordered = [...months].sort((a, b) => a.year - b.year || a.month - b.month);
+    const index = ordered.findIndex((m) => m.id === selectedMonthId);
+    return index > 0 ? ordered[index - 1]?.id ?? '' : '';
+  }, [months, selectedMonthId]);
+  const previousReadinessQuery = useProcessingMonthLineReadiness(
+    previousMonthId,
+    Boolean(previousMonthId)
+  );
   const customersQuery = useGetV1Customers({
     page_index: 0,
     page_size: 10
@@ -61,7 +107,8 @@ export const DashboardView = () => {
 
   const summaryPending =
     statsQuery.isPending ||
-    operationalQuery.isPending ||
+    monthsQuery.isPending ||
+    (operationalQuery.isPending && !operationalQuery.data) ||
     customersQuery.isPending ||
     phoneLinesQuery.isPending;
 
@@ -107,8 +154,30 @@ export const DashboardView = () => {
   const projectedRevenue = operational?.financial_summary.projected_monthly_revenue ?? 0;
   const projectedCost = operational?.financial_summary.total_base_cost ?? 0;
   const marginPercentage = operational?.financial_summary.margin_percentage ?? 0;
-  const currentMonthName = operational?.current_month_status?.display_name ?? 'Agosto 2026';
+  const selectedMonth =
+    months.find((m) => m.id === selectedMonthId) ??
+    months.find((m) => m.id === operational?.current_month_status?.processing_month_id);
+  const currentMonthName =
+    selectedMonth?.display_name ?? operational?.current_month_status?.display_name ?? 'Sem competência';
   const pendingDivergences = operational?.pending_divergences ?? 0;
+  const importedInvoices =
+    operational?.current_month_status?.invoice_count ?? parseTotalCount(stats.provider_invoices_count);
+  const activeCustomers =
+    operational?.customers_summary.active_customers ?? parseTotalCount(stats.customers_count);
+  const totalCustomers =
+    operational?.customers_summary.total_customers ?? activeCustomers;
+
+  const readyLines = readinessQuery.data?.ready_lines ?? 0;
+  const readinessTotal = readinessQuery.data?.total_lines ?? 0;
+  const readinessPct = readinessTotal > 0 ? Math.round((readyLines / readinessTotal) * 100) : 0;
+  const previousReady = previousReadinessQuery.data?.ready_lines ?? 0;
+  const previousTotal = previousReadinessQuery.data?.total_lines ?? 0;
+  const previousPct = previousTotal > 0 ? Math.round((previousReady / previousTotal) * 100) : null;
+  const readinessDelta = previousPct !== null ? readinessPct - previousPct : null;
+  const readyDots = Math.round((readinessPct / 100) * 28);
+
+  const monthlyTrend = operational?.monthly_trend ?? [];
+  const maxTrendRevenue = Math.max(0, ...monthlyTrend.map((item) => item.revenue));
 
   // Cálculos 100% reais da distribuição do parque
   const activePct = totalLines > 0 ? Math.round((activeLines / totalLines) * 100) : (activeLines > 0 ? 100 : 0);
@@ -143,10 +212,11 @@ export const DashboardView = () => {
           <span className="text-muted-foreground hidden text-xs font-semibold sm:inline-block">
             {todayDateStr}
           </span>
-          <div className="inline-flex items-center gap-2 rounded-full border bg-card px-3.5 py-1.5 text-xs font-semibold text-foreground shadow-xs">
-            <span>{currentMonthName}</span>
-            <ChevronDown className="size-3.5 opacity-60" />
-          </div>
+          <CompetenceMonthSelect
+            months={months}
+            value={selectedMonthId}
+            onChange={setMonthId}
+          />
         </div>
       </div>
 
@@ -290,7 +360,8 @@ export const DashboardView = () => {
                   <span className="text-muted-foreground ml-1 text-xs font-semibold">empresas</span>
                 </div>
                 <div className="text-right text-[11px] font-semibold text-emerald-600">
-                  +100% ativos
+                  {formatCount(activeCustomers)} {activeCustomers === 1 ? 'ativo' : 'ativos'}
+                  {totalCustomers > activeCustomers ? ` de ${formatCount(totalCustomers)}` : ''}
                 </div>
               </div>
             </div>
@@ -304,14 +375,29 @@ export const DashboardView = () => {
                   </div>
                   <span className="text-xs font-bold text-foreground">Prontidão</span>
                 </div>
-                <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                  +10%
-                </span>
+                {readinessDelta !== null ? (
+                  <span
+                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                      readinessDelta >= 0
+                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                        : 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
+                    }`}
+                  >
+                    {readinessDelta > 0 ? '+' : ''}
+                    {readinessDelta}%
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground text-[10px] font-semibold">
+                    {readyLines}/{readinessTotal || 0} linhas
+                  </span>
+                )}
               </div>
 
               <div className="mt-2">
                 <div className="flex items-baseline gap-1">
-                  <span className="text-3xl font-extrabold tracking-tight text-foreground">94</span>
+                  <span className="text-3xl font-extrabold tracking-tight text-foreground">
+                    {readinessQuery.isPending && !readinessQuery.data ? '—' : readinessPct}
+                  </span>
                   <span className="text-muted-foreground text-sm font-bold">%</span>
                 </div>
 
@@ -321,11 +407,7 @@ export const DashboardView = () => {
                     <div
                       key={idx}
                       className={`size-2.5 rounded-full ${
-                        idx < 22
-                          ? 'bg-primary/80'
-                          : idx < 26
-                          ? 'bg-emerald-500'
-                          : 'bg-muted'
+                        idx < readyDots ? 'bg-primary/80' : 'bg-muted'
                       }`}
                     />
                   ))}
@@ -347,10 +429,12 @@ export const DashboardView = () => {
                 </div>
               </div>
 
-              <div className="inline-flex items-center gap-2 rounded-full border bg-muted/40 px-3 py-1 text-xs font-semibold text-foreground">
-                <span>Competência Mensal</span>
-                <ChevronDown className="size-3.5 opacity-60" />
-              </div>
+              <CompetenceMonthSelect
+                months={months}
+                value={selectedMonthId}
+                onChange={setMonthId}
+                label="Competência Mensal"
+              />
             </div>
 
             <div className="my-6 grid grid-cols-2 gap-6 sm:grid-cols-4">
@@ -365,7 +449,7 @@ export const DashboardView = () => {
               </div>
 
               <div className="border-l-2 border-indigo-500 pl-3">
-                <span className="text-2xl font-black text-foreground">{formatCount(parseTotalCount(stats.provider_invoices_count))}</span>
+                <span className="text-2xl font-black text-foreground">{formatCount(importedInvoices)}</span>
                 <p className="text-muted-foreground text-xs">Faturas Importadas</p>
               </div>
 
@@ -377,34 +461,41 @@ export const DashboardView = () => {
 
             {/* Gráfico de Barras Mensais Estilizado */}
             <div className="mt-2 flex h-28 items-end justify-between gap-2 border-t pt-4">
-              {[
-                { label: 'Mai', height: '35%', active: false },
-                { label: 'Jun', height: '45%', active: false },
-                { label: 'Jul', height: '60%', active: false },
-                { label: 'Ago ↗', height: '95%', active: true },
-                { label: 'Set', height: '50%', active: false },
-                { label: 'Out', height: '65%', active: false },
-                { label: 'Nov', height: '70%', active: false }
-              ].map((bar, i) => (
-                <div key={i} className="flex flex-1 flex-col items-center gap-2">
-                  <div className="relative flex h-20 w-full max-w-[28px] items-end rounded-full bg-muted/60 p-1">
-                    {bar.active ? (
-                      <div
-                        className="bg-primary w-full rounded-full shadow-sm"
-                        style={{ height: bar.height }}
-                      />
-                    ) : (
-                      <div
-                        className="w-full rounded-full bg-primary/25"
-                        style={{ height: bar.height }}
-                      />
-                    )}
-                  </div>
-                  <span className={`text-[10px] font-bold ${bar.active ? 'text-primary' : 'text-muted-foreground'}`}>
-                    {bar.label}
-                  </span>
-                </div>
-              ))}
+              {monthlyTrend.length === 0 ? (
+                <p className="text-muted-foreground w-full self-center text-center text-xs">
+                  Sem competências para montar o histórico.
+                </p>
+              ) : (
+                monthlyTrend.map((bar) => {
+                  const active = bar.processing_month_id === selectedMonthId;
+                  const height =
+                    maxTrendRevenue > 0
+                      ? `${Math.max(12, Math.round((bar.revenue / maxTrendRevenue) * 100))}%`
+                      : '20%';
+                  return (
+                    <button
+                      key={bar.processing_month_id}
+                      type="button"
+                      className="flex flex-1 flex-col items-center gap-2"
+                      onClick={() => setMonthId(bar.processing_month_id)}
+                      aria-pressed={active}
+                      aria-label={`Selecionar competência ${bar.display_name}`}
+                    >
+                      <div className="relative flex h-20 w-full max-w-[28px] items-end rounded-full bg-muted/60 p-1">
+                        <div
+                          className={`w-full rounded-full ${active ? 'bg-primary shadow-sm' : 'bg-primary/25'}`}
+                          style={{ height }}
+                        />
+                      </div>
+                      <span
+                        className={`text-[10px] font-bold ${active ? 'text-primary' : 'text-muted-foreground'}`}
+                      >
+                        {active ? `${shortMonthLabel(bar.month)} ↗` : shortMonthLabel(bar.month)}
+                      </span>
+                    </button>
+                  );
+                })
+              )}
             </div>
           </div>
         </div>
@@ -418,6 +509,45 @@ export const DashboardView = () => {
     </div>
   );
 };
+
+function CompetenceMonthSelect({
+  months,
+  value,
+  onChange,
+  label
+}: {
+  months: ListProcessingMonthResponse[];
+  value: string;
+  onChange: (id: string) => void;
+  label?: string;
+}) {
+  if (months.length === 0) {
+    return (
+      <div className="inline-flex items-center rounded-full border bg-card px-3.5 py-1.5 text-xs font-semibold text-muted-foreground shadow-xs">
+        {label ?? 'Sem competência'}
+      </div>
+    );
+  }
+
+  return (
+    <Select value={value} onValueChange={(next) => onChange(next ?? '')}>
+      <SelectTrigger
+        size="sm"
+        aria-label={label ?? 'Selecionar competência'}
+        className="h-8 rounded-full border bg-card px-3.5 text-xs font-semibold shadow-xs"
+      >
+        <SelectValue placeholder={label ?? 'Competência'} />
+      </SelectTrigger>
+      <SelectContent align="end">
+        {months.map((month) => (
+          <SelectItem key={month.id} value={month.id}>
+            {month.display_name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
 
 const RecentCustomersPanel = ({
   rows

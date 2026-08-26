@@ -13,7 +13,7 @@ import (
 	"github.com/luxus-connect/telefonia/api/internal/store"
 )
 
-func (s *Service) GetOperationalDashboard(ctx context.Context) (*models.OperationalDashboardResponse, error) {
+func (s *Service) GetOperationalDashboard(ctx context.Context, processingMonthID string) (*models.OperationalDashboardResponse, error) {
 	orgID, err := orgFrom(ctx)
 	if err != nil {
 		return nil, err
@@ -55,34 +55,64 @@ func (s *Service) GetOperationalDashboard(ctx context.Context) (*models.Operatio
 	}
 
 	custCount, _ := s.Store.CountDashboardCustomers(ctx, orgID)
-	projectedMargin := precision.Round2(projectedMonthlyRevenue - totalBaseCost)
-	marginPct := 0.0
-	if projectedMonthlyRevenue > 0 {
-		marginPct = precision.Round2((projectedMargin / projectedMonthlyRevenue) * 100.0)
+	revenue := projectedMonthlyRevenue
+	cost := totalBaseCost
+
+	months, _, _ := s.Store.ListProcessingMonths(ctx, orgID, httputil.PageSearch{PageSize: 24})
+	selected := pickDashboardMonth(months, processingMonthID)
+	if selected == nil && processingMonthID != "" {
+		if row, err := s.Store.GetProcessingMonth(ctx, orgID, processingMonthID); err == nil && row != nil {
+			item := models.ListProcessingMonthResponse{
+				ID:          row.ID,
+				ProviderID:  row.ProviderID,
+				Year:        row.Year,
+				Month:       row.Month,
+				DisplayName: row.DisplayName,
+				Status:      row.Status,
+			}
+			selected = &item
+		}
 	}
 
-	// Identificar mês de processamento aberto atual
 	var currentMonthStatus *models.OperationalDashboardMonthStatus
-	months, _, _ := s.Store.ListProcessingMonths(ctx, orgID, httputil.PageSearch{PageSize: 1})
-	if len(months) > 0 {
-		m := months[0]
-		alerts, _ := s.GetPreClosingAlerts(ctx, m.ID)
+	openDiv, _ := s.Store.CountOpenDivergences(ctx, orgID, "")
+	if selected != nil {
+		alerts, _ := s.GetPreClosingAlerts(ctx, selected.ID)
 		crit := 0
 		warn := 0
 		if alerts != nil {
 			crit = alerts.CriticalCount
 			warn = alerts.WarningCount
 		}
+		invoiceCount, _ := s.Store.CountProviderInvoicesForMonth(ctx, orgID, selected.ID)
 		currentMonthStatus = &models.OperationalDashboardMonthStatus{
-			ProcessingMonthID: m.ID,
-			DisplayName:       m.DisplayName,
-			Status:            m.Status,
+			ProcessingMonthID: selected.ID,
+			DisplayName:       selected.DisplayName,
+			Status:            selected.Status,
 			CriticalAlerts:    crit,
 			WarningAlerts:     warn,
+			InvoiceCount:      invoiceCount,
+		}
+		openDiv, _ = s.Store.CountOpenDivergences(ctx, orgID, selected.ID)
+
+		billedRev, _ := s.Store.SumCustomerBillingForMonth(ctx, orgID, selected.ID)
+		invoiceCost, _ := s.Store.SumProviderInvoiceTotalsForMonth(ctx, orgID, selected.ID)
+		isOpen := selected.Status == "open"
+		if billedRev > 0 || !isOpen {
+			revenue = billedRev
+		}
+		if invoiceCost > 0 || !isOpen {
+			cost = invoiceCost
 		}
 	}
 
-	openDiv, _ := s.Store.CountOpenDivergences(ctx, orgID)
+	projectedMargin := precision.Round2(revenue - cost)
+	marginPct := 0.0
+	if revenue > 0 {
+		marginPct = precision.Round2((projectedMargin / revenue) * 100.0)
+	}
+
+	trend := buildMonthlyTrend(ctx, s, orgID, months)
 
 	return &models.OperationalDashboardResponse{
 		LinesSummary: models.OperationalDashboardLinesSummary{
@@ -97,14 +127,53 @@ func (s *Service) GetOperationalDashboard(ctx context.Context) (*models.Operatio
 			ActiveCustomers: custCount,
 		},
 		FinancialSummary: models.OperationalDashboardFinancialSummary{
-			ProjectedMonthlyRevenue: projectedMonthlyRevenue,
-			TotalBaseCost:           totalBaseCost,
+			ProjectedMonthlyRevenue: revenue,
+			TotalBaseCost:           cost,
 			ProjectedMargin:         projectedMargin,
 			MarginPercentage:        marginPct,
 		},
 		CurrentMonthStatus: currentMonthStatus,
 		PendingDivergences: openDiv,
+		MonthlyTrend:       trend,
 	}, nil
+}
+
+func pickDashboardMonth(months []models.ListProcessingMonthResponse, processingMonthID string) *models.ListProcessingMonthResponse {
+	if len(months) == 0 {
+		return nil
+	}
+	if processingMonthID != "" {
+		for i := range months {
+			if months[i].ID == processingMonthID {
+				return &months[i]
+			}
+		}
+		return nil
+	}
+	return &months[0]
+}
+
+func buildMonthlyTrend(ctx context.Context, s *Service, orgID string, months []models.ListProcessingMonthResponse) []models.OperationalDashboardMonthTrend {
+	newest := months
+	if len(newest) > 7 {
+		newest = newest[:7]
+	}
+	trend := make([]models.OperationalDashboardMonthTrend, 0, len(newest))
+	for i := len(newest) - 1; i >= 0; i-- {
+		m := newest[i]
+		rev, _ := s.Store.SumCustomerBillingForMonth(ctx, orgID, m.ID)
+		trend = append(trend, models.OperationalDashboardMonthTrend{
+			ProcessingMonthID: m.ID,
+			DisplayName:       m.DisplayName,
+			Year:              m.Year,
+			Month:             m.Month,
+			Revenue:           rev,
+		})
+	}
+	if trend == nil {
+		trend = []models.OperationalDashboardMonthTrend{}
+	}
+	return trend
 }
 
 func (s *Service) GetPhoneLine360(ctx context.Context, phoneLineID string) (*models.PhoneLine360Response, error) {

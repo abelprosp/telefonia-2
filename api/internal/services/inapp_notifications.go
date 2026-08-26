@@ -23,7 +23,7 @@ func (s *Service) ListInAppNotifications(ctx context.Context, userID string) (*m
 	var notifications []models.InAppNotification
 
 	// 1. Obter status operacional
-	dashboard, _ := s.GetOperationalDashboard(ctx)
+	dashboard, _ := s.GetOperationalDashboard(ctx, "")
 
 	// 2. Verificar Divergências Pendentes
 	monthID := ""

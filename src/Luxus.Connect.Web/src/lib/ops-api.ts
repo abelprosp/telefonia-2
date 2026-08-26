@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { client } from '@/lib/client';
 
@@ -430,20 +430,30 @@ export type OperationalDashboard = {
     status: string;
     critical_alerts: number;
     warning_alerts: number;
+    invoice_count?: number;
   } | null;
   pending_divergences: number;
+  monthly_trend?: {
+    processing_month_id: string;
+    display_name: string;
+    year: number;
+    month: number;
+    revenue: number;
+  }[];
 };
 
-export function useOperationalDashboard() {
+export function useOperationalDashboard(monthId = '') {
   return useQuery({
-    queryKey: ['operational-dashboard'],
+    queryKey: ['operational-dashboard', monthId],
     queryFn: async () => {
       const { data } = await client<OperationalDashboard>({
         url: '/v1/stats/operational-dashboard',
-        method: 'GET'
+        method: 'GET',
+        params: monthId ? { processing_month_id: monthId } : undefined
       });
       return data;
-    }
+    },
+    placeholderData: keepPreviousData
   });
 }
 
@@ -579,7 +589,8 @@ export function useProcessingMonthLineReadiness(monthId: string, enabled = true)
       });
       return data;
     },
-    enabled: Boolean(monthId) && enabled
+    enabled: Boolean(monthId) && enabled,
+    placeholderData: keepPreviousData
   });
 }
 

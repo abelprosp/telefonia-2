@@ -294,7 +294,7 @@ func (h *Handler) closeProcessingMonthWithHash(w http.ResponseWriter, r *http.Re
 }
 
 func (h *Handler) getOperationalDashboard(w http.ResponseWriter, r *http.Request) {
-	item, err := h.Svc.GetOperationalDashboard(r.Context())
+	item, err := h.Svc.GetOperationalDashboard(r.Context(), r.URL.Query().Get("processing_month_id"))
 	if err != nil {
 		httputil.HandleServiceError(w, err)
 		return

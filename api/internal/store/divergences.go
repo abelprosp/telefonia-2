@@ -126,11 +126,17 @@ func (s *Store) ListBillingDivergences(ctx context.Context, orgID string, monthI
 	return items, total, rows.Err()
 }
 
-func (s *Store) CountOpenDivergences(ctx context.Context, orgID string) (int, error) {
+func (s *Store) CountOpenDivergences(ctx context.Context, orgID, monthID string) (int, error) {
 	var n int
+	if monthID == "" {
+		err := s.q(ctx).QueryRow(ctx, `
+			SELECT COUNT(*)::int FROM "BillingDivergences"
+			WHERE "OrganizationId" = $1 AND "Status" IN ('open', 'pending')`, orgID).Scan(&n)
+		return n, err
+	}
 	err := s.q(ctx).QueryRow(ctx, `
 		SELECT COUNT(*)::int FROM "BillingDivergences"
-		WHERE "OrganizationId" = $1 AND "Status" IN ('open', 'pending')`, orgID).Scan(&n)
+		WHERE "OrganizationId" = $1 AND "Status" IN ('open', 'pending') AND "ProcessingMonthId" = $2`, orgID, monthID).Scan(&n)
 	return n, err
 }
 
