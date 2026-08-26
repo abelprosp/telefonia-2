@@ -20,4 +20,5 @@ else
 fi
 
 docker compose "${COMPOSE_FILES[@]}" down --remove-orphans
+docker rm -f web.connect.luxus 2>/dev/null || true
 docker compose "${COMPOSE_FILES[@]}" up -d --build --force-recreate --remove-orphans
