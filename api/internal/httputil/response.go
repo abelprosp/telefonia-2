@@ -2,6 +2,7 @@ package httputil
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/luxus-connect/telefonia/api/internal/notifications"
@@ -38,7 +39,8 @@ func WritePaged[T any](w http.ResponseWriter, items []T, total int64) {
 }
 
 func HandleServiceError(w http.ResponseWriter, err error) {
-	if ae, ok := err.(*AppError); ok {
+	var ae *AppError
+	if errors.As(err, &ae) {
 		WriteError(w, ae)
 		return
 	}

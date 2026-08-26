@@ -96,6 +96,9 @@ func (p *Processor) processInner(ctx context.Context, req *store.ImportRequestRo
 	}
 
 	header := getHeader(parsed)
+	if header == nil {
+		return httputil.BusinessError(notifications.ImportHeaderMissing)
+	}
 	customer011 := getCustomer011(parsed)
 	if customer011 == nil {
 		return fmt.Errorf("missing 011D customer record")
@@ -566,7 +569,7 @@ func getHeader(parsed []any) *vivo.Line010DHeader {
 			return h
 		}
 	}
-	panic("missing 010D header")
+	return nil
 }
 
 func getCustomer011(parsed []any) *vivo.Line011DCustomer {

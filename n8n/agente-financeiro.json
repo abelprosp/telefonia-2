@@ -1,0 +1,1168 @@
+{
+  "name": "Agente Financeiro WhatsApp",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "nodes": [
+    {
+      "id": "note-setup",
+      "name": "Como configurar",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -640,
+        -200
+      ],
+      "parameters": {
+        "content": "## Agente financeiro Luxus\n\n1. Variáveis: `LUXUS_API_URL`, `LUXUS_AGENT_API_KEY`, `EVOLUTION_API_URL`, `EVOLUTION_API_KEY`, `EVOLUTION_INSTANCE`\n2. Credencial OpenAI no nó **OpenAI Chat Model**\n3. Evolution webhook → este Webhook (evento MESSAGES_UPSERT)\n4. API Luxus: `FINANCIAL_AGENT_API_KEY` + `FINANCIAL_AGENT_ORG_ID`\n\nO agente responde no WhatsApp, envia PIX/boleto e valida comprovantes.\n\nOpenAI: credencial no chat model **e** `OPENAI_API_KEY` no ambiente (Vision dos comprovantes).",
+        "height": 360,
+        "width": 380,
+        "color": 7
+      }
+    },
+    {
+      "id": "wh-whatsapp",
+      "name": "Webhook WhatsApp",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -200,
+        220
+      ],
+      "webhookId": "agente-financeiro-whatsapp",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "agente-financeiro-whatsapp",
+        "responseMode": "onReceived",
+        "options": {}
+      }
+    },
+    {
+      "id": "code-normalize",
+      "name": "Normalizar WhatsApp",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        40,
+        220
+      ],
+      "parameters": {
+        "jsCode": "const root = $input.first().json;\nconst data = root.data || root.body?.data || root;\nconst key = data.key || {};\nconst msg = data.message || {};\nconst remoteJid = String(key.remoteJid || data.remoteJid || '');\nconst phone = remoteJid.replace(/@s\\.whatsapp\\.net$/, '').replace(/@g\\.us$/, '').replace(/\\D/g, '');\nconst fromMe = key.fromMe === true || data.fromMe === true;\nlet text = msg.conversation\n  || msg.extendedTextMessage?.text\n  || msg.imageMessage?.caption\n  || msg.documentMessage?.caption\n  || msg.videoMessage?.caption\n  || data.messageTimestamp && data.pushName && ''\n  || '';\nif (!text && typeof data.body === 'string') text = data.body;\nconst hasImage = Boolean(msg.imageMessage || msg.documentMessage || msg.stickerMessage);\nconst pushName = data.pushName || data.notifyName || '';\nconst skip = fromMe || phone === '' || (String(text).trim() === '' && !hasImage);\nreturn [{\n  json: {\n    skip,\n    fromMe,\n    phone,\n    sessionId: remoteJid || phone,\n    pushName,\n    text: String(text || '').trim(),\n    hasImage,\n    rawMessage: data,\n    instance: root.instance || $env.EVOLUTION_INSTANCE\n  }\n}];"
+      }
+    },
+    {
+      "id": "if-skip",
+      "name": "Mensagem válida?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        280,
+        220
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "not-skip",
+              "leftValue": "={{ $json.skip }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "if-media",
+      "name": "Tem comprovante?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        520,
+        120
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-image",
+              "leftValue": "={{ $json.hasImage }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "http-media",
+      "name": "Baixar mídia Evolution",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        760,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.EVOLUTION_API_URL }}/chat/getBase64FromMediaMessage/{{ $json.instance || $env.EVOLUTION_INSTANCE }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.EVOLUTION_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ message: $json.rawMessage, convertToMp4: false }) }}",
+        "options": {
+          "timeout": 60000
+        }
+      }
+    },
+    {
+      "id": "code-prep-vision",
+      "name": "Preparar Vision",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const wa = $('Normalizar WhatsApp').item.json;\nconst media = $input.first().json;\nlet b64 = media.base64 || media.base64Message || (media.data && media.data.base64) || '';\nif (typeof b64 !== 'string') b64 = '';\nb64 = b64.replace(/^data:[^;]+;base64,/, '');\nconst openaiBody = {\n  model: 'gpt-4o',\n  temperature: 0,\n  response_format: { type: 'json_object' },\n  messages: [\n    {\n      role: 'system',\n      content: 'Extraia dados de comprovante de pagamento brasileiro (PIX, TED, boleto). Responda SOMENTE JSON com: payer_name, amount (número), paid_at (AAAA-MM-DD), pix_tx_id, pix_end_to_end, bank_name, nosso_numero, linha_digitavel, invoice_number, receipt_text (resumo curto). Use null se não houver.'\n    },\n    {\n      role: 'user',\n      content: [\n        { type: 'text', text: 'Comprovante enviado pelo WhatsApp. Extraia os campos.' },\n        { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,' + b64 } }\n      ]\n    }\n  ]\n};\nreturn [{ json: { ...wa, openaiBody, hasMedia: Boolean(b64) } }];\n"
+      }
+    },
+    {
+      "id": "http-vision",
+      "name": "Ler comprovante (OpenAI Vision)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1000,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.OPENAI_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.openaiBody) }}",
+        "options": {
+          "timeout": 90000
+        }
+      }
+    },
+    {
+      "id": "code-receipt-msg",
+      "name": "Montar mensagem (comprovante)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1240,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const wa = $('Normalizar WhatsApp').item.json;\nconst vision = $input.first().json;\nlet extracted = {};\ntry {\n  const content = vision.choices?.[0]?.message?.content || vision.content || '';\n  extracted = typeof content === 'string' ? JSON.parse(content) : content;\n} catch (e) {\n  extracted = { receipt_text: String(vision.choices?.[0]?.message?.content || ''), parse_error: e.message };\n}\nconst userMessage = [\n  wa.text ? ('Mensagem do cliente: ' + wa.text) : 'O cliente enviou um comprovante de pagamento.',\n  'Nome no WhatsApp: ' + (wa.pushName || 'não informado'),\n  'Número WhatsApp: ' + wa.phone,\n  'Dados extraídos do comprovante (JSON):',\n  JSON.stringify(extracted)\n].join('\\n');\nreturn [{ json: { ...wa, userMessage, extractedReceipt: extracted } }];"
+      }
+    },
+    {
+      "id": "code-text-msg",
+      "name": "Montar mensagem (texto)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        760,
+        240
+      ],
+      "parameters": {
+        "jsCode": "const wa = $input.first().json;\nconst userMessage = [\n  'Mensagem do cliente: ' + (wa.text || ''),\n  'Nome no WhatsApp: ' + (wa.pushName || 'não informado'),\n  'Número WhatsApp: ' + wa.phone\n].join('\\n');\nreturn [{ json: { ...wa, userMessage } }];"
+      }
+    },
+    {
+      "id": "agent",
+      "name": "Agente Financeiro",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        1480,
+        140
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.userMessage }}",
+        "options": {
+          "systemMessage": "=Você é o agente financeiro da Luxus Connect no WhatsApp. Hoje é {{ $now.toFormat('dd/MM/yyyy') }}.\n\nFale em português brasileiro, curto e claro, como atendimento humano. Não invente valores, vencimentos nem status. Use as ferramentas.\n\nIdentificação:\n- Sempre que possível envie whatsapp_number com o número do cliente.\n- Consulte por nome, telefone, CPF/CNPJ, número da linha ou da fatura.\n- Se houver vários clientes, peça um dado único (CPF ou número da linha).\n\nFatura:\n- Informe número, vencimento, valor, status, PIX copia-e-cola e linha digitável.\n- Para enviar fatura/boleto: chame invoice-package e cole o whatsapp_text na resposta.\n- Se has_boleto_pdf for true, acrescente no FINAL da resposta uma linha exatamente assim: [[BOLETO:<invoice_id>]]\n\nInadimplência:\n- Use check-delinquency com sync_sicredi=true para cruzar sistema + Sicredi.\n- Use calculate-interest para multa/juros (taxas da empresa).\n\nComprovantes:\n- Se a mensagem tiver JSON de comprovante, chame verify-receipt com esses campos.\n- Só diga que o pagamento foi baixado se confirmed=true.\n- Se needs_human_review=true, avise que o financeiro vai conferir e NÃO prometa baixa.\n- Nunca use force_confirm ou force=true sozinho.\n\nLimites:\n- Não renegocie desconto, não suspenda linha, não altere vencimento.\n- Não exponha IDs internos, chaves ou dados de outros clientes.\n- Se a ferramenta falhar, peça o dado novamente ou encaminhe ao financeiro."
+        }
+      }
+    },
+    {
+      "id": "llm-openai",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        1280,
+        400
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o",
+          "cachedResultName": "gpt-4o"
+        },
+        "options": {
+          "temperature": 0.2
+        }
+      }
+    },
+    {
+      "id": "memory",
+      "name": "Memória da conversa",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        1480,
+        400
+      ],
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Normalizar WhatsApp').item.json.sessionId }}",
+        "contextWindowLength": 12
+      }
+    },
+    {
+      "id": "tool-lookup",
+      "name": "consultar_cliente",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        1720,
+        420
+      ],
+      "parameters": {
+        "toolDescription": "Consulta cliente no Luxus Connect por nome, telefone, CPF/CNPJ, número da linha, WhatsApp ou número da fatura.",
+        "method": "POST",
+        "url": "={{ $env.LUXUS_API_URL }}/v1/agent/financial/lookup-customer",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Agent-Key",
+              "value": "={{ $env.LUXUS_AGENT_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"query\": \"{{ $fromAI('query', 'Nome, telefone, CPF/CNPJ, linha ou fatura') }}\", \"whatsapp_number\": \"{{ $fromAI('whatsapp_number', 'Número WhatsApp do cliente', 'string') }}\" }",
+        "placeholderDefinitions": {
+          "values": [
+            {
+              "name": "query",
+              "description": "Nome, telefone, CPF/CNPJ, linha ou fatura",
+              "type": "string"
+            },
+            {
+              "name": "whatsapp_number",
+              "description": "Número WhatsApp",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "tool-invoices",
+      "name": "listar_faturas",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        1900,
+        420
+      ],
+      "parameters": {
+        "toolDescription": "Lista faturas do cliente: número, vencimento, valor, status, PIX, boleto Sicredi. Use customer_id se já tiver, ou query/whatsapp_number.",
+        "method": "POST",
+        "url": "={{ $env.LUXUS_API_URL }}/v1/agent/financial/list-invoices",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Agent-Key",
+              "value": "={{ $env.LUXUS_AGENT_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"customer_id\": \"{{ $fromAI('customer_id', 'ID do cliente se conhecido', 'string') }}\", \"query\": \"{{ $fromAI('query', 'Nome, linha ou fatura', 'string') }}\", \"invoice_number\": \"{{ $fromAI('invoice_number', 'Número da fatura', 'string') }}\", \"due_date\": \"{{ $fromAI('due_date', 'Vencimento AAAA-MM-DD', 'string') }}\", \"overdue_only\": {{ $fromAI('overdue_only', 'true para só vencidas', 'boolean') }}, \"whatsapp_number\": \"{{ $fromAI('whatsapp_number', 'WhatsApp', 'string') }}\" }",
+        "placeholderDefinitions": {
+          "values": [
+            {
+              "name": "customer_id",
+              "description": "ID do cliente",
+              "type": "string"
+            },
+            {
+              "name": "query",
+              "description": "Busca livre",
+              "type": "string"
+            },
+            {
+              "name": "invoice_number",
+              "description": "Número da fatura",
+              "type": "string"
+            },
+            {
+              "name": "due_date",
+              "description": "Vencimento",
+              "type": "string"
+            },
+            {
+              "name": "overdue_only",
+              "description": "Somente vencidas",
+              "type": "boolean"
+            },
+            {
+              "name": "whatsapp_number",
+              "description": "WhatsApp",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "tool-package",
+      "name": "enviar_fatura",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        2080,
+        420
+      ],
+      "parameters": {
+        "toolDescription": "Prepara o texto da fatura para WhatsApp (valor, vencimento, PIX, linha digitável). Use o whatsapp_text na resposta. Se has_boleto_pdf, termine com [[BOLETO:id]].",
+        "method": "POST",
+        "url": "={{ $env.LUXUS_API_URL }}/v1/agent/financial/invoice-package",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Agent-Key",
+              "value": "={{ $env.LUXUS_AGENT_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"invoice_id\": \"{{ $fromAI('invoice_id', 'ID da fatura se conhecido', 'string') }}\", \"customer_id\": \"{{ $fromAI('customer_id', 'ID do cliente', 'string') }}\", \"query\": \"{{ $fromAI('query', 'Nome ou fatura', 'string') }}\", \"whatsapp_number\": \"{{ $fromAI('whatsapp_number', 'WhatsApp', 'string') }}\" }",
+        "placeholderDefinitions": {
+          "values": [
+            {
+              "name": "invoice_id",
+              "description": "ID da fatura",
+              "type": "string"
+            },
+            {
+              "name": "customer_id",
+              "description": "ID do cliente",
+              "type": "string"
+            },
+            {
+              "name": "query",
+              "description": "Busca",
+              "type": "string"
+            },
+            {
+              "name": "whatsapp_number",
+              "description": "WhatsApp",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "tool-delinquency",
+      "name": "verificar_inadimplencia",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        1720,
+        600
+      ],
+      "parameters": {
+        "toolDescription": "Verifica se o cliente está inadimplente no sistema e consulta boletos no Sicredi (sync_sicredi=true). Devolve saldo, multa e juros.",
+        "method": "POST",
+        "url": "={{ $env.LUXUS_API_URL }}/v1/agent/financial/check-delinquency",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Agent-Key",
+              "value": "={{ $env.LUXUS_AGENT_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"customer_id\": \"{{ $fromAI('customer_id', 'ID do cliente', 'string') }}\", \"query\": \"{{ $fromAI('query', 'Nome, documento ou linha', 'string') }}\", \"whatsapp_number\": \"{{ $fromAI('whatsapp_number', 'WhatsApp', 'string') }}\", \"sync_sicredi\": true }",
+        "placeholderDefinitions": {
+          "values": [
+            {
+              "name": "customer_id",
+              "description": "ID do cliente",
+              "type": "string"
+            },
+            {
+              "name": "query",
+              "description": "Busca",
+              "type": "string"
+            },
+            {
+              "name": "whatsapp_number",
+              "description": "WhatsApp",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "tool-interest",
+      "name": "calcular_juros",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        1900,
+        600
+      ],
+      "parameters": {
+        "toolDescription": "Calcula multa e juros de mora de uma fatura (taxas da empresa, pro rata dia). Prefira invoice_id.",
+        "method": "POST",
+        "url": "={{ $env.LUXUS_API_URL }}/v1/agent/financial/calculate-interest",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Agent-Key",
+              "value": "={{ $env.LUXUS_AGENT_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"invoice_id\": \"{{ $fromAI('invoice_id', 'ID da fatura', 'string') }}\", \"amount\": {{ $fromAI('amount', 'Valor se não houver invoice_id', 'number') }}, \"due_date\": \"{{ $fromAI('due_date', 'Vencimento se não houver invoice_id', 'string') }}\" }",
+        "placeholderDefinitions": {
+          "values": [
+            {
+              "name": "invoice_id",
+              "description": "ID da fatura",
+              "type": "string"
+            },
+            {
+              "name": "amount",
+              "description": "Valor original",
+              "type": "number"
+            },
+            {
+              "name": "due_date",
+              "description": "Vencimento",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "tool-sicredi",
+      "name": "sincronizar_sicredi",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        2080,
+        600
+      ],
+      "parameters": {
+        "toolDescription": "Consulta o Sicredi e baixa no sistema se o boleto estiver liquidado. Use invoice_id ou customer_id.",
+        "method": "POST",
+        "url": "={{ $env.LUXUS_API_URL }}/v1/agent/financial/sync-sicredi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Agent-Key",
+              "value": "={{ $env.LUXUS_AGENT_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"invoice_id\": \"{{ $fromAI('invoice_id', 'ID da fatura', 'string') }}\", \"customer_id\": \"{{ $fromAI('customer_id', 'ID do cliente', 'string') }}\" }",
+        "placeholderDefinitions": {
+          "values": [
+            {
+              "name": "invoice_id",
+              "description": "ID da fatura",
+              "type": "string"
+            },
+            {
+              "name": "customer_id",
+              "description": "ID do cliente",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "tool-receipt",
+      "name": "validar_comprovante",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        2260,
+        420
+      ],
+      "parameters": {
+        "toolDescription": "Confere comprovante extraído (valor, data, PIX, pagador) com a fatura e o Sicredi. Só confirma baixa se o retorno vier confirmed=true.",
+        "method": "POST",
+        "url": "={{ $env.LUXUS_API_URL }}/v1/agent/financial/verify-receipt",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Agent-Key",
+              "value": "={{ $env.LUXUS_AGENT_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"invoice_id\": \"{{ $fromAI('invoice_id', 'ID da fatura se conhecido', 'string') }}\", \"customer_id\": \"{{ $fromAI('customer_id', 'ID do cliente', 'string') }}\", \"whatsapp_number\": \"{{ $fromAI('whatsapp_number', 'WhatsApp', 'string') }}\", \"payer_name\": \"{{ $fromAI('payer_name', 'Nome no comprovante', 'string') }}\", \"amount\": {{ $fromAI('amount', 'Valor pago', 'number') }}, \"paid_at\": \"{{ $fromAI('paid_at', 'Data do pagamento', 'string') }}\", \"pix_tx_id\": \"{{ $fromAI('pix_tx_id', 'TxID PIX', 'string') }}\", \"pix_end_to_end\": \"{{ $fromAI('pix_end_to_end', 'End-to-end PIX', 'string') }}\", \"bank_name\": \"{{ $fromAI('bank_name', 'Banco', 'string') }}\", \"nosso_numero\": \"{{ $fromAI('nosso_numero', 'Nosso número', 'string') }}\", \"linha_digitavel\": \"{{ $fromAI('linha_digitavel', 'Linha digitável', 'string') }}\", \"invoice_number\": \"{{ $fromAI('invoice_number', 'Número da fatura', 'string') }}\", \"receipt_text\": \"{{ $fromAI('receipt_text', 'Texto/resumo do comprovante', 'string') }}\", \"force_confirm\": false }",
+        "placeholderDefinitions": {
+          "values": [
+            {
+              "name": "invoice_id",
+              "description": "ID da fatura",
+              "type": "string"
+            },
+            {
+              "name": "customer_id",
+              "description": "ID do cliente",
+              "type": "string"
+            },
+            {
+              "name": "whatsapp_number",
+              "description": "WhatsApp",
+              "type": "string"
+            },
+            {
+              "name": "payer_name",
+              "description": "Pagador",
+              "type": "string"
+            },
+            {
+              "name": "amount",
+              "description": "Valor",
+              "type": "number"
+            },
+            {
+              "name": "paid_at",
+              "description": "Data",
+              "type": "string"
+            },
+            {
+              "name": "pix_tx_id",
+              "description": "TxID PIX",
+              "type": "string"
+            },
+            {
+              "name": "pix_end_to_end",
+              "description": "E2E PIX",
+              "type": "string"
+            },
+            {
+              "name": "bank_name",
+              "description": "Banco",
+              "type": "string"
+            },
+            {
+              "name": "nosso_numero",
+              "description": "Nosso número",
+              "type": "string"
+            },
+            {
+              "name": "linha_digitavel",
+              "description": "Linha digitável",
+              "type": "string"
+            },
+            {
+              "name": "invoice_number",
+              "description": "Fatura",
+              "type": "string"
+            },
+            {
+              "name": "receipt_text",
+              "description": "Resumo",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "tool-confirm",
+      "name": "confirmar_pagamento",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        2260,
+        600
+      ],
+      "parameters": {
+        "toolDescription": "Tenta confirmar pagamento no Sicredi. Sem force. Use após o cliente dizer que pagou o boleto.",
+        "method": "POST",
+        "url": "={{ $env.LUXUS_API_URL }}/v1/agent/financial/confirm-payment",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Agent-Key",
+              "value": "={{ $env.LUXUS_AGENT_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"invoice_id\": \"{{ $fromAI('invoice_id', 'ID da fatura', 'string') }}\", \"force\": false }",
+        "placeholderDefinitions": {
+          "values": [
+            {
+              "name": "invoice_id",
+              "description": "ID da fatura",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "code-reply",
+      "name": "Preparar envio",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        140
+      ],
+      "parameters": {
+        "jsCode": "const out = $input.first().json;\nlet text = out.output || out.text || out.message || '';\nif (typeof text !== 'string') text = JSON.stringify(text);\nconst match = text.match(/\\[\\[BOLETO:([0-9a-fA-F-]{8,})\\]\\]/);\ntext = text.replace(/\\s*\\[\\[BOLETO:[^\\]]+\\]\\]\\s*/g, '').trim();\nif (!text) text = 'Não consegui consultar agora. Pode repetir seu nome ou CPF?';\nconst phone = $('Normalizar WhatsApp').item.json.phone;\nconst instance = $('Normalizar WhatsApp').item.json.instance || $env.EVOLUTION_INSTANCE;\nreturn [{ json: { text, phone, instance, boletoId: match ? match[1] : '', hasBoleto: Boolean(match) } }];"
+      }
+    },
+    {
+      "id": "http-send-text",
+      "name": "Enviar texto WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2000,
+        140
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.EVOLUTION_API_URL }}/message/sendText/{{ $json.instance }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.EVOLUTION_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"number\": \"{{ $json.phone }}\", \"text\": {{ JSON.stringify($json.text) }} }",
+        "options": {}
+      }
+    },
+    {
+      "id": "if-boleto",
+      "name": "Enviar boleto PDF?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2240,
+        140
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-boleto",
+              "leftValue": "={{ $('Preparar envio').item.json.hasBoleto }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "http-pdf",
+      "name": "Baixar PDF Sicredi",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2480,
+        40
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.LUXUS_API_URL }}/v1/agent/financial/invoices/{{ $('Preparar envio').item.json.boletoId }}/boleto-pdf",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Agent-Key",
+              "value": "={{ $env.LUXUS_AGENT_API_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "code-pdf-b64",
+      "name": "PDF em base64",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2720,
+        40
+      ],
+      "parameters": {
+        "jsCode": "const binary = $input.first().binary || {};\nconst file = binary.data || Object.values(binary)[0];\nif (!file) {\n  return [{ json: { skipPdf: true } }];\n}\nconst buf = await this.helpers.getBinaryDataBuffer(0, file.fileName ? 'data' : Object.keys(binary)[0]);\nconst b64 = buf.toString('base64');\nconst prep = $('Preparar envio').item.json;\nreturn [{ json: { skipPdf: false, media: b64, phone: prep.phone, instance: prep.instance, fileName: 'boleto-' + prep.boletoId + '.pdf' } }];"
+      }
+    },
+    {
+      "id": "http-send-pdf",
+      "name": "Enviar PDF WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2960,
+        40
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.EVOLUTION_API_URL }}/message/sendMedia/{{ $json.instance }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.EVOLUTION_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"number\": \"{{ $json.phone }}\", \"mediatype\": \"document\", \"mimetype\": \"application/pdf\", \"caption\": \"Boleto da fatura\", \"fileName\": \"{{ $json.fileName }}\", \"media\": \"{{ $json.media }}\" }",
+        "options": {
+          "timeout": 60000
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Normalizar WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Mensagem válida?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mensagem válida?": {
+      "main": [
+        [
+          {
+            "node": "Tem comprovante?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tem comprovante?": {
+      "main": [
+        [
+          {
+            "node": "Baixar mídia Evolution",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Montar mensagem (texto)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Baixar mídia Evolution": {
+      "main": [
+        [
+          {
+            "node": "Preparar Vision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ler comprovante (OpenAI Vision)": {
+      "main": [
+        [
+          {
+            "node": "Montar mensagem (comprovante)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar mensagem (comprovante)": {
+      "main": [
+        [
+          {
+            "node": "Agente Financeiro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar mensagem (texto)": {
+      "main": [
+        [
+          {
+            "node": "Agente Financeiro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agente Financeiro": {
+      "main": [
+        [
+          {
+            "node": "Preparar envio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Agente Financeiro",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Memória da conversa": {
+      "ai_memory": [
+        [
+          {
+            "node": "Agente Financeiro",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "consultar_cliente": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agente Financeiro",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "listar_faturas": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agente Financeiro",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "enviar_fatura": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agente Financeiro",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "verificar_inadimplencia": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agente Financeiro",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "calcular_juros": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agente Financeiro",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "sincronizar_sicredi": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agente Financeiro",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "validar_comprovante": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agente Financeiro",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "confirmar_pagamento": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agente Financeiro",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar envio": {
+      "main": [
+        [
+          {
+            "node": "Enviar texto WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar texto WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Enviar boleto PDF?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar boleto PDF?": {
+      "main": [
+        [
+          {
+            "node": "Baixar PDF Sicredi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Baixar PDF Sicredi": {
+      "main": [
+        [
+          {
+            "node": "PDF em base64",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PDF em base64": {
+      "main": [
+        [
+          {
+            "node": "Enviar PDF WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Vision": {
+      "main": [
+        [
+          {
+            "node": "Ler comprovante (OpenAI Vision)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

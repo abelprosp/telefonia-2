@@ -97,7 +97,7 @@ func toListUser(u keycloak.UserRecord) models.ListOrganizationUserResponse {
 
 func (s *Service) ListOrganizationUsers(ctx context.Context, search string) ([]models.ListOrganizationUserResponse, error) {
 	if s.Keycloak == nil || !s.Keycloak.Enabled() {
-		return nil, httputil.InternalError(notifications.N("KEYCLOAK_ADMIN_UNAVAILABLE", "User management is not configured."))
+		return nil, httputil.UnavailableError(notifications.N("KEYCLOAK_ADMIN_UNAVAILABLE", "User management is not configured."))
 	}
 	users, err := s.Keycloak.ListUsers(ctx, search, 200)
 	if err != nil {
@@ -123,7 +123,7 @@ func (s *Service) ListOrganizationUsers(ctx context.Context, search string) ([]m
 
 func (s *Service) CreateOrganizationUser(ctx context.Context, input models.CreateOrganizationUserInput) (*models.ListOrganizationUserResponse, error) {
 	if s.Keycloak == nil || !s.Keycloak.Enabled() {
-		return nil, httputil.InternalError(notifications.N("KEYCLOAK_ADMIN_UNAVAILABLE", "User management is not configured."))
+		return nil, httputil.UnavailableError(notifications.N("KEYCLOAK_ADMIN_UNAVAILABLE", "User management is not configured."))
 	}
 
 	username := strings.TrimSpace(input.Username)
@@ -237,7 +237,7 @@ func (s *Service) CreateOrganizationUser(ctx context.Context, input models.Creat
 
 func (s *Service) UpdateOrganizationUser(ctx context.Context, userID string, input models.UpdateOrganizationUserInput) (*models.ListOrganizationUserResponse, error) {
 	if s.Keycloak == nil || !s.Keycloak.Enabled() {
-		return nil, httputil.InternalError(notifications.N("KEYCLOAK_ADMIN_UNAVAILABLE", "User management is not configured."))
+		return nil, httputil.UnavailableError(notifications.N("KEYCLOAK_ADMIN_UNAVAILABLE", "User management is not configured."))
 	}
 	userID = strings.TrimSpace(userID)
 	if userID == "" {

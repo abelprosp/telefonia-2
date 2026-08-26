@@ -376,8 +376,14 @@ func (s *Service) CreateBillingCycle(ctx context.Context, input models.CreateBil
 	if strings.TrimSpace(input.Code) == "" {
 		return nil, httputil.ValidationError(notifications.BillingCycleCodeRequired)
 	}
+	if utf8.RuneCountInString(strings.TrimSpace(input.Code)) > 20 {
+		return nil, httputil.ValidationError(notifications.BillingCycleCodeMaxLength)
+	}
 	if strings.TrimSpace(input.Name) == "" {
 		return nil, httputil.ValidationError(notifications.BillingCycleNameRequired)
+	}
+	if utf8.RuneCountInString(strings.TrimSpace(input.Name)) > 100 {
+		return nil, httputil.ValidationError(notifications.BillingCycleNameMaxLength)
 	}
 	if input.StartDate.IsZero() {
 		return nil, httputil.ValidationError(notifications.N("BILLING_CYCLE_START_DATE_REQUIRED", "Start date is required."))
@@ -403,7 +409,12 @@ func (s *Service) CreateBillingCycle(ctx context.Context, input models.CreateBil
 		return nil, httputil.BusinessError(notifications.ProcessingMonthRetroactiveBlocked)
 	}
 	id := uuid.New().String()
-	if err := s.Store.CreateBillingCycle(ctx, orgID, id, input.ProviderID, input.Code, input.Name, input.StartDate.Time, input.EndDate.Time); err != nil {
+	code := strings.TrimSpace(input.Code)
+	name := strings.TrimSpace(input.Name)
+	if err := s.Store.CreateBillingCycle(ctx, orgID, id, input.ProviderID, code, name, input.StartDate.Time, input.EndDate.Time); err != nil {
+		if isPgUnique(err) {
+			return nil, httputil.BusinessError(notifications.N("BILLING_CYCLE_DUPLICATED", "Já existe um ciclo de faturamento com este código ou nome."))
+		}
 		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
 	return s.GetBillingCycle(ctx, id)
@@ -499,6 +510,9 @@ func (s *Service) CreateProcessingMonth(ctx context.Context, input models.Create
 	}
 	id := uuid.New().String()
 	if err := s.Store.CreateProcessingMonth(ctx, orgID, id, input.ProviderID, input.DisplayName, input.Year, input.Month); err != nil {
+		if isPgUnique(err) {
+			return nil, httputil.BusinessError(notifications.ProcessingMonthDuplicate)
+		}
 		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
 	return s.GetProcessingMonth(ctx, id)

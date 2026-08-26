@@ -2,10 +2,12 @@ package handlers
 
 import (
 	"encoding/json"
-
+	"errors"
+	"io"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	connectauth "github.com/luxus-connect/telefonia/api/internal/auth"
 
 	"github.com/luxus-connect/telefonia/api/internal/httputil"
 
@@ -17,21 +19,26 @@ import (
 )
 
 type Handler struct {
-	Svc *services.Service
-
+	Svc       *services.Service
 	Presigned *services.PresignedService
+	AgentKey  string
+	AgentOrg  string
 }
 
 func decodeJSON(r *http.Request, v any) error {
-
 	defer r.Body.Close()
-
+	if r.Body == nil {
+		return nil
+	}
 	dec := json.NewDecoder(r.Body)
-
 	dec.DisallowUnknownFields()
-
-	return dec.Decode(v)
-
+	if err := dec.Decode(v); err != nil {
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
+		return err
+	}
+	return nil
 }
 
 func (h *Handler) RegisterRoutes(
@@ -56,6 +63,23 @@ func (h *Handler) RegisterRoutes(
 
 		r.Post("/webhooks/sicredi", h.sicrediWebhook)
 		r.Post("/webhooks/zapsign", h.zapsignWebhook)
+
+		r.Group(func(r chi.Router) {
+			r.Use(connectauth.AgentAuthenticate(h.AgentKey, h.AgentOrg))
+			r.Route("/agent/financial", func(r chi.Router) {
+				r.Get("/health", h.agentFinancialHealth)
+				r.Post("/lookup-customer", h.agentLookupCustomer)
+				r.Post("/list-invoices", h.agentListInvoices)
+				r.Post("/invoice-package", h.agentInvoicePackage)
+				r.Post("/check-delinquency", h.agentCheckDelinquency)
+				r.Post("/calculate-interest", h.agentCalculateInterest)
+				r.Post("/sync-sicredi", h.agentSyncSicredi)
+				r.Post("/verify-receipt", h.agentVerifyReceipt)
+				r.Post("/confirm-payment", h.agentConfirmPayment)
+				r.Get("/invoices/{id}/boleto-pdf", h.agentBoletoPDF)
+				r.Get("/invoices/{id}/download", h.agentInvoiceDownload)
+			})
+		})
 
 		// Configurações visuais e de marca com leitura pública para login/whitelabel
 		r.Get("/organization-settings", h.getOrganizationSettings)

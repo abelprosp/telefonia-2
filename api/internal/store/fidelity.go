@@ -352,8 +352,9 @@ func (s *Store) ListExpiringContracts(ctx context.Context, orgID string, daysAhe
 			f."Status"::text
 		FROM "LineFidelities" f
 		JOIN "PhoneLines" pl ON pl."Id" = f."PhoneLineId"
-		JOIN "Providers" p ON p."Id" = pl."ProviderId"
-		LEFT JOIN "PhoneLineCustomerLinks" cl ON cl."PhoneLineId" = pl."Id" AND cl."IsActive" = TRUE
+		JOIN "ProviderPlans" pp ON pp."Id" = pl."ProviderPlanId"
+		JOIN "Providers" p ON p."Id" = pp."ProviderId"
+		LEFT JOIN "PhoneLineCustomerLinks" cl ON cl."PhoneLineId" = pl."Id" AND cl."EndDate" IS NULL
 		LEFT JOIN "Customers" c ON c."Id" = cl."CustomerId"
 		WHERE p."OrganizationId" = $1
 			AND f."Status" = 'active'

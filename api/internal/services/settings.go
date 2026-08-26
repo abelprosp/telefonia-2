@@ -85,7 +85,7 @@ func (s *Service) UpdateCurrentUserProfile(ctx context.Context, input models.Upd
 	}
 
 	if s.Keycloak == nil || !s.Keycloak.Enabled() {
-		return nil, httputil.InternalError(notifications.N("KEYCLOAK_ADMIN_UNAVAILABLE", "Keycloak admin is not available."))
+		return nil, httputil.UnavailableError(notifications.N("KEYCLOAK_ADMIN_UNAVAILABLE", "Keycloak admin is not available."))
 	}
 
 	firstName := ""

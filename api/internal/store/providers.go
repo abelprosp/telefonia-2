@@ -69,16 +69,25 @@ func (s *Store) GetProvider(ctx context.Context, orgID, id string) (*models.GetP
 			return nil, err
 		}
 		svcRows, err := q.Query(ctx, `
-			SELECT "Id", "Name", "Active", "Recurring", "Price"
-			FROM "ProviderPlanServices"
-			WHERE "ProviderPlanId" = $1
-			ORDER BY "Name"`, plan.ID)
+			SELECT pps."Id", pps."Name", pps."Active", pps."Recurring", pps."Price",
+				COALESCE(pps."ServiceType"::text, 'other'),
+				pps."InvoiceName",
+				COALESCE(pps."ApplicationType", 'both'),
+				COALESCE(pps."AvailabilityRule", 'global'),
+				pps."ExclusiveCustomerId",
+				c."Name" AS "ExclusiveCustomerName"
+			FROM "ProviderPlanServices" pps
+			LEFT JOIN "Customers" c ON c."Id" = pps."ExclusiveCustomerId"
+			WHERE pps."ProviderPlanId" = $1
+			ORDER BY pps."Name"`, plan.ID)
 		if err != nil {
 			return nil, err
 		}
 		for svcRows.Next() {
 			var svc models.GetProviderPlanServiceResponse
-			if err := svcRows.Scan(&svc.ID, &svc.Name, &svc.Active, &svc.Recurring, &svc.Price); err != nil {
+			if err := svcRows.Scan(&svc.ID, &svc.Name, &svc.Active, &svc.Recurring, &svc.Price,
+				&svc.ServiceType, &svc.InvoiceName, &svc.ApplicationType, &svc.AvailabilityRule,
+				&svc.ExclusiveCustomerID, &svc.ExclusiveCustomerName); err != nil {
 				svcRows.Close()
 				return nil, err
 			}

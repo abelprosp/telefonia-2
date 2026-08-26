@@ -14,8 +14,6 @@ func (s *Store) ListCustomers(ctx context.Context, orgID string, providerID *str
 	q := s.q(ctx)
 	base := `
 		FROM "Customers" c
-		LEFT JOIN "CustomerDocuments" cd ON cd."CustomerId" = c."Id" AND cd."DocumentType" IN ('cpf', 'cnpj')
-		LEFT JOIN "CustomerDocuments" sr ON sr."CustomerId" = c."Id" AND sr."DocumentType" = 'state_registration'
 		WHERE c."OrganizationId" = $1`
 	args := []any{orgID}
 	if providerID != nil && *providerID != "" {
@@ -30,15 +28,18 @@ func (s *Store) ListCustomers(ctx context.Context, orgID string, providerID *str
 	}
 
 	var total int64
-	countQuery := `SELECT COUNT(DISTINCT c."Id") ` + base
+	countQuery := `SELECT COUNT(*) ` + base
 	if err := q.QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
 	selectQuery := `
-		SELECT DISTINCT c."Id", c."Active", c."Type"::text, c."Name",
-			COALESCE(cd."Number", ''), sr."Number", c."LegalName",
-			c."BirthOrOpeningDate", c."ResponsibleSalespersonUserId", c."BillingEmail",
+		SELECT c."Id", c."Active", c."Type"::text, c."Name",
+			COALESCE((SELECT cd."Number" FROM "CustomerDocuments" cd
+				WHERE cd."CustomerId" = c."Id" AND cd."DocumentType" IN ('cpf','cnpj') LIMIT 1), ''),
+			(SELECT sr."Number" FROM "CustomerDocuments" sr
+				WHERE sr."CustomerId" = c."Id" AND sr."DocumentType" = 'state_registration' LIMIT 1),
+			c."LegalName", c."BirthOrOpeningDate", c."ResponsibleSalespersonUserId", c."BillingEmail",
 			COALESCE(c."IsReseller", false), c."CommercialActivationDate", c."ContractedLuxusCnpj"
 		` + base + `
 		ORDER BY c."Name"

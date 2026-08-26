@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/luxus-connect/telefonia/api/internal/auth"
 	"github.com/luxus-connect/telefonia/api/internal/email"
 	"github.com/luxus-connect/telefonia/api/internal/httputil"
@@ -26,14 +27,15 @@ type ImportProcessor interface {
 }
 
 type Service struct {
-	Store        *store.Store
-	Publisher    EventPublisher
-	Processor    ImportProcessor
-	Keycloak     *keycloak.AdminClient
-	Mailer       *email.Sender
-	Sicredi      SicrediBoletoIssuer
-	ZapSign      *zapsign.Client
-	StateMachine *statemachine.Engine
+	Store                   *store.Store
+	Publisher               EventPublisher
+	Processor               ImportProcessor
+	Keycloak                *keycloak.AdminClient
+	Mailer                  *email.Sender
+	Sicredi                 SicrediBoletoIssuer
+	ZapSign                 *zapsign.Client
+	StateMachine            *statemachine.Engine
+	FinancialAgentPublicURL string
 }
 
 func (s *Service) SM() *statemachine.Engine {
@@ -98,6 +100,11 @@ func userFrom(ctx context.Context) (*auth.User, error) {
 
 func isPgNoRows(err error) bool {
 	return errors.Is(err, pgx.ErrNoRows)
+}
+
+func isPgUnique(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }
 
 // --- Providers ---
@@ -333,8 +340,12 @@ func (s *Service) ListCustomers(ctx context.Context, providerID *string, page ht
 	return s.Store.ListCustomers(ctx, orgID, providerID, nil, page)
 }
 
-func (s *Service) GetCustomer(ctx context.Context, id string) (*models.ListCustomerResponse, error) {
-	c, err := s.Store.GetCustomer(ctx, id)
+func (s *Service) requireCustomer(ctx context.Context, id string) (*models.ListCustomerResponse, error) {
+	orgID, err := orgFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+	c, err := s.Store.GetCustomerInOrg(ctx, orgID, id, nil)
 	if err != nil {
 		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
@@ -342,6 +353,10 @@ func (s *Service) GetCustomer(ctx context.Context, id string) (*models.ListCusto
 		return nil, httputil.NotFoundError(notifications.CustomerNotFound)
 	}
 	return c, nil
+}
+
+func (s *Service) GetCustomer(ctx context.Context, id string) (*models.ListCustomerResponse, error) {
+	return s.requireCustomer(ctx, id)
 }
 
 func (s *Service) CreateCustomer(ctx context.Context, input models.CreateCustomerInput) (*models.CreateCustomerResponse, error) {
@@ -413,6 +428,9 @@ func validateCreateCustomer(input models.CreateCustomerInput) error {
 }
 
 func (s *Service) UpdateCustomer(ctx context.Context, id string, input models.UpdateCustomerInput) error {
+	if _, err := s.requireCustomer(ctx, id); err != nil {
+		return err
+	}
 	if strings.TrimSpace(input.Name) == "" {
 		return httputil.ValidationError(notifications.CustomerNameRequired)
 	}
@@ -494,7 +512,7 @@ func (s *Service) applyCustomerCommercial(ctx context.Context, id string, activa
 }
 
 func (s *Service) InactivateCustomer(ctx context.Context, id string) error {
-	if _, err := userFrom(ctx); err != nil {
+	if _, err := s.requireCustomer(ctx, id); err != nil {
 		return err
 	}
 	if err := s.Store.InactivateCustomer(ctx, id); err != nil {
@@ -804,12 +822,9 @@ func (s *Service) AnonymizeCustomer(ctx context.Context, customerID string) (*mo
 	if !auth.CanAnonymizeData(ctx) {
 		return nil, httputil.BusinessError(notifications.N("ANONYMIZATION_FORBIDDEN", "Apenas administradores master ou DPO podem executar a anonimização de titulares."))
 	}
-	cust, err := s.Store.GetCustomer(ctx, customerID)
+	cust, err := s.requireCustomer(ctx, customerID)
 	if err != nil {
-		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
-	}
-	if cust == nil {
-		return nil, httputil.NotFoundError(notifications.CustomerNotFound)
+		return nil, err
 	}
 
 	if err := s.Store.AnonymizeCustomer(ctx, orgID, customerID); err != nil {
@@ -822,7 +837,7 @@ func (s *Service) AnonymizeCustomer(ctx context.Context, customerID string) (*mo
 		"status": "anonymized",
 	})
 
-	return s.Store.GetCustomer(ctx, customerID)
+	return s.requireCustomer(ctx, customerID)
 }
 
 func (s *Service) ExportCustomerPersonalData(ctx context.Context, customerID string) (*models.CustomerPersonalDataExportResponse, error) {
@@ -834,12 +849,9 @@ func (s *Service) ExportCustomerPersonalData(ctx context.Context, customerID str
 	if err != nil {
 		return nil, err
 	}
-	cust, err := s.Store.GetCustomer(ctx, customerID)
+	cust, err := s.requireCustomer(ctx, customerID)
 	if err != nil {
-		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
-	}
-	if cust == nil {
-		return nil, httputil.NotFoundError(notifications.CustomerNotFound)
+		return nil, err
 	}
 
 	lines, _, err := s.Store.ListCustomerPhoneLines(ctx, orgID, customerID, httputil.PageSearch{PageSize: 200})

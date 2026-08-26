@@ -14,6 +14,7 @@ const (
 	ErrorBusiness
 	ErrorForbidden
 	ErrorInternal
+	ErrorUnavailable
 )
 
 type AppError struct {
@@ -41,6 +42,10 @@ func InternalError(n notifications.Notification) *AppError {
 	return &AppError{Kind: ErrorInternal, Notifications: []notifications.Notification{n}}
 }
 
+func UnavailableError(n notifications.Notification) *AppError {
+	return &AppError{Kind: ErrorUnavailable, Notifications: []notifications.Notification{n}}
+}
+
 func (e *AppError) StatusCode() int {
 	switch e.Kind {
 	case ErrorValidation:
@@ -51,6 +56,8 @@ func (e *AppError) StatusCode() int {
 		return http.StatusConflict
 	case ErrorForbidden:
 		return http.StatusForbidden
+	case ErrorUnavailable:
+		return http.StatusServiceUnavailable
 	default:
 		return http.StatusInternalServerError
 	}

@@ -17,22 +17,10 @@ func (s *Store) resolveOrgID(ctx context.Context, orgID string) string {
 		if exists {
 			return orgID
 		}
-		var orgExists bool
-		_ = q.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM "Organizations" WHERE "Id" = $1)`, orgID).Scan(&orgExists)
-		if orgExists {
-			return orgID
-		}
 	}
 
-	// Busca a primeira organização configurada
 	var existingOrgID string
 	err := q.QueryRow(ctx, `SELECT "OrganizationId" FROM "OrganizationSettings" ORDER BY "UpdatedAt" DESC LIMIT 1`).Scan(&existingOrgID)
-	if err == nil && existingOrgID != "" {
-		return existingOrgID
-	}
-
-	// Busca a primeira organização cadastrada no sistema
-	err = q.QueryRow(ctx, `SELECT "Id" FROM "Organizations" ORDER BY "CreatedAt" ASC LIMIT 1`).Scan(&existingOrgID)
 	if err == nil && existingOrgID != "" {
 		return existingOrgID
 	}

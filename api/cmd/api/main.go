@@ -82,13 +82,14 @@ func main() {
 	})
 
 	svc := &services.Service{
-		Store:        st,
-		Publisher:    publisher,
-		Keycloak:     kcAdmin,
-		Mailer:       email.NewSender(cfg),
-		Sicredi:      sicredi.NewClient(sicredi.ConfigFrom(cfg)),
-		ZapSign:      zapClient,
-		StateMachine: statemachine.NewEngine(st),
+		Store:                   st,
+		Publisher:               publisher,
+		Keycloak:                kcAdmin,
+		Mailer:                  email.NewSender(cfg),
+		Sicredi:                 sicredi.NewClient(sicredi.ConfigFrom(cfg)),
+		ZapSign:                 zapClient,
+		StateMachine:            statemachine.NewEngine(st),
+		FinancialAgentPublicURL: cfg.FinancialAgentPublicURL,
 	}
 	if zapClient.Enabled() {
 		logger.Info("zapsign integration enabled")
@@ -131,6 +132,11 @@ func main() {
 	} else if cfg.SicrediEnabled {
 		logger.Warn("sicredi enabled but missing credentials — set SICREDI_API_KEY, SICREDI_PASSWORD, etc.")
 	}
+	if cfg.FinancialAgentAPIKey != "" && cfg.FinancialAgentOrgID != "" {
+		logger.Info("financial n8n agent enabled")
+	} else {
+		logger.Info("financial n8n agent disabled — set FINANCIAL_AGENT_API_KEY and FINANCIAL_AGENT_ORG_ID")
+	}
 
 	var presigned *services.PresignedService
 	if cfg.ObjectStorageServiceURL != "" {
@@ -161,7 +167,12 @@ func main() {
 		presigned = &services.PresignedService{}
 	}
 
-	h := &handlers.Handler{Svc: svc, Presigned: presigned}
+	h := &handlers.Handler{
+		Svc:       svc,
+		Presigned: presigned,
+		AgentKey:  cfg.FinancialAgentAPIKey,
+		AgentOrg:  cfg.FinancialAgentOrgID,
+	}
 
 	healthChecker := observability.NewHealthChecker()
 	healthChecker.Register("postgres", func(c context.Context) observability.ComponentHealth {
@@ -202,7 +213,7 @@ func main() {
 		r.Use(cors.Handler(cors.Options{
 			AllowedOrigins:   cfg.CORSOrigins,
 			AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"},
-			AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Correlation-ID", "X-Request-ID"},
+			AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Correlation-ID", "X-Request-ID", "X-Agent-Key"},
 			ExposedHeaders:   []string{"X-Correlation-ID", "X-Request-ID"},
 			AllowCredentials: true,
 			MaxAge:           300,

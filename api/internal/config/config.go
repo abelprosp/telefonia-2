@@ -8,48 +8,51 @@ import (
 )
 
 type Config struct {
-	DatabaseURL              string
-	RabbitMQURL              string
-	KeycloakRealm            string
+	DatabaseURL                 string
+	RabbitMQURL                 string
+	KeycloakRealm               string
 	KeycloakAuthServerURL       string
 	KeycloakPublicAuthServerURL string
 	KeycloakResource            string
-	ObjectStorageServiceURL  string
-	ObjectStoragePublicURL   string
-	ObjectStorageAccessKeyID string
-	ObjectStorageSecretKey   string
-	CORSOrigins              []string
-	Port                     string
-	Environment              string
-	KeycloakAdminUsername    string
-	KeycloakAdminPassword    string
-	SMTPHost                 string
-	SMTPPort                 int
-	SMTPUser                 string
-	SMTPPassword             string
-	SMTPFrom                 string
-	SMTPTLS                  bool
-	SicrediEnabled           bool
-	SicrediSandbox           bool
-	SicrediAPIKey            string
-	SicrediUsername          string
-	SicrediPassword          string
-	SicrediCooperativa       string
-	SicrediPosto             string
-	SicrediCodigoBeneficiario string
-	SicrediWebhookToken       string
-	SicrediPublicAPIURL       string
-	SicrediAutoRegisterWebhook bool
-	MonitoringTestEnabled    bool
-	ImportEnforceStateMachine bool
-	FinancialSFTPHost        string
-	FinancialSFTPPort        int
-	FinancialSFTPUser        string
-	FinancialSFTPPassword    string
-	FinancialSFTPPath        string
-	ZapSignAPIToken          string
-	ZapSignBaseURL           string
-	ZapSignSandbox           bool
+	ObjectStorageServiceURL     string
+	ObjectStoragePublicURL      string
+	ObjectStorageAccessKeyID    string
+	ObjectStorageSecretKey      string
+	CORSOrigins                 []string
+	Port                        string
+	Environment                 string
+	KeycloakAdminUsername       string
+	KeycloakAdminPassword       string
+	SMTPHost                    string
+	SMTPPort                    int
+	SMTPUser                    string
+	SMTPPassword                string
+	SMTPFrom                    string
+	SMTPTLS                     bool
+	SicrediEnabled              bool
+	SicrediSandbox              bool
+	SicrediAPIKey               string
+	SicrediUsername             string
+	SicrediPassword             string
+	SicrediCooperativa          string
+	SicrediPosto                string
+	SicrediCodigoBeneficiario   string
+	SicrediWebhookToken         string
+	SicrediPublicAPIURL         string
+	SicrediAutoRegisterWebhook  bool
+	MonitoringTestEnabled       bool
+	ImportEnforceStateMachine   bool
+	FinancialSFTPHost           string
+	FinancialSFTPPort           int
+	FinancialSFTPUser           string
+	FinancialSFTPPassword       string
+	FinancialSFTPPath           string
+	ZapSignAPIToken             string
+	ZapSignBaseURL              string
+	ZapSignSandbox              bool
+	FinancialAgentAPIKey        string
+	FinancialAgentOrgID         string
+	FinancialAgentPublicURL     string
 }
 
 func Load() Config {
@@ -86,48 +89,51 @@ func Load() Config {
 	}
 
 	return Config{
-		DatabaseURL:              dbURL,
-		RabbitMQURL:              os.Getenv("RABBITMQ_URL"),
-		KeycloakRealm:            os.Getenv("KEYCLOAK_REALM"),
+		DatabaseURL:                 dbURL,
+		RabbitMQURL:                 os.Getenv("RABBITMQ_URL"),
+		KeycloakRealm:               os.Getenv("KEYCLOAK_REALM"),
 		KeycloakAuthServerURL:       strings.TrimRight(os.Getenv("KEYCLOAK_AUTH_SERVER_URL"), "/"),
 		KeycloakPublicAuthServerURL: strings.TrimRight(firstNonEmpty(os.Getenv("KEYCLOAK_PUBLIC_AUTH_SERVER_URL"), os.Getenv("KEYCLOAK_AUTH_SERVER_URL")), "/"),
 		KeycloakResource:            os.Getenv("KEYCLOAK_RESOURCE"),
-		ObjectStorageServiceURL:  os.Getenv("OBJECT_STORAGE_SERVICE_URL"),
-		ObjectStoragePublicURL:   firstNonEmpty(os.Getenv("OBJECT_STORAGE_PUBLIC_URL"), os.Getenv("OBJECT_STORAGE_SERVICE_URL")),
-		ObjectStorageAccessKeyID: os.Getenv("OBJECT_STORAGE_ACCESS_KEY_ID"),
-		ObjectStorageSecretKey:   os.Getenv("OBJECT_STORAGE_SECRET_ACCESS_KEY"),
-		CORSOrigins:              origins,
-		Port:                     port,
-		Environment:              env,
-		KeycloakAdminUsername:    firstNonEmpty(os.Getenv("KEYCLOAK_ADMIN_USERNAME"), "admin"),
-		KeycloakAdminPassword:    os.Getenv("KEYCLOAK_ADMIN_PASSWORD"),
-		SMTPHost:                 strings.TrimSpace(os.Getenv("SMTP_HOST")),
-		SMTPPort:                 GetEnvInt("SMTP_PORT", 587),
-		SMTPUser:                 strings.TrimSpace(os.Getenv("SMTP_USER")),
-		SMTPPassword:             os.Getenv("SMTP_PASSWORD"),
-		SMTPFrom:                 strings.TrimSpace(os.Getenv("SMTP_FROM")),
-		SMTPTLS:                  strings.EqualFold(os.Getenv("SMTP_TLS"), "true"),
-		SicrediEnabled:           strings.EqualFold(os.Getenv("SICREDI_ENABLED"), "true"),
-		SicrediSandbox:           !strings.EqualFold(os.Getenv("SICREDI_SANDBOX"), "false"),
-		SicrediAPIKey:            strings.TrimSpace(os.Getenv("SICREDI_API_KEY")),
-		SicrediUsername:          strings.TrimSpace(os.Getenv("SICREDI_USERNAME")),
-		SicrediPassword:          os.Getenv("SICREDI_PASSWORD"),
-		SicrediCooperativa:       strings.TrimSpace(os.Getenv("SICREDI_COOPERATIVA")),
-		SicrediPosto:             strings.TrimSpace(os.Getenv("SICREDI_POSTO")),
-		SicrediCodigoBeneficiario: strings.TrimSpace(os.Getenv("SICREDI_CODIGO_BENEFICIARIO")),
-		SicrediWebhookToken:       strings.TrimSpace(os.Getenv("SICREDI_WEBHOOK_TOKEN")),
-		SicrediPublicAPIURL:       sicrediPublicURL,
-		SicrediAutoRegisterWebhook: strings.EqualFold(os.Getenv("SICREDI_AUTO_REGISTER_WEBHOOK"), "true"),
-		MonitoringTestEnabled:    strings.EqualFold(os.Getenv("MONITORING_TEST_ENABLED"), "true"),
-		ImportEnforceStateMachine: GetEnvBool("IMPORT_ENFORCE_STATE_MACHINE", true),
-		FinancialSFTPHost:        strings.TrimSpace(os.Getenv("FINANCIAL_SFTP_HOST")),
-		FinancialSFTPPort:        GetEnvInt("FINANCIAL_SFTP_PORT", 22),
-		FinancialSFTPUser:        strings.TrimSpace(os.Getenv("FINANCIAL_SFTP_USER")),
-		FinancialSFTPPassword:    os.Getenv("FINANCIAL_SFTP_PASSWORD"),
-		FinancialSFTPPath:        strings.TrimSpace(firstNonEmpty(os.Getenv("FINANCIAL_SFTP_PATH"), "/inbound")),
-		ZapSignAPIToken:          strings.TrimSpace(os.Getenv("ZAPSIGN_API_TOKEN")),
-		ZapSignBaseURL:           strings.TrimSpace(os.Getenv("ZAPSIGN_BASE_URL")),
-		ZapSignSandbox:           strings.EqualFold(os.Getenv("ZAPSIGN_SANDBOX"), "true"),
+		ObjectStorageServiceURL:     os.Getenv("OBJECT_STORAGE_SERVICE_URL"),
+		ObjectStoragePublicURL:      firstNonEmpty(os.Getenv("OBJECT_STORAGE_PUBLIC_URL"), os.Getenv("OBJECT_STORAGE_SERVICE_URL")),
+		ObjectStorageAccessKeyID:    os.Getenv("OBJECT_STORAGE_ACCESS_KEY_ID"),
+		ObjectStorageSecretKey:      os.Getenv("OBJECT_STORAGE_SECRET_ACCESS_KEY"),
+		CORSOrigins:                 origins,
+		Port:                        port,
+		Environment:                 env,
+		KeycloakAdminUsername:       firstNonEmpty(os.Getenv("KEYCLOAK_ADMIN_USERNAME"), "admin"),
+		KeycloakAdminPassword:       os.Getenv("KEYCLOAK_ADMIN_PASSWORD"),
+		SMTPHost:                    strings.TrimSpace(os.Getenv("SMTP_HOST")),
+		SMTPPort:                    GetEnvInt("SMTP_PORT", 587),
+		SMTPUser:                    strings.TrimSpace(os.Getenv("SMTP_USER")),
+		SMTPPassword:                os.Getenv("SMTP_PASSWORD"),
+		SMTPFrom:                    strings.TrimSpace(os.Getenv("SMTP_FROM")),
+		SMTPTLS:                     strings.EqualFold(os.Getenv("SMTP_TLS"), "true"),
+		SicrediEnabled:              strings.EqualFold(os.Getenv("SICREDI_ENABLED"), "true"),
+		SicrediSandbox:              !strings.EqualFold(os.Getenv("SICREDI_SANDBOX"), "false"),
+		SicrediAPIKey:               strings.TrimSpace(os.Getenv("SICREDI_API_KEY")),
+		SicrediUsername:             strings.TrimSpace(os.Getenv("SICREDI_USERNAME")),
+		SicrediPassword:             os.Getenv("SICREDI_PASSWORD"),
+		SicrediCooperativa:          strings.TrimSpace(os.Getenv("SICREDI_COOPERATIVA")),
+		SicrediPosto:                strings.TrimSpace(os.Getenv("SICREDI_POSTO")),
+		SicrediCodigoBeneficiario:   strings.TrimSpace(os.Getenv("SICREDI_CODIGO_BENEFICIARIO")),
+		SicrediWebhookToken:         strings.TrimSpace(os.Getenv("SICREDI_WEBHOOK_TOKEN")),
+		SicrediPublicAPIURL:         sicrediPublicURL,
+		SicrediAutoRegisterWebhook:  strings.EqualFold(os.Getenv("SICREDI_AUTO_REGISTER_WEBHOOK"), "true"),
+		MonitoringTestEnabled:       strings.EqualFold(os.Getenv("MONITORING_TEST_ENABLED"), "true"),
+		ImportEnforceStateMachine:   GetEnvBool("IMPORT_ENFORCE_STATE_MACHINE", true),
+		FinancialSFTPHost:           strings.TrimSpace(os.Getenv("FINANCIAL_SFTP_HOST")),
+		FinancialSFTPPort:           GetEnvInt("FINANCIAL_SFTP_PORT", 22),
+		FinancialSFTPUser:           strings.TrimSpace(os.Getenv("FINANCIAL_SFTP_USER")),
+		FinancialSFTPPassword:       os.Getenv("FINANCIAL_SFTP_PASSWORD"),
+		FinancialSFTPPath:           strings.TrimSpace(firstNonEmpty(os.Getenv("FINANCIAL_SFTP_PATH"), "/inbound")),
+		ZapSignAPIToken:             strings.TrimSpace(os.Getenv("ZAPSIGN_API_TOKEN")),
+		ZapSignBaseURL:              strings.TrimSpace(os.Getenv("ZAPSIGN_BASE_URL")),
+		ZapSignSandbox:              strings.EqualFold(os.Getenv("ZAPSIGN_SANDBOX"), "true"),
+		FinancialAgentAPIKey:        strings.TrimSpace(os.Getenv("FINANCIAL_AGENT_API_KEY")),
+		FinancialAgentOrgID:         strings.TrimSpace(os.Getenv("FINANCIAL_AGENT_ORG_ID")),
+		FinancialAgentPublicURL:     strings.TrimRight(firstNonEmpty(os.Getenv("FINANCIAL_AGENT_PUBLIC_URL"), sicrediPublicURL), "/"),
 	}
 }
 

@@ -656,12 +656,9 @@ func (s *Service) GenerateContractForCustomer(ctx context.Context, customerID st
 		return nil, err
 	}
 
-	cust, err := s.Store.GetCustomer(ctx, customerID)
+	cust, err := s.GetCustomer(ctx, customerID)
 	if err != nil {
-		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
-	}
-	if cust == nil {
-		return nil, httputil.NotFoundError(notifications.CustomerNotFound)
+		return nil, err
 	}
 
 	template, err := s.Store.GetContractTemplate(ctx, orgID, input.ContractTemplateID)

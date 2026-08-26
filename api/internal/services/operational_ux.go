@@ -49,7 +49,7 @@ func (s *Service) GetOperationalDashboard(ctx context.Context) (*models.Operatio
 			}
 		case "in_transition":
 			inTransitionLines++
-		case "canceled":
+		case "cancelled", "canceled":
 			canceledLines++
 		}
 	}
@@ -164,12 +164,9 @@ func (s *Service) GetCustomer360(ctx context.Context, customerID string) (*model
 		return nil, err
 	}
 
-	cust, err := s.Store.GetCustomer(ctx, customerID)
+	cust, err := s.GetCustomer(ctx, customerID)
 	if err != nil {
-		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
-	}
-	if cust == nil {
-		return nil, httputil.NotFoundError(notifications.CustomerNotFound)
+		return nil, err
 	}
 
 	lines, totalLines, err := s.Store.ListCustomerPhoneLines(ctx, orgID, customerID, httputil.PageSearch{PageSize: 500})
