@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS "OrganizationSettings" (
     "DaysAfterDueReminder" integer NOT NULL DEFAULT 2,
     "AutoSendInvoiceEmail" boolean NOT NULL DEFAULT TRUE,
     "AutoSendCollectionReminder" boolean NOT NULL DEFAULT FALSE,
+    "ProrataDivisor" integer NOT NULL DEFAULT 30,
 
     "UpdatedAt" timestamp with time zone NOT NULL DEFAULT now(),
     "UpdatedBy" character varying(36),

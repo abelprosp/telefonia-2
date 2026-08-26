@@ -111,6 +111,11 @@ func (s *Store) GetOrganizationSettings(ctx context.Context, orgID string) (*mod
 		}, nil
 	}
 	if err != nil {
+		if isUndefinedColumn(err) {
+			if ensErr := s.ensureOrganizationSettingsSchema(ctx); ensErr == nil {
+				return s.GetOrganizationSettings(ctx, orgID)
+			}
+		}
 		return nil, err
 	}
 

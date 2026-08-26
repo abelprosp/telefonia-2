@@ -134,7 +134,11 @@ func (s *Service) GetOrganizationSettings(ctx context.Context) (*models.Organiza
 	if org != nil && org.ID != "" {
 		orgID = org.ID
 	}
-	return s.Store.GetOrganizationSettings(ctx, orgID)
+	settings, err := s.Store.GetOrganizationSettings(ctx, orgID)
+	if err != nil {
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+	return settings, nil
 }
 
 func (s *Service) UpdateCompanySettings(ctx context.Context, input models.UpdateCompanySettingsInput) (*models.OrganizationSettingsResponse, error) {

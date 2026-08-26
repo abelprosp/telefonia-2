@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
@@ -28,7 +29,21 @@ func New(ctx context.Context, databaseURL string) (*Store, error) {
 		pool.Close()
 		return nil, fmt.Errorf("ping: %w", err)
 	}
-	return &Store{pool: pool}, nil
+	s := &Store{pool: pool}
+	_ = s.ensureOrganizationSettingsSchema(ctx)
+	return s, nil
+}
+
+func isUndefinedColumn(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "42703"
+}
+
+func (s *Store) ensureOrganizationSettingsSchema(ctx context.Context) error {
+	_, err := s.pool.Exec(ctx, `
+		ALTER TABLE IF EXISTS "OrganizationSettings"
+		    ADD COLUMN IF NOT EXISTS "ProrataDivisor" integer NOT NULL DEFAULT 30`)
+	return err
 }
 
 func (s *Store) Close() {
