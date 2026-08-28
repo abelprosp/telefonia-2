@@ -2,7 +2,9 @@
 
 set -euo pipefail
 
-# Perfil "dev" inclui connect-web-dev (Vite). Em produção use o alvo "prod" sem este perfil.
+# Perfil "dev" inclui connect-web-dev (Vite).
+# Na VPS Hostinger: ./docker-up.sh prod
+# O nginx do Ubuntu fica na 80/443; os contentores usam 3005 / 8002 / 8081.
 if [ "${1:-}" = "prod" ]; then
   unset COMPOSE_PROFILES
 else
