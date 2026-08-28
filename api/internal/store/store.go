@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/luxus-connect/telefonia/api/internal/dbmigrate"
 )
 
 type Store struct {
@@ -31,6 +32,9 @@ func New(ctx context.Context, databaseURL string) (*Store, error) {
 		return nil, fmt.Errorf("ping: %w", err)
 	}
 	s := &Store{pool: pool}
+	if err := dbmigrate.Apply(ctx, pool); err != nil {
+		fmt.Fprintf(os.Stderr, "dbmigrate: %v\n", err)
+	}
 	if err := s.ensureOrganizationSettingsSchema(ctx); err != nil {
 		fmt.Fprintf(os.Stderr, "ensure OrganizationSettings schema: %v\n", err)
 	}
@@ -43,6 +47,11 @@ func New(ctx context.Context, databaseURL string) (*Store, error) {
 func isUndefinedColumn(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "42703"
+}
+
+func isUndefinedTable(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "42P01"
 }
 
 func (s *Store) ensureOrganizationSettingsSchema(ctx context.Context) error {

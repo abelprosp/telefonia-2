@@ -5,6 +5,7 @@ DB_NAME="luxus_connect_dev"
 CONTAINER_NAME="postgres.connect.luxus"
 
 echo "Aplicando migrações no banco $DB_NAME..."
+echo "(A API também aplica 021+ no arranque; este script cobre a base completa.)"
 
 for f in $(ls db/migrations/[0-9]*.sql | sort); do
   echo "==> Executando $f"

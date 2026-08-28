@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/luxus-connect/telefonia/api/internal/dbmigrate"
 )
 
 type ProcessingMonthRunRow struct {
@@ -21,16 +22,16 @@ type ProcessingMonthRunRow struct {
 }
 
 type ProcessingMonthRunStepRow struct {
-	ID         string
-	RunID      string
-	StepKey    string
-	StepOrder  int
-	Label      string
-	Status     string
-	StartedAt  *time.Time
+	ID          string
+	RunID       string
+	StepKey     string
+	StepOrder   int
+	Label       string
+	Status      string
+	StartedAt   *time.Time
 	CompletedAt *time.Time
-	DurationMs *int
-	Error      *string
+	DurationMs  *int
+	Error       *string
 	SummaryJSON *string
 }
 
@@ -140,6 +141,18 @@ type PortalCustomerLinkRow struct {
 }
 
 func (s *Store) GetPortalLinkByUser(ctx context.Context, orgID, userID string) (*PortalCustomerLinkRow, error) {
+	r, err := s.scanPortalLinkByUser(ctx, orgID, userID)
+	if err != nil && isUndefinedTable(err) {
+		_ = dbmigrate.Apply(ctx, s.pool)
+		r, err = s.scanPortalLinkByUser(ctx, orgID, userID)
+		if isUndefinedTable(err) {
+			return nil, nil
+		}
+	}
+	return r, err
+}
+
+func (s *Store) scanPortalLinkByUser(ctx context.Context, orgID, userID string) (*PortalCustomerLinkRow, error) {
 	var r PortalCustomerLinkRow
 	err := s.q(ctx).QueryRow(ctx, `
 		SELECT "Id","OrganizationId","UserId","CustomerId","Document","CreatedAt"
@@ -148,7 +161,10 @@ func (s *Store) GetPortalLinkByUser(ctx context.Context, orgID, userID string) (
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
-	return &r, err
+	if err != nil {
+		return nil, err
+	}
+	return &r, nil
 }
 
 func (s *Store) UpsertPortalCustomerLink(ctx context.Context, r PortalCustomerLinkRow) error {
@@ -157,6 +173,14 @@ func (s *Store) UpsertPortalCustomerLink(ctx context.Context, r PortalCustomerLi
 		VALUES ($1,$2,$3,$4,$5,$6)
 		ON CONFLICT ("OrganizationId","UserId") DO UPDATE SET "CustomerId"=EXCLUDED."CustomerId", "Document"=EXCLUDED."Document"`,
 		r.ID, r.OrganizationID, r.UserID, r.CustomerID, r.Document, r.CreatedAt)
+	if err != nil && isUndefinedTable(err) {
+		_ = dbmigrate.Apply(ctx, s.pool)
+		_, err = s.q(ctx).Exec(ctx, `
+			INSERT INTO "PortalCustomerLinks" ("Id","OrganizationId","UserId","CustomerId","Document","CreatedAt")
+			VALUES ($1,$2,$3,$4,$5,$6)
+			ON CONFLICT ("OrganizationId","UserId") DO UPDATE SET "CustomerId"=EXCLUDED."CustomerId", "Document"=EXCLUDED."Document"`,
+			r.ID, r.OrganizationID, r.UserID, r.CustomerID, r.Document, r.CreatedAt)
+	}
 	return err
 }
 
