@@ -27,7 +27,10 @@ services:
     environment:
       - KC_HTTP_RELATIVE_PATH=/auth
       - KC_PROXY_HEADERS=xforwarded
-      - KC_HOSTNAME=telefonia.redobrai.online
+      - KC_HOSTNAME=https://telefonia.redobrai.online/auth
+      - KC_HOSTNAME_ADMIN=https://telefonia.redobrai.online/auth
+      - KC_HOSTNAME_URL=https://telefonia.redobrai.online/auth
+      - KC_HOSTNAME_ADMIN_URL=https://telefonia.redobrai.online/auth
       - KC_HOSTNAME_STRICT=false
     ports: []
     restart: on-failure

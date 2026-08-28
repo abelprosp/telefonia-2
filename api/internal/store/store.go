@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -30,8 +31,12 @@ func New(ctx context.Context, databaseURL string) (*Store, error) {
 		return nil, fmt.Errorf("ping: %w", err)
 	}
 	s := &Store{pool: pool}
-	_ = s.ensureOrganizationSettingsSchema(ctx)
-	_ = s.ensureFinancialAgentSchema(ctx)
+	if err := s.ensureOrganizationSettingsSchema(ctx); err != nil {
+		fmt.Fprintf(os.Stderr, "ensure OrganizationSettings schema: %v\n", err)
+	}
+	if err := s.ensureFinancialAgentSchema(ctx); err != nil {
+		fmt.Fprintf(os.Stderr, "ensure FinancialAgent schema: %v\n", err)
+	}
 	return s, nil
 }
 

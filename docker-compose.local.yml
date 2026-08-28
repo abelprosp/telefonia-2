@@ -15,7 +15,8 @@ services:
 
   keycloak:
     environment:
-      - KC_HOSTNAME=localhost
+      - KC_HOSTNAME=http://localhost:8081/auth
+      - KC_HOSTNAME_ADMIN=http://localhost:8081/auth
       - KC_HOSTNAME_URL=http://localhost:8081/auth
       - KC_HOSTNAME_ADMIN_URL=http://localhost:8081/auth
       - KC_HOSTNAME_STRICT=false

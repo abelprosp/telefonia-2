@@ -31,9 +31,56 @@ func (s *Store) resolveOrgID(ctx context.Context, orgID string) string {
 	return "00000000-0000-0000-0000-000000000001"
 }
 
-func (s *Store) GetOrganizationSettings(ctx context.Context, orgID string) (*models.OrganizationSettingsResponse, error) {
-	effectiveOrgID := s.resolveOrgID(ctx, orgID)
+func defaultOrganizationSettings(orgID string) *models.OrganizationSettingsResponse {
+	return &models.OrganizationSettingsResponse{
+		OrganizationID: orgID,
+		Company: models.CompanySettingsDto{
+			CompanyName:       "Luxus Telefonia Ltda",
+			TradingName:       "Luxus Connect",
+			Cnpj:              "11.309.896/0001-01",
+			StateRegistration: "",
+			Email:             "contato@luxusconnect.com.br",
+			Phone:             "(11) 99999-9999",
+			Website:           "https://telefonia.redobrai.online",
+			ZipCode:           "",
+			Street:            "",
+			Number:            "",
+			Complement:        "",
+			Neighborhood:      "",
+			City:              "",
+			State:             "",
+		},
+		Whitelabel: models.WhitelabelSettingsDto{
+			AppName:      "Luxus Connect",
+			AppSlogan:    "Gestão Inteligente de Telefonia",
+			LogoUrl:      "",
+			DarkLogoUrl:  "",
+			FaviconUrl:   "",
+			PrimaryColor: "#0f766e",
+			SupportEmail: "suporte@luxusconnect.com.br",
+			SupportPhone: "(11) 99999-9999",
+			FooterText:   "© 2026 Luxus Connect. Todos os direitos reservados.",
+		},
+		System: models.SystemSettingsDto{
+			DefaultDueDay:              10,
+			LateFeePercentage:          2.00,
+			InterestRateMonthly:        1.00,
+			DaysBeforeDueReminder:      3,
+			DaysAfterDueReminder:       2,
+			AutoSendInvoiceEmail:       true,
+			AutoSendCollectionReminder: false,
+			ProrataDivisor:             30,
+		},
+		UpdatedAt: time.Now(),
+	}
+}
+
+func (s *Store) scanOrganizationSettings(ctx context.Context, orgID string, withProrata bool) (*models.OrganizationSettingsResponse, error) {
 	q := s.q(ctx)
+	prorataSelect := `30`
+	if withProrata {
+		prorataSelect = `COALESCE("ProrataDivisor", 30)`
+	}
 	query := `
 		SELECT "OrganizationId",
 			"CompanyName", "TradingName", "Cnpj", "StateRegistration", "Email", "Phone", "Website",
@@ -42,19 +89,18 @@ func (s *Store) GetOrganizationSettings(ctx context.Context, orgID string) (*mod
 			"SupportEmail", "SupportPhone", "FooterText",
 			"DefaultDueDay", "LateFeePercentage", "InterestRateMonthly", "DaysBeforeDueReminder",
 			"DaysAfterDueReminder", "AutoSendInvoiceEmail", "AutoSendCollectionReminder",
-			COALESCE("ProrataDivisor", 30),
+			` + prorataSelect + `,
 			"UpdatedAt", "UpdatedBy"
 		FROM "OrganizationSettings"
 		WHERE "OrganizationId" = $1
 	`
 	var (
-		res models.OrganizationSettingsResponse
-		comp models.CompanySettingsDto
+		res   models.OrganizationSettingsResponse
+		comp  models.CompanySettingsDto
 		white models.WhitelabelSettingsDto
-		sys models.SystemSettingsDto
+		sys   models.SystemSettingsDto
 	)
-
-	err := q.QueryRow(ctx, query, effectiveOrgID).Scan(
+	err := q.QueryRow(ctx, query, orgID).Scan(
 		&res.OrganizationID,
 		&comp.CompanyName, &comp.TradingName, &comp.Cnpj, &comp.StateRegistration, &comp.Email, &comp.Phone, &comp.Website,
 		&comp.ZipCode, &comp.Street, &comp.Number, &comp.Complement, &comp.Neighborhood, &comp.City, &comp.State,
@@ -65,60 +111,9 @@ func (s *Store) GetOrganizationSettings(ctx context.Context, orgID string) (*mod
 		&sys.ProrataDivisor,
 		&res.UpdatedAt, &res.UpdatedBy,
 	)
-
-	if errors.Is(err, pgx.ErrNoRows) {
-		// Retorna defaults se ainda não houver registro
-		return &models.OrganizationSettingsResponse{
-			OrganizationID: effectiveOrgID,
-			Company: models.CompanySettingsDto{
-				CompanyName:       "Luxus Telefonia Ltda",
-				TradingName:       "Luxus Connect",
-				Cnpj:              "11.309.896/0001-01",
-				StateRegistration: "",
-				Email:             "contato@luxusconnect.com.br",
-				Phone:             "(11) 99999-9999",
-				Website:           "https://telefonia.redobrai.online",
-				ZipCode:           "",
-				Street:            "",
-				Number:            "",
-				Complement:        "",
-				Neighborhood:      "",
-				City:              "",
-				State:             "",
-			},
-			Whitelabel: models.WhitelabelSettingsDto{
-				AppName:      "Luxus Connect",
-				AppSlogan:    "Gestão Inteligente de Telefonia",
-				LogoUrl:      "",
-				DarkLogoUrl:  "",
-				FaviconUrl:   "",
-				PrimaryColor: "#0f766e",
-				SupportEmail: "suporte@luxusconnect.com.br",
-				SupportPhone: "(11) 99999-9999",
-				FooterText:   "© 2026 Luxus Connect. Todos os direitos reservados.",
-			},
-			System: models.SystemSettingsDto{
-				DefaultDueDay:              10,
-				LateFeePercentage:          2.00,
-				InterestRateMonthly:        1.00,
-				DaysBeforeDueReminder:      3,
-				DaysAfterDueReminder:       2,
-				AutoSendInvoiceEmail:       true,
-				AutoSendCollectionReminder: false,
-				ProrataDivisor:             30,
-			},
-			UpdatedAt: time.Now(),
-		}, nil
-	}
 	if err != nil {
-		if isUndefinedColumn(err) {
-			if ensErr := s.ensureOrganizationSettingsSchema(ctx); ensErr == nil {
-				return s.GetOrganizationSettings(ctx, orgID)
-			}
-		}
 		return nil, err
 	}
-
 	res.Company = comp
 	res.Whitelabel = white
 	res.System = sys
@@ -128,12 +123,31 @@ func (s *Store) GetOrganizationSettings(ctx context.Context, orgID string) (*mod
 	return &res, nil
 }
 
+func (s *Store) GetOrganizationSettings(ctx context.Context, orgID string) (*models.OrganizationSettingsResponse, error) {
+	effectiveOrgID := s.resolveOrgID(ctx, orgID)
+	res, err := s.scanOrganizationSettings(ctx, effectiveOrgID, true)
+	if err != nil && isUndefinedColumn(err) {
+		_ = s.ensureOrganizationSettingsSchema(ctx)
+		res, err = s.scanOrganizationSettings(ctx, effectiveOrgID, true)
+		if err != nil && isUndefinedColumn(err) {
+			res, err = s.scanOrganizationSettings(ctx, effectiveOrgID, false)
+		}
+	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		return defaultOrganizationSettings(effectiveOrgID), nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
 func (s *Store) GetProrataDivisor(ctx context.Context, orgID string) (int, error) {
 	effectiveOrgID := s.resolveOrgID(ctx, orgID)
 	var n int
 	err := s.q(ctx).QueryRow(ctx, `
 		SELECT COALESCE("ProrataDivisor", 30) FROM "OrganizationSettings" WHERE "OrganizationId" = $1`, effectiveOrgID).Scan(&n)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, pgx.ErrNoRows) || isUndefinedColumn(err) {
 		return 30, nil
 	}
 	if err != nil {
