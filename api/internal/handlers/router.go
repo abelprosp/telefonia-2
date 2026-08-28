@@ -442,6 +442,15 @@ func (h *Handler) RegisterRoutes(
 
 			r.Get("/financial/summary", h.getFinancialSummary)
 
+			r.Route("/financial-agent", func(r chi.Router) {
+				r.Get("/", h.getFinancialAgentPanel)
+				r.Put("/settings", h.updateFinancialAgentSettings)
+				r.Get("/events", h.listFinancialAgentEvents)
+				r.Get("/whatsapp", h.getFinancialAgentWhatsApp)
+				r.Post("/whatsapp/connect", h.connectFinancialAgentWhatsApp)
+				r.Post("/whatsapp/disconnect", h.disconnectFinancialAgentWhatsApp)
+			})
+
 			r.Route("/accounts-payable", func(r chi.Router) {
 
 				r.Get("/", h.listAccountsPayable)

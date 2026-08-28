@@ -12,3 +12,12 @@ services:
   connect-web:
     ports: !override
       - '3001:80'
+
+  keycloak:
+    environment:
+      - KC_HOSTNAME=localhost
+      - KC_HOSTNAME_URL=http://localhost:8081/auth
+      - KC_HOSTNAME_ADMIN_URL=http://localhost:8081/auth
+      - KC_HOSTNAME_STRICT=false
+      - KC_HOSTNAME_STRICT_HTTPS=false
+

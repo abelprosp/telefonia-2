@@ -66,6 +66,12 @@ func (s *Service) FinancialAgentLookupCustomer(ctx context.Context, input models
 	default:
 		msg = "Vários clientes encontrados. Confirme o nome ou o CPF/CNPJ."
 	}
+	var cust *models.FinancialAgentCustomer
+	if len(items) == 1 {
+		c := items[0]
+		cust = &c
+	}
+	s.logAgentEvent(ctx, "lookup", len(items) > 0, msg, input.WhatsAppNumber, cust, nil)
 	return &models.FinancialAgentLookupResponse{Query: query, Count: len(items), Items: items, Message: msg}, nil
 }
 
@@ -210,6 +216,7 @@ func (s *Service) FinancialAgentInvoicePackage(ctx context.Context, input models
 			pkg.BoletoPDFURL = base + "/v1/agent/financial/invoices/" + inv.ID + "/boleto-pdf"
 		}
 	}
+	s.logAgentEvent(ctx, "invoice_package", true, "Pacote da fatura "+inv.InvoiceNumber+" montado.", input.WhatsAppNumber, nil, &inv)
 	return pkg, nil
 }
 
@@ -304,6 +311,7 @@ func (s *Service) FinancialAgentCheckDelinquency(ctx context.Context, input mode
 		out.Summary = fmt.Sprintf("%s está inadimplente: %d fatura(s) vencida(s), saldo original %s, total com multa e juros %s.",
 			cust.Name, out.OverdueCount, formatMoneyBR(out.OverdueBalance), formatMoneyBR(out.TotalWithCharges))
 	}
+	s.logAgentEvent(ctx, "delinquency", true, out.Summary, input.WhatsAppNumber, &cust, nil)
 	return out, nil
 }
 
@@ -502,6 +510,7 @@ func (s *Service) FinancialAgentVerifyReceipt(ctx context.Context, input models.
 
 	if inv.Paid {
 		resp.Summary = fmt.Sprintf("Comprovante parece da fatura %s, que já está paga.", inv.InvoiceNumber)
+		s.logAgentEvent(ctx, "verify_receipt", true, resp.Summary, input.WhatsAppNumber, nil, &inv)
 		return resp, nil
 	}
 
@@ -509,11 +518,13 @@ func (s *Service) FinancialAgentVerifyReceipt(ctx context.Context, input models.
 		if _, err := s.confirmAgentPayment(ctx, orgID, inv, input.Amount, paidAt, receiptReference(input), "Comprovante validado pelo agente financeiro", sicrediLiquidated); err != nil {
 			resp.NeedsHumanReview = true
 			resp.Summary = "Comprovante conferido, mas a baixa automática falhou: " + err.Error()
+			s.logAgentEvent(ctx, "verify_receipt", false, resp.Summary, input.WhatsAppNumber, nil, &inv)
 			return resp, nil
 		}
 		resp.Confirmed = true
 		resp.NeedsHumanReview = false
 		resp.Summary = fmt.Sprintf("Comprovante conferido e pagamento da fatura %s baixado automaticamente.", inv.InvoiceNumber)
+		s.logAgentEvent(ctx, "verify_receipt", true, resp.Summary, input.WhatsAppNumber, nil, &inv)
 		return resp, nil
 	}
 
@@ -525,11 +536,13 @@ func (s *Service) FinancialAgentVerifyReceipt(ctx context.Context, input models.
 		resp.CanAutoConfirm = true
 		resp.NeedsHumanReview = false
 		resp.Summary = fmt.Sprintf("Pagamento da fatura %s baixado por confirmação explícita do operador.", inv.InvoiceNumber)
+		s.logAgentEvent(ctx, "verify_receipt", true, resp.Summary, input.WhatsAppNumber, nil, &inv)
 		return resp, nil
 	}
 
 	resp.Summary = fmt.Sprintf("Comprovante com confiança %s (%d). Fatura candidata %s, valor original %s, total com encargos %s. Não baixar automaticamente — revisão humana.",
 		label, score, inv.InvoiceNumber, formatMoneyBR(inv.Amount), formatMoneyBR(interest.TotalAmount))
+	s.logAgentEvent(ctx, "verify_receipt", resp.Matched, resp.Summary, input.WhatsAppNumber, nil, &inv)
 	return resp, nil
 }
 
@@ -623,6 +636,7 @@ func (s *Service) confirmAgentPayment(ctx context.Context, orgID string, inv mod
 	} else {
 		_ = s.Store.MarkSicrediBoletoPaid(ctx, orgID, inv.ID, when)
 	}
+	s.logAgentEvent(ctx, "confirm_payment", true, "Pagamento da fatura "+inv.InvoiceNumber+" baixado.", "", nil, &inv)
 	return &models.FinancialAgentConfirmPaymentResponse{
 		Success: true, InvoiceID: inv.ID, InvoiceNumber: inv.InvoiceNumber, Amount: amount,
 	}, nil

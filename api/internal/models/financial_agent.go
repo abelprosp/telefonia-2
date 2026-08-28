@@ -205,3 +205,64 @@ type FinancialAgentHealthResponse struct {
 	SicrediConnected bool   `json:"sicredi_connected"`
 	Message          string `json:"message"`
 }
+
+type FinancialAgentSettingsInput struct {
+	Enabled           *bool   `json:"enabled,omitempty"`
+	EvolutionAPIURL   *string `json:"evolution_api_url,omitempty"`
+	EvolutionAPIKey   *string `json:"evolution_api_key,omitempty"`
+	EvolutionInstance *string `json:"evolution_instance,omitempty"`
+	N8nWebhookURL     *string `json:"n8n_webhook_url,omitempty"`
+}
+
+type FinancialAgentSettingsResponse struct {
+	Enabled              bool      `json:"enabled"`
+	EvolutionAPIURL      string    `json:"evolution_api_url"`
+	EvolutionAPIKeySet   bool      `json:"evolution_api_key_set"`
+	EvolutionInstance    string    `json:"evolution_instance"`
+	N8nWebhookURL        string    `json:"n8n_webhook_url"`
+	UpdatedAt            time.Time `json:"updated_at,omitempty"`
+}
+
+type FinancialAgentWhatsAppStatus struct {
+	Configured    bool   `json:"configured"`
+	State         string `json:"state"`
+	Connected     bool   `json:"connected"`
+	QRCode        string `json:"qr_code,omitempty"`
+	PairingCode   string `json:"pairing_code,omitempty"`
+	InstanceName  string `json:"instance_name,omitempty"`
+	ProfileName   string `json:"profile_name,omitempty"`
+	OwnerJID      string `json:"owner_jid,omitempty"`
+	Message       string `json:"message,omitempty"`
+}
+
+type FinancialAgentEvent struct {
+	ID             string    `json:"id"`
+	EventType      string    `json:"event_type"`
+	EventLabel     string    `json:"event_label"`
+	WhatsAppNumber string    `json:"whatsapp_number,omitempty"`
+	CustomerName   string    `json:"customer_name,omitempty"`
+	InvoiceNumber  string    `json:"invoice_number,omitempty"`
+	Success        bool      `json:"success"`
+	Summary        string    `json:"summary"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
+type FinancialAgentPanelStats struct {
+	TotalToday    int `json:"total_today"`
+	SuccessToday  int `json:"success_today"`
+	FailedToday   int `json:"failed_today"`
+	LookupsToday  int `json:"lookups_today"`
+	ReceiptsToday int `json:"receipts_today"`
+	PaymentsToday int `json:"payments_today"`
+}
+
+type FinancialAgentPanelResponse struct {
+	ToolsReady          bool                            `json:"tools_ready"`
+	OrganizationSet     bool                            `json:"organization_set"`
+	SicrediEnabled      bool                            `json:"sicredi_enabled"`
+	SicrediConnected    bool                            `json:"sicredi_connected"`
+	Settings            FinancialAgentSettingsResponse  `json:"settings"`
+	WhatsApp            FinancialAgentWhatsAppStatus    `json:"whatsapp"`
+	Stats               FinancialAgentPanelStats        `json:"stats"`
+	Message             string                          `json:"message"`
+}

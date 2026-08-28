@@ -89,7 +89,8 @@ func main() {
 		Sicredi:                 sicredi.NewClient(sicredi.ConfigFrom(cfg)),
 		ZapSign:                 zapClient,
 		StateMachine:            statemachine.NewEngine(st),
-		FinancialAgentPublicURL: cfg.FinancialAgentPublicURL,
+		FinancialAgentPublicURL:  cfg.FinancialAgentPublicURL,
+		FinancialAgentConfigured: cfg.FinancialAgentAPIKey != "" && cfg.FinancialAgentOrgID != "",
 	}
 	if zapClient.Enabled() {
 		logger.Info("zapsign integration enabled")

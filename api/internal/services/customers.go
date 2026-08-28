@@ -27,15 +27,16 @@ type ImportProcessor interface {
 }
 
 type Service struct {
-	Store                   *store.Store
-	Publisher               EventPublisher
-	Processor               ImportProcessor
-	Keycloak                *keycloak.AdminClient
-	Mailer                  *email.Sender
-	Sicredi                 SicrediBoletoIssuer
-	ZapSign                 *zapsign.Client
-	StateMachine            *statemachine.Engine
-	FinancialAgentPublicURL string
+	Store                      *store.Store
+	Publisher                  EventPublisher
+	Processor                  ImportProcessor
+	Keycloak                   *keycloak.AdminClient
+	Mailer                     *email.Sender
+	Sicredi                    SicrediBoletoIssuer
+	ZapSign                    *zapsign.Client
+	StateMachine               *statemachine.Engine
+	FinancialAgentPublicURL    string
+	FinancialAgentConfigured   bool
 }
 
 func (s *Service) SM() *statemachine.Engine {

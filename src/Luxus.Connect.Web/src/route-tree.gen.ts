@@ -52,6 +52,7 @@ import { Route as _appFinancePayablesIndexRouteImport } from './pages/__app/fina
 import { Route as _appFinancePartnerSalesIndexRouteImport } from './pages/__app/finance/partner-sales/index'
 import { Route as _appFinanceInvoiceLayoutTemplatesIndexRouteImport } from './pages/__app/finance/invoice-layout-templates/index'
 import { Route as _appFinanceInvoiceEmailTemplatesIndexRouteImport } from './pages/__app/finance/invoice-email-templates/index'
+import { Route as _appFinanceFinancialAgentIndexRouteImport } from './pages/__app/finance/financial-agent/index'
 import { Route as _appFinanceCustomerInvoicesIndexRouteImport } from './pages/__app/finance/customer-invoices/index'
 import { Route as _appFinanceCollectionsIndexRouteImport } from './pages/__app/finance/collections/index'
 import { Route as _appPartnerCommercialSalesSaleIdRouteImport } from './pages/__app/partner/commercial-sales/$saleId'
@@ -291,6 +292,12 @@ const _appFinanceInvoiceEmailTemplatesIndexRoute =
     path: '/finance/invoice-email-templates/',
     getParentRoute: () => _appLayoutRoute,
   } as any)
+const _appFinanceFinancialAgentIndexRoute =
+  _appFinanceFinancialAgentIndexRouteImport.update({
+    id: '/finance/financial-agent/',
+    path: '/finance/financial-agent/',
+    getParentRoute: () => _appLayoutRoute,
+  } as any)
 const _appFinanceCustomerInvoicesIndexRoute =
   _appFinanceCustomerInvoicesIndexRouteImport.update({
     id: '/finance/customer-invoices/',
@@ -370,6 +377,7 @@ export interface FileRoutesByFullPath {
   '/partner/commercial-sales/$saleId': typeof _appPartnerCommercialSalesSaleIdRoute
   '/finance/collections/': typeof _appFinanceCollectionsIndexRoute
   '/finance/customer-invoices/': typeof _appFinanceCustomerInvoicesIndexRoute
+  '/finance/financial-agent/': typeof _appFinanceFinancialAgentIndexRoute
   '/finance/invoice-email-templates/': typeof _appFinanceInvoiceEmailTemplatesIndexRoute
   '/finance/invoice-layout-templates/': typeof _appFinanceInvoiceLayoutTemplatesIndexRoute
   '/finance/partner-sales/': typeof _appFinancePartnerSalesIndexRoute
@@ -421,6 +429,7 @@ export interface FileRoutesByTo {
   '/partner/commercial-sales/$saleId': typeof _appPartnerCommercialSalesSaleIdRoute
   '/finance/collections': typeof _appFinanceCollectionsIndexRoute
   '/finance/customer-invoices': typeof _appFinanceCustomerInvoicesIndexRoute
+  '/finance/financial-agent': typeof _appFinanceFinancialAgentIndexRoute
   '/finance/invoice-email-templates': typeof _appFinanceInvoiceEmailTemplatesIndexRoute
   '/finance/invoice-layout-templates': typeof _appFinanceInvoiceLayoutTemplatesIndexRoute
   '/finance/partner-sales': typeof _appFinancePartnerSalesIndexRoute
@@ -474,6 +483,7 @@ export interface FileRoutesById {
   '/__app/partner/commercial-sales/$saleId': typeof _appPartnerCommercialSalesSaleIdRoute
   '/__app/finance/collections/': typeof _appFinanceCollectionsIndexRoute
   '/__app/finance/customer-invoices/': typeof _appFinanceCustomerInvoicesIndexRoute
+  '/__app/finance/financial-agent/': typeof _appFinanceFinancialAgentIndexRoute
   '/__app/finance/invoice-email-templates/': typeof _appFinanceInvoiceEmailTemplatesIndexRoute
   '/__app/finance/invoice-layout-templates/': typeof _appFinanceInvoiceLayoutTemplatesIndexRoute
   '/__app/finance/partner-sales/': typeof _appFinancePartnerSalesIndexRoute
@@ -527,6 +537,7 @@ export interface FileRouteTypes {
     | '/partner/commercial-sales/$saleId'
     | '/finance/collections/'
     | '/finance/customer-invoices/'
+    | '/finance/financial-agent/'
     | '/finance/invoice-email-templates/'
     | '/finance/invoice-layout-templates/'
     | '/finance/partner-sales/'
@@ -578,6 +589,7 @@ export interface FileRouteTypes {
     | '/partner/commercial-sales/$saleId'
     | '/finance/collections'
     | '/finance/customer-invoices'
+    | '/finance/financial-agent'
     | '/finance/invoice-email-templates'
     | '/finance/invoice-layout-templates'
     | '/finance/partner-sales'
@@ -630,6 +642,7 @@ export interface FileRouteTypes {
     | '/__app/partner/commercial-sales/$saleId'
     | '/__app/finance/collections/'
     | '/__app/finance/customer-invoices/'
+    | '/__app/finance/financial-agent/'
     | '/__app/finance/invoice-email-templates/'
     | '/__app/finance/invoice-layout-templates/'
     | '/__app/finance/partner-sales/'
@@ -953,6 +966,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof _appFinanceInvoiceEmailTemplatesIndexRouteImport
       parentRoute: typeof _appLayoutRoute
     }
+    '/__app/finance/financial-agent/': {
+      id: '/__app/finance/financial-agent/'
+      path: '/finance/financial-agent'
+      fullPath: '/finance/financial-agent/'
+      preLoaderRoute: typeof _appFinanceFinancialAgentIndexRouteImport
+      parentRoute: typeof _appLayoutRoute
+    }
     '/__app/finance/customer-invoices/': {
       id: '/__app/finance/customer-invoices/'
       path: '/finance/customer-invoices'
@@ -1041,6 +1061,7 @@ interface _appLayoutRouteChildren {
   _appPartnerCommercialSalesSaleIdRoute: typeof _appPartnerCommercialSalesSaleIdRoute
   _appFinanceCollectionsIndexRoute: typeof _appFinanceCollectionsIndexRoute
   _appFinanceCustomerInvoicesIndexRoute: typeof _appFinanceCustomerInvoicesIndexRoute
+  _appFinanceFinancialAgentIndexRoute: typeof _appFinanceFinancialAgentIndexRoute
   _appFinanceInvoiceEmailTemplatesIndexRoute: typeof _appFinanceInvoiceEmailTemplatesIndexRoute
   _appFinanceInvoiceLayoutTemplatesIndexRoute: typeof _appFinanceInvoiceLayoutTemplatesIndexRoute
   _appFinancePartnerSalesIndexRoute: typeof _appFinancePartnerSalesIndexRoute
@@ -1096,6 +1117,7 @@ const _appLayoutRouteChildren: _appLayoutRouteChildren = {
   _appPartnerCommercialSalesSaleIdRoute: _appPartnerCommercialSalesSaleIdRoute,
   _appFinanceCollectionsIndexRoute: _appFinanceCollectionsIndexRoute,
   _appFinanceCustomerInvoicesIndexRoute: _appFinanceCustomerInvoicesIndexRoute,
+  _appFinanceFinancialAgentIndexRoute: _appFinanceFinancialAgentIndexRoute,
   _appFinanceInvoiceEmailTemplatesIndexRoute:
     _appFinanceInvoiceEmailTemplatesIndexRoute,
   _appFinanceInvoiceLayoutTemplatesIndexRoute:

@@ -115,6 +115,7 @@ const financialMenuItem: MenuItem = {
     { title: 'Contas a receber', url: '/finance/receivables' },
     { title: 'Faturas para envio', url: '/finance/customer-invoices' },
     { title: 'Inadimplentes', url: '/finance/collections' },
+    { title: 'Agente WhatsApp', url: '/finance/financial-agent' },
     { title: 'Templates de e-mail', url: '/finance/invoice-email-templates' },
     { title: 'Layouts de fatura', url: '/finance/invoice-layout-templates' },
     { title: 'Vendas de parceiros', url: '/finance/partner-sales' }

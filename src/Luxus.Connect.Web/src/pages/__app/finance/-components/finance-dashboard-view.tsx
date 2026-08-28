@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router';
-import { ArrowDownCircle, ArrowUpCircle, FileText, Handshake, Layers, Mail, Wallet } from 'lucide-react';
+import { ArrowDownCircle, ArrowUpCircle, FileText, Handshake, Layers, Mail, MessageCircle, Wallet } from 'lucide-react';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -136,6 +136,12 @@ export function FinanceDashboardView() {
       icon: Wallet,
       to: '/finance/collections',
       search: { page: 1, pageSize: 10 }
+    },
+    {
+      title: 'Agente WhatsApp',
+      value: 'Painel',
+      icon: MessageCircle,
+      to: '/finance/financial-agent'
     }
   ];
 
@@ -207,6 +213,12 @@ export function FinanceDashboardView() {
             className="text-primary text-sm font-medium hover:underline"
           >
             Inadimplentes
+          </Link>
+          <Link
+            to="/finance/financial-agent"
+            className="text-primary text-sm font-medium hover:underline"
+          >
+            Agente WhatsApp
           </Link>
           <Link
             to="/finance/invoice-email-templates"

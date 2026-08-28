@@ -228,4 +228,6 @@ var (
 	FinancialAgentQueryRequired         = N("FINANCIAL_AGENT_QUERY_REQUIRED", "Informe nome, telefone, CPF/CNPJ, número da linha ou número da fatura.")
 	FinancialAgentReceiptRequired       = N("FINANCIAL_AGENT_RECEIPT_REQUIRED", "Informe os dados extraídos do comprovante (valor e data, PIX ou número da fatura).")
 	FinancialAgentConfirmDenied         = N("FINANCIAL_AGENT_CONFIRM_DENIED", "Pagamento não pode ser confirmado automaticamente. Encaminhe para revisão humana.")
+	FinancialAgentWhatsAppNotConfigured = N("FINANCIAL_AGENT_WHATSAPP_NOT_CONFIGURED", "Informe a URL, a chave e o nome da instância da Evolution API.")
+	FinancialAgentDisabled              = N("FINANCIAL_AGENT_DISABLED", "O agente financeiro está desabilitado nesta organização.")
 )

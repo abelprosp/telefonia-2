@@ -46,6 +46,9 @@ services:
       - OBJECT_STORAGE_ACCESS_KEY_ID=${OBJECT_STORAGE_ACCESS_KEY_ID}
       - OBJECT_STORAGE_SECRET_ACCESS_KEY=${OBJECT_STORAGE_SECRET_ACCESS_KEY}
       - CORS_ORIGINS=https://telefonia.redobrai.online
+      - FINANCIAL_AGENT_API_KEY=${FINANCIAL_AGENT_API_KEY:-}
+      - FINANCIAL_AGENT_ORG_ID=${FINANCIAL_AGENT_ORG_ID:-}
+      - FINANCIAL_AGENT_PUBLIC_URL=${FINANCIAL_AGENT_PUBLIC_URL:-https://telefonia.redobrai.online/api}
     ports: []
     depends_on:
       postgres:

@@ -31,6 +31,7 @@ func New(ctx context.Context, databaseURL string) (*Store, error) {
 	}
 	s := &Store{pool: pool}
 	_ = s.ensureOrganizationSettingsSchema(ctx)
+	_ = s.ensureFinancialAgentSchema(ctx)
 	return s, nil
 }
 
@@ -43,6 +44,38 @@ func (s *Store) ensureOrganizationSettingsSchema(ctx context.Context) error {
 	_, err := s.pool.Exec(ctx, `
 		ALTER TABLE IF EXISTS "OrganizationSettings"
 		    ADD COLUMN IF NOT EXISTS "ProrataDivisor" integer NOT NULL DEFAULT 30`)
+	return err
+}
+
+func (s *Store) ensureFinancialAgentSchema(ctx context.Context) error {
+	_, err := s.pool.Exec(ctx, `
+		CREATE TABLE IF NOT EXISTS "FinancialAgentSettings" (
+			"OrganizationId" character varying(36) NOT NULL,
+			"Enabled" boolean NOT NULL DEFAULT true,
+			"EvolutionApiUrl" text NOT NULL DEFAULT '',
+			"EvolutionApiKey" text NOT NULL DEFAULT '',
+			"EvolutionInstance" character varying(128) NOT NULL DEFAULT 'luxus',
+			"N8nWebhookUrl" text NOT NULL DEFAULT '',
+			"UpdatedAt" timestamp with time zone NOT NULL DEFAULT now(),
+			"UpdatedBy" character varying(256),
+			CONSTRAINT "PK_FinancialAgentSettings" PRIMARY KEY ("OrganizationId")
+		);
+		CREATE TABLE IF NOT EXISTS "FinancialAgentEvents" (
+			"Id" character varying(36) NOT NULL,
+			"OrganizationId" character varying(36) NOT NULL,
+			"EventType" character varying(64) NOT NULL,
+			"WhatsAppNumber" character varying(32),
+			"CustomerId" character varying(36),
+			"CustomerName" character varying(256),
+			"InvoiceId" character varying(36),
+			"InvoiceNumber" character varying(64),
+			"Success" boolean NOT NULL DEFAULT true,
+			"Summary" text NOT NULL DEFAULT '',
+			"CreatedAt" timestamp with time zone NOT NULL DEFAULT now(),
+			CONSTRAINT "PK_FinancialAgentEvents" PRIMARY KEY ("Id")
+		);
+		CREATE INDEX IF NOT EXISTS "IX_FinancialAgentEvents_Org_Created"
+			ON "FinancialAgentEvents" ("OrganizationId", "CreatedAt" DESC)`)
 	return err
 }
 
