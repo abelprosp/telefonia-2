@@ -1,6 +1,6 @@
 # Produção na VPS Hostinger (telefonia.redobrai.online).
 # O nginx do Ubuntu escuta 80/443 e faz proxy para:
-#   web :3005  |  API :8002  |  Keycloak :8081
+#   web :3005  |  API :8010  |  Keycloak :8081
 # Não publicar 80/443 nos contentores — senão o web não sobe e o host devolve 502.
 
 services:
@@ -101,7 +101,7 @@ services:
       retries: 12
       start_period: 20s
     ports:
-      - '127.0.0.1:8002:80'
+      - '127.0.0.1:8010:80'
 
   connect-web:
     build:
