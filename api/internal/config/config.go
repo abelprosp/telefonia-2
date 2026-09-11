@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -50,6 +51,7 @@ type Config struct {
 	ZapSignAPIToken             string
 	ZapSignBaseURL              string
 	ZapSignSandbox              bool
+	ZapSignWebhookToken         string
 	FinancialAgentAPIKey        string
 	FinancialAgentOrgID         string
 	FinancialAgentPublicURL     string
@@ -131,6 +133,7 @@ func Load() Config {
 		ZapSignAPIToken:             strings.TrimSpace(os.Getenv("ZAPSIGN_API_TOKEN")),
 		ZapSignBaseURL:              strings.TrimSpace(os.Getenv("ZAPSIGN_BASE_URL")),
 		ZapSignSandbox:              strings.EqualFold(os.Getenv("ZAPSIGN_SANDBOX"), "true"),
+		ZapSignWebhookToken:         strings.TrimSpace(os.Getenv("ZAPSIGN_WEBHOOK_TOKEN")),
 		FinancialAgentAPIKey:        strings.TrimSpace(os.Getenv("FINANCIAL_AGENT_API_KEY")),
 		FinancialAgentOrgID:         strings.TrimSpace(os.Getenv("FINANCIAL_AGENT_ORG_ID")),
 		FinancialAgentPublicURL:     strings.TrimRight(firstNonEmpty(os.Getenv("FINANCIAL_AGENT_PUBLIC_URL"), sicrediPublicURL), "/"),
@@ -192,12 +195,21 @@ func NormalizeDatabaseURL(raw string) string {
 	if port == "" {
 		port = "5432"
 	}
+	sslMode := firstNonEmpty(parts["ssl mode"], parts["sslmode"])
+	if sslMode == "" {
+		switch strings.ToLower(host) {
+		case "localhost", "127.0.0.1", "::1", "postgres":
+			sslMode = "disable"
+		default:
+			sslMode = "require"
+		}
+	}
 
 	userInfo := user
 	if password != "" {
 		userInfo = user + ":" + password
 	}
-	return fmt.Sprintf("postgres://%s@%s:%s/%s?sslmode=disable", userInfo, host, port, database)
+	return fmt.Sprintf("postgres://%s@%s:%s/%s?sslmode=%s", userInfo, host, port, database, url.QueryEscape(sslMode))
 }
 
 func GetEnvInt(key string, def int) int {

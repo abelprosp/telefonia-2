@@ -59,13 +59,13 @@ Marcar como **disponíveis no build** (Railway → Variables → ☑ Build):
 VITE_API_URL=https://<dominio-publico-da-api>
 VITE_AUTH_URL=https://<dominio-keycloak-ou-proxy>/auth
 VITE_CLIENT_ID=connect-cli
-VITE_CLIENT_SECRET=<secret-do-realm>
 VITE_STORAGE_BUCKET_NAME=luxus-connect
 ```
 
 ## 4. Schema do banco
 
-A API **não** roda migrações no startup. Após o primeiro deploy da API:
+A API aplica as migrações incrementais 021–025 no startup. Em uma base vazia,
+aplique primeiro `001_initial_schema.sql`. Após o primeiro deploy da API:
 
 ```bash
 # Com Railway CLI instalado e projeto linkado

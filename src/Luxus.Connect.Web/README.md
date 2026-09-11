@@ -8,16 +8,17 @@ No monorepo, em **`../old`**, está a **versão anterior do frontend em Next.js*
 
 ## Scripts
 
-- `pnpm dev` — desenvolvimento (http://localhost:5173)
-- `pnpm build` — `tsc -b` + build de produção
-- `pnpm preview` — pré-visualizar o build
-- `pnpm lint` — ESLint
+- `npm run dev` — desenvolvimento (http://localhost:5173)
+- `npm run build` — `tsc -b` + build de produção
+- `npm run preview` — pré-visualizar o build
+- `npm run lint` — ESLint
 
 ## Variáveis de ambiente
 
 Copie `.env.example` para `.env`. Obrigatórios para o cliente: `VITE_API_URL`, `VITE_AUTH_URL` (ver `src/env.ts`).
 
-Alinhar `VITE_API_URL` com a API **Luxus.Connect.Api** (ex.: `http://localhost:5193`) e CORS para a origem do Vite.
+Alinhar `VITE_API_URL` com a API Go (ex.: `http://localhost:8002`) e CORS
+para a origem do Vite.
 
 ## shadcn/ui
 

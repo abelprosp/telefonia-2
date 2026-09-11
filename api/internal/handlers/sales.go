@@ -285,6 +285,16 @@ func (h *Handler) syncZapSignContract(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) zapsignWebhook(w http.ResponseWriter, r *http.Request) {
+	if h.ZapSignWebhookToken == "" {
+		httputil.WriteFail(w, http.StatusServiceUnavailable, notifications.N("ZAPSIGN_WEBHOOK_NOT_CONFIGURED", "Webhook do ZapSign não configurado."))
+		return
+	}
+	auth := r.Header.Get("Authorization")
+	headerToken := r.Header.Get("X-ZapSign-Token")
+	if auth != "Bearer "+h.ZapSignWebhookToken && auth != h.ZapSignWebhookToken && headerToken != h.ZapSignWebhookToken {
+		httputil.WriteFail(w, http.StatusUnauthorized, notifications.N("ZAPSIGN_WEBHOOK_UNAUTHORIZED", "Token de webhook inválido."))
+		return
+	}
 	var payload struct {
 		Event      string  `json:"event_type"`
 		Token      string  `json:"token"`
@@ -292,9 +302,15 @@ func (h *Handler) zapsignWebhook(w http.ResponseWriter, r *http.Request) {
 		SignedFile *string `json:"signed_file"`
 		ExternalID string  `json:"external_id"`
 	}
-	_ = decodeJSON(r, &payload)
+	if err := decodeJSON(r, &payload); err != nil {
+		httputil.WriteFail(w, http.StatusBadRequest, notifications.N("ZAPSIGN_WEBHOOK_INVALID", "Payload inválido."))
+		return
+	}
 	if payload.ExternalID != "" {
-		_, _ = h.Svc.SyncZapSignContractStatus(r.Context(), payload.ExternalID)
+		if err := h.Svc.HandleZapSignWebhook(r.Context(), payload.ExternalID); err != nil {
+			httputil.HandleServiceError(w, err)
+			return
+		}
 	}
 	w.WriteHeader(http.StatusOK)
 }

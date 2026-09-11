@@ -21,6 +21,7 @@ else
   fi
 fi
 
-docker compose "${COMPOSE_FILES[@]}" down --remove-orphans
-docker rm -f web.connect.luxus 2>/dev/null || true
-docker compose "${COMPOSE_FILES[@]}" up -d --build --force-recreate --remove-orphans
+# Keep the current stack available while images are built. Compose recreates only
+# the services whose configuration/image changed, avoiding an unnecessary 502
+# window caused by taking the whole stack down first.
+docker compose "${COMPOSE_FILES[@]}" up -d --build --remove-orphans --wait --wait-timeout 180

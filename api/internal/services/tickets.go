@@ -2,10 +2,12 @@ package services
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/luxus-connect/telefonia/api/internal/httputil"
 	"github.com/luxus-connect/telefonia/api/internal/models"
 	"github.com/luxus-connect/telefonia/api/internal/notifications"
@@ -31,21 +33,26 @@ func (s *Service) CreateSupportTicket(ctx context.Context, input models.CreateSu
 		return nil, httputil.ValidationError(notifications.N("TICKET_TITLE_REQUIRED", "Informe o título do ticket."))
 	}
 	now := time.Now().UTC()
-	n, err := s.Store.NextSupportTicketNumber(ctx, orgID)
-	if err != nil {
-		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
-	}
 	priority := firstNonEmpty(input.Priority, "media")
 	sla := slaForPriority(priority, now)
-	row := store.SupportTicketRow{
-		ID: uuid.New().String(), OrganizationID: orgID, Number: n, Title: title,
-		Category: firstNonEmpty(input.Category, "geral"), Priority: priority, Status: "aberto",
-		SlaDueAt: &sla, RequesterUserID: &user.ID, CustomerID: optStr(input.CustomerID),
-		PhoneLineID: optStr(input.PhoneLineID), ChargeRef: optStr(input.ChargeRef), InvoiceID: optStr(input.InvoiceID),
-		CreatedAt: now, UpdatedAt: now,
-	}
-	if err := s.Store.InsertSupportTicket(ctx, row); err != nil {
-		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	var row store.SupportTicketRow
+	for attempt := 0; attempt < 3; attempt++ {
+		n, err := s.Store.NextSupportTicketNumber(ctx, orgID)
+		if err != nil {
+			return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+		}
+		row = store.SupportTicketRow{
+			ID: uuid.New().String(), OrganizationID: orgID, Number: n, Title: title,
+			Category: firstNonEmpty(input.Category, "geral"), Priority: priority, Status: "aberto",
+			SlaDueAt: &sla, RequesterUserID: &user.ID, CustomerID: optStr(input.CustomerID),
+			PhoneLineID: optStr(input.PhoneLineID), ChargeRef: optStr(input.ChargeRef), InvoiceID: optStr(input.InvoiceID),
+			CreatedAt: now, UpdatedAt: now,
+		}
+		if err := s.Store.InsertSupportTicket(ctx, row); err == nil {
+			break
+		} else if !isTicketNumberConflict(err) || attempt == 2 {
+			return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+		}
 	}
 	_ = s.Store.InsertSupportTicketHistory(ctx, store.SupportTicketHistoryRow{
 		ID: uuid.New().String(), TicketID: row.ID, ActorUserID: &user.ID, EventType: "created", ToValue: strPtr("aberto"), CreatedAt: now,
@@ -57,6 +64,13 @@ func (s *Service) CreateSupportTicket(ctx context.Context, input models.CreateSu
 		})
 	}
 	return s.GetSupportTicket(ctx, row.ID, true)
+}
+
+func isTicketNumberConflict(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) &&
+		pgErr.Code == "23505" &&
+		pgErr.ConstraintName == "UX_SupportTickets_Org_Number"
 }
 
 func (s *Service) ListSupportTickets(ctx context.Context, customerID, status string, page httputil.PageSearch) ([]models.SupportTicketResponse, int64, error) {

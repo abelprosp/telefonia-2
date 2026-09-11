@@ -5,6 +5,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
+COMPOSE_FILES=(-f docker-compose.yml -f docker-compose.prod.yml)
 
 echo "=== 1. Quem escuta 80/443/3005/8081/8002 ==="
 ss -tlnp | grep -E ':80 |:443 |:3005 |:8081 |:8002 ' || true
@@ -16,12 +17,12 @@ echo
 
 echo "=== 3. Remover web/keycloak órfãos (nome fixo) ==="
 docker rm -f web.connect.luxus keycloak.connect.luxus 2>/dev/null || true
-docker compose down --remove-orphans || true
+docker compose "${COMPOSE_FILES[@]}" down --remove-orphans || true
 docker rm -f web.connect.luxus keycloak.connect.luxus 2>/dev/null || true
 
 echo "=== 4. Subir stack (override: web :3005, keycloak :8081, api :8002) ==="
-docker compose build connect-web --no-cache
-docker compose up -d --force-recreate --remove-orphans keycloak connect-web connect-api
+docker compose "${COMPOSE_FILES[@]}" build connect-web --no-cache
+docker compose "${COMPOSE_FILES[@]}" up -d --force-recreate --remove-orphans --wait --wait-timeout 180 keycloak connect-web connect-api
 
 echo "=== 5. Nginx do host (HTTPS → 3005 / 8081 / 8002) ==="
 if [ -d /etc/nginx/sites-available ] || [ -d /etc/nginx/conf.d ]; then

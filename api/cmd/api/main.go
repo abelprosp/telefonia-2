@@ -82,13 +82,13 @@ func main() {
 	})
 
 	svc := &services.Service{
-		Store:                   st,
-		Publisher:               publisher,
-		Keycloak:                kcAdmin,
-		Mailer:                  email.NewSender(cfg),
-		Sicredi:                 sicredi.NewClient(sicredi.ConfigFrom(cfg)),
-		ZapSign:                 zapClient,
-		StateMachine:            statemachine.NewEngine(st),
+		Store:                    st,
+		Publisher:                publisher,
+		Keycloak:                 kcAdmin,
+		Mailer:                   email.NewSender(cfg),
+		Sicredi:                  sicredi.NewClient(sicredi.ConfigFrom(cfg)),
+		ZapSign:                  zapClient,
+		StateMachine:             statemachine.NewEngine(st),
 		FinancialAgentPublicURL:  cfg.FinancialAgentPublicURL,
 		FinancialAgentConfigured: cfg.FinancialAgentAPIKey != "" && cfg.FinancialAgentOrgID != "",
 	}
@@ -169,10 +169,11 @@ func main() {
 	}
 
 	h := &handlers.Handler{
-		Svc:       svc,
-		Presigned: presigned,
-		AgentKey:  cfg.FinancialAgentAPIKey,
-		AgentOrg:  cfg.FinancialAgentOrgID,
+		Svc:                 svc,
+		Presigned:           presigned,
+		AgentKey:            cfg.FinancialAgentAPIKey,
+		AgentOrg:            cfg.FinancialAgentOrgID,
+		ZapSignWebhookToken: cfg.ZapSignWebhookToken,
 	}
 
 	healthChecker := observability.NewHealthChecker()
@@ -182,6 +183,28 @@ func main() {
 		observability.Observe("db.ping", time.Since(start), err == nil)
 		if err != nil {
 			return observability.ComponentHealth{Status: observability.StatusDown, Message: err.Error()}
+		}
+		return observability.ComponentHealth{Status: observability.StatusUp}
+	})
+	healthChecker.Register("schema", func(c context.Context) observability.ComponentHealth {
+		var ready bool
+		err := st.Pool().QueryRow(c, `
+			SELECT
+				to_regclass('"Providers"') IS NOT NULL
+				AND to_regclass('"Customers"') IS NOT NULL
+				AND to_regclass('"OrganizationSettings"') IS NOT NULL
+				AND to_regclass('"PortalCustomerLinks"') IS NOT NULL
+				AND EXISTS (
+					SELECT 1 FROM information_schema.columns
+					WHERE table_schema = 'public'
+					  AND table_name = 'OrganizationSettings'
+					  AND column_name = 'ProrataDivisor'
+				)`).Scan(&ready)
+		if err != nil {
+			return observability.ComponentHealth{Status: observability.StatusDown, Message: "schema check failed"}
+		}
+		if !ready {
+			return observability.ComponentHealth{Status: observability.StatusDown, Message: "required schema is not applied"}
 		}
 		return observability.ComponentHealth{Status: observability.StatusUp}
 	})

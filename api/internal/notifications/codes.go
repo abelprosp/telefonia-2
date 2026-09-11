@@ -15,8 +15,8 @@ func NP(code, message, param string) Notification {
 }
 
 // Shared
-func SharedUnexpectedError(msg string) Notification {
-	return N("UNEXPECTED_ERROR", msg)
+func SharedUnexpectedError(_ string) Notification {
+	return N("UNEXPECTED_ERROR", "An unexpected error occurred. Please try again.")
 }
 
 var (

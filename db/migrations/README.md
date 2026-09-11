@@ -7,7 +7,7 @@ As migrações históricas estão em `ef/` para referência e para bases novas.
 
 Com PostgreSQL acessível e variáveis `POSTGRES_USER` / `POSTGRES_PASSWORD` no `.env`:
 
-1. Crie a base `luxus_connect_dev` (o `docker/postgres/init.sql` já cria bases no primeiro boot).
+1. Suba o Compose: `docker/postgres/init.sh` cria as bases e aplica as migrações no primeiro boot.
 2. Aplique o script consolidado (recomendado, sem .NET SDK):
 
    ```bash
@@ -16,8 +16,13 @@ Com PostgreSQL acessível e variáveis `POSTGRES_USER` / `POSTGRES_PASSWORD` no 
 
    Alternativa: execute as migrações EF na ordem dos ficheiros `ef/2026*.cs` (Up), ou restaure um dump existente.
 
-A API Go **não** executa migrações no startup — assume schema já aplicado.
+Em produção, a API Go reaplica as migrações incrementais 021–025 e um
+bootstrap idempotente no startup. Isso evita que uma base existente fique sem
+colunas/tabelas novas durante um deploy. A migração inicial 001 continua sendo
+obrigatória para uma base vazia e deve ser aplicada antes de subir a API.
 
 ## Evolução futura
 
-Para novas alterações de schema, adicione ficheiros SQL versionados nesta pasta ou adopte uma ferramenta como `golang-migrate`.
+Para novas alterações de schema, adicione ficheiros SQL versionados nesta pasta
+e copie o novo ficheiro para `api/internal/dbmigrate/sql/`, ou adopte uma
+ferramenta como `golang-migrate`.

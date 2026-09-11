@@ -215,8 +215,8 @@ func (s *Service) HandleSicrediWebhook(ctx context.Context, r *http.Request) err
 		return httputil.BusinessError(notifications.SicrediNotConfigured)
 	}
 	cfg := s.Sicredi.Config()
-	if cfg.Production && strings.TrimSpace(cfg.WebhookToken) == "" {
-		return httputil.BusinessError(notifications.N("SICREDI_WEBHOOK_TOKEN_REQUIRED", "Configure SICREDI_WEBHOOK_TOKEN em produção para aceitar webhooks."))
+	if strings.TrimSpace(cfg.WebhookToken) == "" {
+		return httputil.BusinessError(notifications.N("SICREDI_WEBHOOK_TOKEN_REQUIRED", "Configure SICREDI_WEBHOOK_TOKEN para aceitar webhooks."))
 	}
 	if token := strings.TrimSpace(cfg.WebhookToken); token != "" {
 		auth := strings.TrimSpace(r.Header.Get("Authorization"))

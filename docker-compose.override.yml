@@ -26,23 +26,21 @@ services:
 
       args:
 
-        VITE_API_URL: ${VITE_API_URL:-https://telefonia.redobrai.online/api}
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8002}
 
-        VITE_AUTH_URL: ${VITE_AUTH_URL:-https://telefonia.redobrai.online/auth}
+        VITE_AUTH_URL: ${VITE_AUTH_URL:-http://localhost:8081/auth}
 
         VITE_CLIENT_ID: connect-cli
-
-        VITE_CLIENT_SECRET: ${KC_CLIENT_SECRET:-dev-secret}
 
         VITE_STORAGE_BUCKET_NAME: luxus-connect
 
   keycloak:
     environment:
       - KC_HTTP_RELATIVE_PATH=/auth
-      - KC_HOSTNAME=https://telefonia.redobrai.online/auth
-      - KC_HOSTNAME_ADMIN=https://telefonia.redobrai.online/auth
-      - KC_HOSTNAME_URL=https://telefonia.redobrai.online/auth
-      - KC_HOSTNAME_ADMIN_URL=https://telefonia.redobrai.online/auth
+      - KC_HOSTNAME=http://localhost:8081/auth
+      - KC_HOSTNAME_ADMIN=http://localhost:8081/auth
+      - KC_HOSTNAME_URL=http://localhost:8081/auth
+      - KC_HOSTNAME_ADMIN_URL=http://localhost:8081/auth
       - KC_HOSTNAME_STRICT=false
       - KC_HOSTNAME_STRICT_HTTPS=false
       - KC_PROXY_HEADERS=xforwarded
@@ -152,7 +150,7 @@ services:
 
       - KEYCLOAK_AUTH_SERVER_URL=http://keycloak:8080/auth
 
-      - KEYCLOAK_PUBLIC_AUTH_SERVER_URL=${KEYCLOAK_PUBLIC_AUTH_SERVER_URL:-https://telefonia.redobrai.online/auth}
+      - KEYCLOAK_PUBLIC_AUTH_SERVER_URL=${KEYCLOAK_PUBLIC_AUTH_SERVER_URL:-http://localhost:8081/auth}
 
       - KEYCLOAK_RESOURCE=connect-cli
 

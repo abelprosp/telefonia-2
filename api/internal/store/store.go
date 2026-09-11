@@ -49,11 +49,6 @@ func isUndefinedColumn(err error) bool {
 	return errors.As(err, &pgErr) && pgErr.Code == "42703"
 }
 
-func isUndefinedTable(err error) bool {
-	var pgErr *pgconn.PgError
-	return errors.As(err, &pgErr) && pgErr.Code == "42P01"
-}
-
 func (s *Store) ensureOrganizationSettingsSchema(ctx context.Context) error {
 	_, err := s.pool.Exec(ctx, `
 		ALTER TABLE IF EXISTS "OrganizationSettings"

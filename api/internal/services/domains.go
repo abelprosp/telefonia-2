@@ -713,23 +713,16 @@ func (s *Service) ApportionProviderInvoiceDiscount(ctx context.Context, invoiceI
 }
 
 func (s *Service) GetImportRequestStatus(ctx context.Context, id string) (*models.RequestProviderInvoiceImportResponse, error) {
-	orgID, _ := orgFrom(ctx)
-	var row *store.ImportRequestRow
-	var err error
-	if orgID != "" {
-		row, err = s.Store.GetImportRequestForOrg(ctx, orgID, id)
+	orgID, err := orgFrom(ctx)
+	if err != nil {
+		return nil, err
 	}
+	row, err := s.Store.GetImportRequestForOrg(ctx, orgID, id)
 	if err != nil {
 		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
 	if row == nil {
-		row, err = s.Store.GetImportRequest(ctx, id)
-		if err != nil {
-			return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
-		}
-		if row == nil {
-			return nil, httputil.NotFoundError(notifications.ImportRequestNotFound)
-		}
+		return nil, httputil.NotFoundError(notifications.ImportRequestNotFound)
 	}
 	return &models.RequestProviderInvoiceImportResponse{
 		ID:                row.ID,

@@ -315,6 +315,34 @@ func (s *Store) GetGeneratedContract(ctx context.Context, orgID, contractID stri
 	return &item, nil
 }
 
+// GetGeneratedContractByID is used only by the verified provider webhook,
+// whose request has no user/organization JWT context.
+func (s *Store) GetGeneratedContractByID(ctx context.Context, contractID string) (*models.GeneratedContractResponse, error) {
+	var item models.GeneratedContractResponse
+	err := s.q(ctx).QueryRow(ctx, `
+		SELECT g."Id", g."CustomerId", g."PhoneLineId", g."SaleId", g."ContractTemplateId", t."Name",
+			g."Trigger", g."Status"::text, g."RenderedHtml", g."PdfUrl", g."PdfStorageKey",
+			COALESCE(g."SignatureMethod", 'manual'), g."ZapSignDocToken", g."ZapSignOpenID",
+			g."ZapSignSignURL", g."ZapSignStatus", g."SignedPdfUrl", g."SignedAt", g."SignedBy",
+			g."AttachedAt", g."GeneratedAt", g."CreatedAt"
+		FROM "GeneratedContracts" g
+		JOIN "ContractTemplates" t ON t."Id" = g."ContractTemplateId"
+		WHERE g."Id" = $1`, contractID).Scan(
+		&item.ID, &item.CustomerID, &item.PhoneLineID, &item.SaleID, &item.ContractTemplateID,
+		&item.ContractTemplateName, &item.Trigger, &item.Status, &item.RenderedHTML,
+		&item.PdfURL, &item.PdfStorageKey, &item.SignatureMethod, &item.ZapSignDocToken,
+		&item.ZapSignOpenID, &item.ZapSignSignURL, &item.ZapSignStatus, &item.SignedPdfURL,
+		&item.SignedAt, &item.SignedBy, &item.AttachedAt, &item.GeneratedAt, &item.CreatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &item, nil
+}
+
 func (s *Store) SaveCustomerGeneratedContract(ctx context.Context, id, orgID, customerID, templateID, signatureMethod string, pdfURL, pdfStorageKey, renderedHTML *string, now time.Time) error {
 	_, err := s.q(ctx).Exec(ctx, `
 		INSERT INTO "GeneratedContracts" (
@@ -388,4 +416,3 @@ func (s *Store) ListExpiringContracts(ctx context.Context, orgID string, daysAhe
 	}
 	return items, rows.Err()
 }
-

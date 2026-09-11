@@ -73,7 +73,7 @@ func (h *HealthChecker) Check(ctx context.Context) HealthResponse {
 			mu.Lock()
 			resp.Components[compName] = result
 			if result.Status == StatusDown {
-				if compName == "postgres" {
+				if compName == "postgres" || compName == "schema" {
 					resp.Status = "unhealthy"
 				} else if resp.Status != "unhealthy" {
 					resp.Status = "degraded"

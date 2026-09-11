@@ -124,7 +124,10 @@ chmod +x docker-up.sh
 
 ### 4. Schema PostgreSQL
 
-O schema deve existir antes da API subir (bases criadas pelo `docker/postgres/init.sql` no primeiro boot). Migrações históricas EF estão em [`db/migrations/ef/`](db/migrations/ef/) — ver [`db/migrations/README.md`](db/migrations/README.md).
+O `docker/postgres/init.sh` cria os bancos e aplica todas as migrações em uma
+base vazia; em uma base existente, a API aplica as migrações incrementais
+021–025 no arranque. Ver
+[`db/migrations/README.md`](db/migrations/README.md).
 
 ### API local (sem Docker)
 
@@ -177,16 +180,20 @@ Os valores **realm**, **client** e **URL do servidor** têm de estar alinhados e
 Variáveis injetadas no contentor `connect-api`:
 
 - `KEYCLOAK_REALM=luxus`
-- `KEYCLOAK_AUTH_SERVER_URL=http://host.docker.internal:8081`
+- `KEYCLOAK_AUTH_SERVER_URL=http://keycloak:8080/auth`
 - `KEYCLOAK_RESOURCE=connect-cli`
 
 ### Frontend (`src/Luxus.Connect.Web`)
 
-Variáveis obrigatórias: `VITE_API_URL`, `VITE_AUTH_URL`, `VITE_CLIENT_ID`, `VITE_CLIENT_SECRET`, `VITE_STORAGE_BUCKET_NAME` (ver [`src/Luxus.Connect.Web/src/env.ts`](src/Luxus.Connect.Web/src/env.ts)). O serviço `connect-web-dev` no Compose define exemplos para apontar para a API e Keycloak no host.
+Variáveis obrigatórias: `VITE_API_URL`, `VITE_AUTH_URL`, `VITE_CLIENT_ID`,
+`VITE_STORAGE_BUCKET_NAME` (ver [`src/Luxus.Connect.Web/src/env.ts`](src/Luxus.Connect.Web/src/env.ts)).
+O client OIDC é público; não coloque segredos em `VITE_*`.
 
 ### Produção (VPS)
 
-Keycloak fica atrás do nginx em **`/auth`**; a API em **`/api`**. Variáveis em [`docker-compose.prod.yml`](docker-compose.prod.yml) (ex.: `KEYCLOAK_AUTH_SERVER_URL=https://<domínio>/auth`).
+Keycloak fica atrás do nginx em **`/auth`**; a API em **`/api`**. O nginx do
+Ubuntu encaminha para frontend `:3005`, API `:8002` e Keycloak `:8081`.
+Variáveis em [`docker-compose.prod.yml`](docker-compose.prod.yml).
 
 **Temas Keycloak:** volume `./resources/theme/` → `/opt/keycloak/themes/` (ver imagem no `docker-compose.yml`).
 

@@ -183,6 +183,7 @@ export const LayoutSidebar = ({ ...props }: ComponentProps<typeof Sidebar>) => {
     isPartnerOnly,
     isCustomerPortal,
     isInternalStaff,
+    isViewer,
     canAccessOperations,
     canAccessFinance,
     canManageUsers
@@ -215,6 +216,17 @@ export const LayoutSidebar = ({ ...props }: ComponentProps<typeof Sidebar>) => {
       return;
     }
 
+    if (
+      isViewer &&
+      !canAccessOperations &&
+      !canAccessFinance &&
+      path !== '/' &&
+      path !== '/settings'
+    ) {
+      void navigate({ to: '/' });
+      return;
+    }
+
     if (isPartnerOnly) {
       if (path.startsWith('/portal') || (!path.startsWith('/partner') && path !== '/settings')) {
         void navigate({ to: '/partner' });
@@ -238,6 +250,7 @@ export const LayoutSidebar = ({ ...props }: ComponentProps<typeof Sidebar>) => {
     isCustomerPortal,
     isInternalStaff,
     isPartnerOnly,
+    isViewer,
     canAccessOperations,
     canAccessFinance,
     location.pathname,

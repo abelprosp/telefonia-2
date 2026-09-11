@@ -1,6 +1,10 @@
 # Deploy em VPS (Docker Compose — produção)
 
-Guia consolidado para publicar **Luxus Connect** numa VPS com `docker-compose.yml` + `docker-compose.prod.yml`. O domínio público usado no repositório é **`luxus.your-domain-here.com.br`** (nginx, TLS; Keycloak em **`/auth`**; API em **`/api`** — URLs públicas tipo `/api/v1/...`, o Kestrel continua a servir `/v1/...` por dentro). Se mudares o domínio, tens de alinhar **todos** os sítios indicados na secção [Domínio e ficheiros a manter coerentes](#domínio-e-ficheiros-a-manter-coerentes).
+Guia consolidado para publicar **Luxus Connect** na VPS Hostinger com
+`docker-compose.yml` + `docker-compose.prod.yml`. O domínio público é
+**`telefonia.redobrai.online`**. O nginx do Ubuntu escuta 80/443 e encaminha
+para frontend `:3005`, API `:8002` e Keycloak `:8081`; publicamente, Keycloak
+fica em **`/auth`** e a API em **`/api`**.
 
 ---
 
@@ -9,7 +13,7 @@ Guia consolidado para publicar **Luxus Connect** numa VPS com `docker-compose.ym
 - **Docker** e **Docker Compose** (plugin v2).
 - **Git** (ou outro meio de levar o código).
 - Portas **80** e **443** abertas no firewall (e **22** para SSH).
-- **DNS**: o nome usado na app (ex.: `luxus.your-domain-here.com.br`) deve resolver para o **IP público** desta máquina.
+- **DNS**: `telefonia.redobrai.online` deve resolver para o IP público desta máquina.
 
 ---
 
@@ -30,21 +34,13 @@ Copia `docker/env.deploy.example` para `.env` na raiz e preenche. Variáveis usa
 
 ---
 
-## Pacotes NuGet privados (`Goal.*` / Azure Artifacts)
-
-O **`docker compose build` da API** monta um segredo BuildKit a partir de **`${NUGET_CONFIG_FILE:-docker/build-secrets/nuget.config}`** (substitui por um ficheiro só na VPS com URL + `packageSourceCredentials` do Azure Artifacts, sem committar segredos ao Git). Alternativa sem ficheiro: **`NUGET_FEED_URL`** + **`NUGET_PAT`** no **`.env`**.
-
-Para `dotnet restore` à parte (CI ou máquinas de desenvolvimento), **`nuget.config`** na raiz continua válido onde o projeto o utilizar (**`.gitignore`**).
-
----
-
 ## Certificados TLS (Let’s Encrypt + Certbot)
 
-O container **connect-web** (nginx) monta TLS a partir de:
+O nginx do Ubuntu usa diretamente:
 
-`docker/ssl/<nome-do-host>/`
+`/etc/letsencrypt/live/telefonia.redobrai.online/`
 
-No estado atual do repositório, `<nome-do-host>` corresponde ao FQDN em **`docker-compose.prod.yml`** e no **nginx** (ex.: pasta `docker/ssl/luxus.your-domain-here.com.br/` com `fullchain.pem` e `privkey.pem`).
+O nginx do host usa diretamente os certificados do Certbot nesse caminho.
 
 ### Emitir certificado (modo `standalone`)
 
@@ -61,25 +57,21 @@ No estado atual do repositório, `<nome-do-host>` corresponde ao FQDN em **`dock
 4. Emite o certificado (ajusta o domínio e inclui `www` só se tiveres DNS para isso):
 
    ```bash
-   sudo certbot certonly --standalone -d luxus.your-domain-here.com.br
+   sudo certbot certonly --standalone -d telefonia.redobrai.online
    ```
 
 5. Copia (ou cria **symlinks**) para a pasta que o Docker monta:
 
    ```bash
-   sudo mkdir -p docker/ssl/luxus.your-domain-here.com.br
-   sudo cp /etc/letsencrypt/live/luxus.your-domain-here.com.br/fullchain.pem docker/ssl/luxus.your-domain-here.com.br/
-   sudo cp /etc/letsencrypt/live/luxus.your-domain-here.com.br/privkey.pem docker/ssl/luxus.your-domain-here.com.br/
-   sudo chown -R "$USER:$USER" docker/ssl/luxus.your-domain-here.com.br
-   chmod 644 docker/ssl/luxus.your-domain-here.com.br/fullchain.pem
-   chmod 600 docker/ssl/luxus.your-domain-here.com.br/privkey.pem
+   sudo nginx -t && sudo systemctl reload nginx
    ```
 
 6. Volta a subir a stack (secção seguinte).
 
 ### Renovação
 
-Teste: `sudo certbot renew --dry-run`. Após renovação real, **reinicia** o serviço `connect-web` (ou a stack) para o nginx voltar a carregar os certificados.
+Teste: `sudo certbot renew --dry-run`. Após renovação real, execute
+`sudo nginx -t && sudo systemctl reload nginx`.
 
 ---
 
@@ -95,7 +87,8 @@ chmod +x docker-up.sh
 - Usa **apenas** `docker-compose.yml` + `docker-compose.prod.yml`.
 - **Não** ativa o perfil `dev`: o serviço **`connect-web-dev`** (Vite) **não** sobe em produção.
 
-Para desenvolvimento local, o script usa `COMPOSE_PROFILES=dev` (exceto com alvo `prod`) e, quando existir, `docker-compose.<nome>.yml` extra; o ficheiro **`docker-compose.override.yml`** define portas locais do `connect-web` (ex.: `3000:80`) e garante o `connect-web-dev` quando usas `docker compose up` com override.
+Para desenvolvimento local, o script usa `COMPOSE_PROFILES=dev` (exceto com alvo
+`prod`) e o `docker-compose.override.yml` define as portas locais.
 
 ---
 
@@ -104,7 +97,7 @@ Para desenvolvimento local, o script usa `COMPOSE_PROFILES=dev` (exceto com alvo
 Com o Postgres acessível (container em execução ou connection string correta):
 
 ```bash
-./ef-database-update.sh
+./scripts/apply-migrations.sh
 ```
 
 Ajusta ambiente/connection string conforme o README principal do repositório se o script assumir `localhost`.
@@ -113,9 +106,9 @@ Ajusta ambiente/connection string conforme o README principal do repositório se
 
 ## Keycloak (primeira vez / após mudar domínio)
 
-- Admin: URL base com path `/auth` (ex.: `https://luxus.your-domain-here.com.br/auth`), conforme `KC_HTTP_RELATIVE_PATH` no compose de produção.
-- Realm **`luxus`**, client **`connect-cli`**, secret alinhado com `KC_CLIENT_SECRET` no `.env`.
-- **Valid redirect URIs** / **Web origins** devem incluir a origem HTTPS do front (ex.: `https://luxus.your-domain-here.com.br/*`).
+- Admin: URL base com path `/auth`: `https://telefonia.redobrai.online/auth`.
+- Realm **`luxus`**, client público **`connect-cli`**.
+- **Valid redirect URIs** / **Web origins** devem incluir `https://telefonia.redobrai.online/*`.
 - O access token deve incluir o claim **`organization`** (estrutura esperada pela SPA). Sem isso, o login no Keycloak até funciona, mas a app não marca sessão e não redireciona para a home. Configura um **protocol mapper** (ou similar) no client `connect-cli` para emitir esse claim.
 
 Se o volume do Keycloak foi criado **antes** de configurar o path `/auth`, pode ser necessário rever o realm ou o volume na primeira subida com o novo esquema.
@@ -124,28 +117,28 @@ Se o volume do Keycloak foi criado **antes** de configurar o path `/auth`, pode 
 
 ## Domínio e ficheiros a manter coerentes
 
-Se alterares o FQDN (ex.: de `luxus.your-domain-here.com.br` para outro), atualiza de forma consistente:
+Se alterares o FQDN, atualiza de forma consistente:
 
-- `docker-compose.prod.yml` — `KC_HOSTNAME`, `ASPNETCORE_Keycloak__AuthServerUrl`, `ASPNETCORE_Cors__Origins`, args de build `VITE_API_URL` / `VITE_AUTH_URL`, volume `docker/ssl/...`
-- `docker/nginx/connect-web.vps.conf` — `server_name`, redirecionamentos
-- Pasta **`docker/ssl/<hostname>/`** — certificados e montagem no compose
+- `docker-compose.prod.yml` — `KC_HOSTNAME`, `CORS_ORIGINS`, args de build `VITE_API_URL` / `VITE_AUTH_URL`
+- `docker/nginx/telefonia.redobrai.online.conf` — `server_name`, certificados e upstreams
+- Certificados em `/etc/letsencrypt/live/<hostname>/`
 - Rebuild obrigatório do **`connect-web`** após mudar `VITE_*`
 
 ---
 
 ## Verificação rápida
 
-- Front: `https://luxus.your-domain-here.com.br`
-- API (exemplo): rotas sob `https://luxus.your-domain-here.com.br/api/v1/...`
+- Front: `https://telefonia.redobrai.online`
+- API: rotas sob `https://telefonia.redobrai.online/api/v1/...`
 - Logs: `docker compose -f docker-compose.yml -f docker-compose.prod.yml logs connect-api --tail=100`
 
 ---
 
 ## Arquitetura resumida (produção)
 
-- **nginx** no `connect-web` expõe **80** (redirect para HTTPS) e **443** (TLS); faz proxy de `/auth/` para Keycloak, de **`/api/`** para a API (remove o prefixo `/api` ao encaminhar), e serve o SPA no restante.
-- **connect-api** escuta só na rede Docker (sem portas publicadas no host); confia em cabeçalhos `X-Forwarded-*` (middleware de forwarded headers na API).
-- **Keycloak** não expõe porta no host em produção; fica atrás do nginx em `/auth`.
+- **nginx do Ubuntu** expõe **80** (redirect para HTTPS) e **443** (TLS); faz proxy de `/auth/` e `/realms/` para Keycloak, de **`/api/`** para a API e serve o frontend em `:3005`.
+- **connect-api** é publicado em `127.0.0.1:8002`; o nginx remove o prefixo `/api` ao encaminhar.
+- **Keycloak** é publicado em `127.0.0.1:8081` e fica atrás do nginx em `/auth`.
 
 ---
 
@@ -154,8 +147,7 @@ Se alterares o FQDN (ex.: de `luxus.your-domain-here.com.br` para outro), atuali
 | Sintoma                         | O que verificar                                                                                                    |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | Certbot **404** no desafio ACME | Porta **80** ocupada; registo **AAAA** a apontar para outro sítio; domínio ainda a apontar para hospedagem antiga. |
-| nginx não arranca               | `fullchain.pem` / `privkey.pem` em falta ou caminho do volume errado.                                              |
-| CORS / login                    | `ASPNETCORE_Cors__Origins`, URLs `VITE_*` no build do web, realm Keycloak e redirects.                             |
-| Restore NuGet no build          | `nuget.config` na raiz da VPS com credenciais do feed.                                                             |
+| nginx não arranca               | Execute `sudo nginx -t`; confirme certificados e upstreams `:3005`, `:8002`, `:8081`.                              |
+| CORS / login                    | `CORS_ORIGINS`, URLs `VITE_*` no build do web, realm Keycloak e redirects.                                         |
 
-Para mais contexto de produto e roadmap, ver [PRODUTO_E_ROADMAP.md](./PRODUTO_E_ROADMAP.md).
+Para detalhes funcionais, ver [Documento de Especificação Funcional-v2.md](./Documento%20de%20Especificação%20Funcional-v2.md).

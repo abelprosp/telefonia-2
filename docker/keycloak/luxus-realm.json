@@ -307,6 +307,8 @@
       "redirectUris": [
         "http://localhost:5173/*",
         "http://localhost:3000/*",
+        "http://localhost:3005/*",
+        "http://localhost:3001/*",
         "http://localhost:8002/*",
         "http://127.0.0.1:5173/*",
         "https://telefonia.redobrai.online/*"
@@ -314,6 +316,8 @@
       "webOrigins": [
         "http://localhost:5173",
         "http://localhost:3000",
+        "http://localhost:3005",
+        "http://localhost:3001",
         "http://localhost:8002",
         "http://127.0.0.1:5173",
         "https://telefonia.redobrai.online",

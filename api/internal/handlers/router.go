@@ -19,10 +19,11 @@ import (
 )
 
 type Handler struct {
-	Svc       *services.Service
-	Presigned *services.PresignedService
-	AgentKey  string
-	AgentOrg  string
+	Svc                 *services.Service
+	Presigned           *services.PresignedService
+	AgentKey            string
+	AgentOrg            string
+	ZapSignWebhookToken string
 }
 
 func decodeJSON(r *http.Request, v any) error {
@@ -56,8 +57,6 @@ func (h *Handler) RegisterRoutes(
 	partner func(http.Handler) http.Handler,
 
 ) {
-
-	r.Post("/setup/keycloak", h.setupKeycloak)
 
 	r.Route("/v1", func(r chi.Router) {
 

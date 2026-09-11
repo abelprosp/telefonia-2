@@ -524,23 +524,23 @@ func (s *Service) generateContractForSale(ctx context.Context, orgID, saleID, te
 
 func renderContractTemplate(body string, customer *store.CustomerContractData, sale *models.GetSaleResponse, salesperson *auth.User) string {
 	replacements := map[string]string{
-		"{{customer.name}}":       customer.Name,
-		"{{customer.legal_name}}": derefString(customer.LegalName, customer.Name),
-		"{{customer.document}}":   customer.Document,
-		"{{customer.type}}":       customer.Type,
-		"{{customer.address.full}}": formatFullAddress(customer),
-		"{{customer.address.street}}": customer.Street,
-		"{{customer.address.number}}": customer.Number,
+		"{{customer.name}}":                 customer.Name,
+		"{{customer.legal_name}}":           derefString(customer.LegalName, customer.Name),
+		"{{customer.document}}":             customer.Document,
+		"{{customer.type}}":                 customer.Type,
+		"{{customer.address.full}}":         formatFullAddress(customer),
+		"{{customer.address.street}}":       customer.Street,
+		"{{customer.address.number}}":       customer.Number,
 		"{{customer.address.neighborhood}}": customer.Neighborhood,
-		"{{customer.address.city}}": customer.City,
-		"{{customer.address.state}}": customer.State,
-		"{{customer.address.zip_code}}": customer.ZipCode,
-		"{{customer.address.country}}": customer.Country,
-		"{{sale.sale_number}}":    sale.SaleNumber,
-		"{{sale.total_amount}}":   formatMoneyBR(sale.TotalAmount),
-		"{{sale.sold_at}}":        formatDateBR(sale.SoldAt),
-		"{{sale.items_table}}":    buildItemsTableHTML(sale.Items),
-		"{{salesperson.name}}":    salespersonDisplayName(salesperson),
+		"{{customer.address.city}}":         customer.City,
+		"{{customer.address.state}}":        customer.State,
+		"{{customer.address.zip_code}}":     customer.ZipCode,
+		"{{customer.address.country}}":      customer.Country,
+		"{{sale.sale_number}}":              sale.SaleNumber,
+		"{{sale.total_amount}}":             formatMoneyBR(sale.TotalAmount),
+		"{{sale.sold_at}}":                  formatDateBR(sale.SoldAt),
+		"{{sale.items_table}}":              buildItemsTableHTML(sale.Items),
+		"{{salesperson.name}}":              salespersonDisplayName(salesperson),
 	}
 	out := body
 	for k, v := range replacements {
@@ -804,4 +804,26 @@ func (s *Service) SyncZapSignContractStatus(ctx context.Context, contractID stri
 	}
 
 	return s.Store.GetGeneratedContract(ctx, orgID, contractID)
+}
+
+func (s *Service) HandleZapSignWebhook(ctx context.Context, contractID string) error {
+	contract, err := s.Store.GetGeneratedContractByID(ctx, contractID)
+	if err != nil || contract == nil {
+		return httputil.NotFoundError(notifications.ContractTemplateNotFound)
+	}
+	if contract.ZapSignDocToken == nil || *contract.ZapSignDocToken == "" || s.ZapSign == nil || !s.ZapSign.Enabled() {
+		return nil
+	}
+	zapDoc, err := s.ZapSign.GetDocument(ctx, *contract.ZapSignDocToken)
+	if err != nil || zapDoc == nil {
+		return err
+	}
+	if zapDoc.Status == "signed" && zapDoc.SignedFile != nil && *zapDoc.SignedFile != "" {
+		return s.Store.UpdateGeneratedContractSigned(ctx, contractID, *zapDoc.SignedFile, "", "ZapSign Eletrônico", time.Now().UTC())
+	}
+	signURL := ""
+	if len(zapDoc.Signers) > 0 {
+		signURL = zapDoc.Signers[0].SignURL
+	}
+	return s.Store.UpdateGeneratedContractZapSign(ctx, contractID, zapDoc.Token, signURL, zapDoc.Status, zapDoc.OpenID)
 }

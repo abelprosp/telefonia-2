@@ -10,24 +10,10 @@ import (
 )
 
 func (s *Store) resolveOrgID(ctx context.Context, orgID string) string {
-	q := s.q(ctx)
-	if orgID != "" && orgID != "default" {
-		var exists bool
-		_ = q.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM "OrganizationSettings" WHERE "OrganizationId" = $1)`, orgID).Scan(&exists)
-		if exists {
-			return orgID
-		}
-	}
-
-	var existingOrgID string
-	err := q.QueryRow(ctx, `SELECT "OrganizationId" FROM "OrganizationSettings" ORDER BY "UpdatedAt" DESC LIMIT 1`).Scan(&existingOrgID)
-	if err == nil && existingOrgID != "" {
-		return existingOrgID
-	}
-
 	if orgID != "" && orgID != "default" {
 		return orgID
 	}
+
 	return "00000000-0000-0000-0000-000000000001"
 }
 
