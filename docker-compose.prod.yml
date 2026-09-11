@@ -46,7 +46,7 @@ services:
       - KC_HOSTNAME_ADMIN_URL=https://telefonia.redobrai.online/auth
       - KC_HOSTNAME_STRICT=false
     ports:
-      - '127.0.0.1:8083:8080'
+      - !override '127.0.0.1:8083:8080'
     restart: on-failure
 
   connect-api:
@@ -101,7 +101,7 @@ services:
       retries: 12
       start_period: 20s
     ports:
-      - '127.0.0.1:8010:80'
+      - !override '127.0.0.1:8010:80'
 
   connect-web:
     build:
