@@ -17,7 +17,7 @@ nginx -t
 echo "=== Recarregando Nginx ==="
 systemctl reload nginx
 
-echo "=== Testando Keycloak (path /auth, porta 8081) ==="
-curl -sI "http://127.0.0.1:8081/auth/realms/luxus/.well-known/openid-configuration" | head -n 15 || echo "Keycloak ainda iniciando na 8081..."
+echo "=== Testando Keycloak (path /auth, porta 8083) ==="
+curl -sI "http://127.0.0.1:8083/auth/realms/luxus/.well-known/openid-configuration" | head -n 15 || echo "Keycloak ainda iniciando na 8083..."
 
 echo "=== Concluído. Confirme Content-Type: application/json no endpoint OIDC. ==="

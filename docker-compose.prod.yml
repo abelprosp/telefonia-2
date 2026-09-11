@@ -1,6 +1,6 @@
 # Produção na VPS Hostinger (telefonia.redobrai.online).
 # O nginx do Ubuntu escuta 80/443 e faz proxy para:
-#   web :3005  |  API :8010  |  Keycloak :8081
+#   web :3005  |  API :8010  |  Keycloak :8083
 # Não publicar 80/443 nos contentores — senão o web não sobe e o host devolve 502.
 
 services:
@@ -46,7 +46,7 @@ services:
       - KC_HOSTNAME_ADMIN_URL=https://telefonia.redobrai.online/auth
       - KC_HOSTNAME_STRICT=false
     ports:
-      - '127.0.0.1:8081:8080'
+      - '127.0.0.1:8083:8080'
     restart: on-failure
 
   connect-api:
