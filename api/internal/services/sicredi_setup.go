@@ -12,19 +12,20 @@ func (s *Service) SetupSicrediProduction(ctx context.Context, input *models.Regi
 	steps := make([]models.SicrediSetupStep, 0, 5)
 	allOK := true
 
-	if s.Sicredi == nil || !s.Sicredi.Enabled() {
+	client := s.sicrediForRequest(ctx)
+	if client == nil || !client.Enabled() {
 		return &models.SicrediProductionSetupResponse{
 			Success: false,
-			Message: "Integração Sicredi desabilitada ou sem credenciais.",
+			Message: "Integração Sicredi desabilitada ou sem credenciais nesta empresa.",
 			Steps: []models.SicrediSetupStep{{
 				Name:    "config",
 				OK:      false,
-				Message: "Defina SICREDI_ENABLED=true e credenciais OAuth.",
+				Message: "Ative o Sicredi e informe as credenciais em Configurações.",
 			}},
 		}, nil
 	}
 
-	cfg := s.Sicredi.Config()
+	cfg := client.Config()
 	env := "produção"
 	if cfg.Sandbox {
 		env = "sandbox"
@@ -35,12 +36,12 @@ func (s *Service) SetupSicrediProduction(ctx context.Context, input *models.Regi
 		Message: fmt.Sprintf("Ambiente: %s", env),
 	})
 
-	if cfg.Production && strings.TrimSpace(cfg.WebhookToken) == "" {
+	if !cfg.Sandbox && strings.TrimSpace(cfg.WebhookToken) == "" {
 		allOK = false
 		steps = append(steps, models.SicrediSetupStep{
 			Name:    "webhook_token",
 			OK:      false,
-			Message: "Configure SICREDI_WEBHOOK_TOKEN (token enviado pelo Sicredi no header Authorization).",
+			Message: "Configure o token de webhook nas configurações Sicredi da empresa.",
 		})
 	} else {
 		steps = append(steps, models.SicrediSetupStep{
@@ -59,7 +60,7 @@ func (s *Service) SetupSicrediProduction(ctx context.Context, input *models.Regi
 		steps = append(steps, models.SicrediSetupStep{
 			Name:    "public_url",
 			OK:      false,
-			Message: "Configure SICREDI_PUBLIC_API_URL com a URL HTTPS pública da API.",
+			Message: "Configure a URL HTTPS pública da API nas configurações Sicredi.",
 		})
 	} else {
 		steps = append(steps, models.SicrediSetupStep{
@@ -69,7 +70,7 @@ func (s *Service) SetupSicrediProduction(ctx context.Context, input *models.Regi
 		})
 	}
 
-	if err := s.Sicredi.Ping(ctx); err != nil {
+	if err := client.Ping(ctx); err != nil {
 		allOK = false
 		steps = append(steps, models.SicrediSetupStep{
 			Name:    "connection",
@@ -83,9 +84,9 @@ func (s *Service) SetupSicrediProduction(ctx context.Context, input *models.Regi
 			Message: "OAuth autenticado com sucesso.",
 		})
 
-		webhookOK := false
 		if publicURL != "" && !strings.Contains(publicURL, "localhost") && !strings.Contains(publicURL, "127.0.0.1") {
-			if contracts, err := s.Sicredi.ListWebhookContracts(ctx); err == nil {
+			webhookOK := false
+			if contracts, err := client.ListWebhookContracts(ctx); err == nil {
 				expected := strings.TrimRight(publicURL, "/") + "/v1/webhooks/sicredi"
 				for _, c := range contracts {
 					if strings.TrimRight(c.URL, "/") == expected {
@@ -96,49 +97,32 @@ func (s *Service) SetupSicrediProduction(ctx context.Context, input *models.Regi
 			}
 			if !webhookOK {
 				if _, err := s.RegisterSicrediWebhook(ctx, &models.RegisterSicrediWebhookInput{PublicAPIURL: publicURL}); err != nil {
+					allOK = false
 					steps = append(steps, models.SicrediSetupStep{
 						Name:    "webhook_register",
 						OK:      false,
 						Message: err.Error(),
 					})
-					allOK = false
 				} else {
-					webhookOK = true
-					webhookURL := strings.TrimRight(publicURL, "/") + "/v1/webhooks/sicredi"
 					steps = append(steps, models.SicrediSetupStep{
 						Name:    "webhook_register",
 						OK:      true,
-						Message: "Webhook registrado: " + webhookURL,
+						Message: "Webhook registrado.",
 					})
 				}
 			} else {
 				steps = append(steps, models.SicrediSetupStep{
 					Name:    "webhook_register",
 					OK:      true,
-					Message: "Webhook já registrado no Sicredi.",
+					Message: "Webhook já registrado.",
 				})
 			}
 		}
-
-		if contracts, err := s.Sicredi.ListWebhookContracts(ctx); err == nil && len(contracts) > 0 {
-			steps = append(steps, models.SicrediSetupStep{
-				Name:    "webhook_active",
-				OK:      true,
-				Message: contracts[0].URL,
-			})
-		} else if !webhookOK {
-			allOK = false
-			steps = append(steps, models.SicrediSetupStep{
-				Name:    "webhook_active",
-				OK:      false,
-				Message: "Nenhum contrato de webhook ativo no Sicredi.",
-			})
-		}
 	}
 
-	msg := "Integração Sicredi pronta para produção."
+	msg := "Setup Sicredi concluído."
 	if !allOK {
-		msg = "Corrija os itens pendentes antes de usar em produção."
+		msg = "Setup Sicredi incompleto. Revise os passos com falha."
 	}
 	return &models.SicrediProductionSetupResponse{
 		Success: allOK,

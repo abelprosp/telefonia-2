@@ -19,7 +19,8 @@ func (s *Service) IssueSicrediBoleto(ctx context.Context, documentID string) (*m
 	if err != nil {
 		return nil, err
 	}
-	if s.Sicredi == nil || !s.Sicredi.Enabled() {
+	client := s.sicrediForOrg(ctx, orgID)
+	if client == nil || !client.Enabled() {
 		return nil, httputil.BusinessError(notifications.SicrediNotConfigured)
 	}
 	doc, err := s.GetCustomerBillingDocument(ctx, documentID)
@@ -37,7 +38,8 @@ func (s *Service) IssueSicrediBoleto(ctx context.Context, documentID string) (*m
 }
 
 func (s *Service) tryAttachSicrediBoleto(ctx context.Context, orgID, documentID string) (issued bool, errMsg string) {
-	if s.Sicredi == nil || !s.Sicredi.Enabled() {
+	client := s.sicrediForOrg(ctx, orgID)
+	if client == nil || !client.Enabled() {
 		return false, ""
 	}
 	doc, err := s.GetCustomerBillingDocument(ctx, documentID)
@@ -58,7 +60,8 @@ func (s *Service) tryAttachSicrediBoleto(ctx context.Context, orgID, documentID 
 }
 
 func (s *Service) applySicrediFeedback(ctx context.Context, documentID string, message *string, status **string, nosso **string, boletoErr **string) {
-	if s.Sicredi == nil || !s.Sicredi.Enabled() {
+	client := s.sicrediForRequest(ctx)
+	if client == nil || !client.Enabled() {
 		return
 	}
 	doc, err := s.GetCustomerBillingDocument(ctx, documentID)
@@ -132,7 +135,12 @@ func (s *Service) issueSicrediBoletoForDocument(ctx context.Context, orgID strin
 		Pagador: pagador,
 	}
 
-	boleto, err := s.Sicredi.CreateHybridBoleto(ctx, input)
+	client := s.sicrediForOrg(ctx, orgID)
+	if client == nil || !client.Enabled() {
+		s.saveSicrediBoletoError(ctx, orgID, doc.ID, doc.EmailBodyHtml, "Sicredi não configurado para esta empresa")
+		return nil, httputil.BusinessError(notifications.SicrediNotConfigured)
+	}
+	boleto, err := client.CreateHybridBoleto(ctx, input)
 	now := time.Now().UTC()
 	if err != nil {
 		s.saveSicrediBoletoError(ctx, orgID, doc.ID, doc.EmailBodyHtml, err.Error())

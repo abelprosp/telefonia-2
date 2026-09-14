@@ -81,3 +81,17 @@ func (h *Handler) updateSystemSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	httputil.WriteJSON(w, http.StatusOK, settings)
 }
+
+func (h *Handler) updateSicrediSettings(w http.ResponseWriter, r *http.Request) {
+	var input models.UpdateSicrediSettingsInput
+	if err := decodeJSON(r, &input); err != nil {
+		httputil.WriteFail(w, http.StatusBadRequest, notifications.N("REQUEST_VALIDATION", "Corpo da requisição inválido."))
+		return
+	}
+	settings, err := h.Svc.UpdateSicrediSettings(r.Context(), input)
+	if err != nil {
+		httputil.HandleServiceError(w, err)
+		return
+	}
+	httputil.WriteJSON(w, http.StatusOK, settings)
+}

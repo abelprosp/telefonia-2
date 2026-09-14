@@ -607,6 +607,8 @@ func (h *Handler) RegisterRoutes(
 			r.Put("/whitelabel-settings", h.updateWhitelabelSettings)
 			r.Put("/organization-settings/system", h.updateSystemSettings)
 			r.Put("/system-settings", h.updateSystemSettings)
+			r.Put("/organization-settings/sicredi", h.updateSicrediSettings)
+			r.Put("/sicredi-settings", h.updateSicrediSettings)
 
 			r.Route("/users", func(r chi.Router) {
 

@@ -1658,11 +1658,27 @@ type SystemSettingsDto struct {
 	ProrataDivisor             int     `json:"prorata_divisor"`
 }
 
+type SicrediSettingsDto struct {
+	Enabled            bool   `json:"enabled"`
+	Sandbox            bool   `json:"sandbox"`
+	APIKeySet          bool   `json:"api_key_set"`
+	Username           string `json:"username"`
+	PasswordSet        bool   `json:"password_set"`
+	Cooperativa        string `json:"cooperativa"`
+	Posto              string `json:"posto"`
+	CodigoBeneficiario string `json:"codigo_beneficiario"`
+	AccountNumber      string `json:"account_number"`
+	WebhookTokenSet    bool   `json:"webhook_token_set"`
+	PublicAPIURL       string `json:"public_api_url"`
+	Configured         bool   `json:"configured"`
+}
+
 type OrganizationSettingsResponse struct {
 	OrganizationID string                `json:"organization_id"`
 	Company        CompanySettingsDto    `json:"company"`
 	Whitelabel     WhitelabelSettingsDto `json:"whitelabel"`
 	System         SystemSettingsDto     `json:"system"`
+	Sicredi        SicrediSettingsDto    `json:"sicredi"`
 	UpdatedAt      time.Time             `json:"updated_at"`
 	UpdatedBy      *string               `json:"updated_by,omitempty"`
 }
@@ -1705,6 +1721,20 @@ type UpdateSystemSettingsInput struct {
 	AutoSendInvoiceEmail       *bool    `json:"auto_send_invoice_email,omitempty"`
 	AutoSendCollectionReminder *bool    `json:"auto_send_collection_reminder,omitempty"`
 	ProrataDivisor             *int     `json:"prorata_divisor,omitempty"`
+}
+
+type UpdateSicrediSettingsInput struct {
+	Enabled            *bool   `json:"enabled,omitempty"`
+	Sandbox            *bool   `json:"sandbox,omitempty"`
+	APIKey             *string `json:"api_key,omitempty"`
+	Username           *string `json:"username,omitempty"`
+	Password           *string `json:"password,omitempty"`
+	Cooperativa        *string `json:"cooperativa,omitempty"`
+	Posto              *string `json:"posto,omitempty"`
+	CodigoBeneficiario *string `json:"codigo_beneficiario,omitempty"`
+	AccountNumber      *string `json:"account_number,omitempty"`
+	WebhookToken       *string `json:"webhook_token,omitempty"`
+	PublicAPIURL       *string `json:"public_api_url,omitempty"`
 }
 
 type ExpiringContractResponse struct {

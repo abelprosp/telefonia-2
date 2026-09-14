@@ -66,11 +66,41 @@ export type SystemSettings = {
   prorata_divisor: number;
 };
 
+export type SicrediSettings = {
+  enabled: boolean;
+  sandbox: boolean;
+  api_key_set: boolean;
+  username: string;
+  password_set: boolean;
+  cooperativa: string;
+  posto: string;
+  codigo_beneficiario: string;
+  account_number: string;
+  webhook_token_set: boolean;
+  public_api_url: string;
+  configured: boolean;
+};
+
+export type UpdateSicrediSettingsInput = {
+  enabled?: boolean;
+  sandbox?: boolean;
+  api_key?: string;
+  username?: string;
+  password?: string;
+  cooperativa?: string;
+  posto?: string;
+  codigo_beneficiario?: string;
+  account_number?: string;
+  webhook_token?: string;
+  public_api_url?: string;
+};
+
 export type OrganizationSettings = {
   organization_id: string;
   company: CompanySettings;
   whitelabel: WhitelabelSettings;
   system: SystemSettings;
+  sicredi: SicrediSettings;
   updated_at: string;
   updated_by?: string;
 };
@@ -98,13 +128,29 @@ export async function fetchOrganizationSettings(): Promise<OrganizationSettings>
       url: '/v1/organization-settings',
       method: 'GET'
     });
-    return res.data;
+    return {
+      ...res.data,
+      sicredi: res.data.sicredi ?? {
+        enabled: false,
+        sandbox: true,
+        api_key_set: false,
+        username: '',
+        password_set: false,
+        cooperativa: '',
+        posto: '',
+        codigo_beneficiario: '',
+        account_number: '',
+        webhook_token_set: false,
+        public_api_url: '',
+        configured: false
+      }
+    };
   } catch {
     return {
       organization_id: 'default',
       company: {
-        company_name: 'Luxus Connect',
-        trading_name: 'Luxus Connect Telecom',
+        company_name: '',
+        trading_name: '',
         cnpj: '',
         state_registration: '',
         email: '',
@@ -119,25 +165,39 @@ export async function fetchOrganizationSettings(): Promise<OrganizationSettings>
         state: ''
       },
       whitelabel: {
-        app_name: 'Luxus Connect',
-        app_slogan: 'Gestão de Telefonia Inteligente',
+        app_name: '',
+        app_slogan: '',
         logo_url: '',
         dark_logo_url: '',
         favicon_url: '',
         primary_color: '#0f766e',
-        support_email: 'suporte@luxusconnect.com.br',
-        support_phone: '(11) 99999-9999',
-        footer_text: '© 2026 Luxus Connect. Todos os direitos reservados.'
+        support_email: '',
+        support_phone: '',
+        footer_text: ''
       },
       system: {
         default_due_day: 10,
         late_fee_percentage: 2,
         interest_rate_monthly: 1,
         days_before_due_reminder: 3,
-        days_after_due_reminder: 1,
+        days_after_due_reminder: 2,
         auto_send_invoice_email: false,
         auto_send_collection_reminder: false,
         prorata_divisor: 30
+      },
+      sicredi: {
+        enabled: false,
+        sandbox: true,
+        api_key_set: false,
+        username: '',
+        password_set: false,
+        cooperativa: '',
+        posto: '',
+        codigo_beneficiario: '',
+        account_number: '',
+        webhook_token_set: false,
+        public_api_url: '',
+        configured: false
       },
       updated_at: new Date().toISOString()
     };
@@ -165,6 +225,17 @@ export async function updateWhitelabelSettings(data: Partial<WhitelabelSettings>
 export async function updateSystemSettings(data: Partial<SystemSettings>): Promise<OrganizationSettings> {
   const res = await client<OrganizationSettings, unknown, Partial<SystemSettings>>({
     url: '/v1/system-settings',
+    method: 'PUT',
+    data
+  });
+  return res.data;
+}
+
+export async function updateSicrediSettings(
+  data: UpdateSicrediSettingsInput
+): Promise<OrganizationSettings> {
+  const res = await client<OrganizationSettings, unknown, UpdateSicrediSettingsInput>({
+    url: '/v1/sicredi-settings',
     method: 'PUT',
     data
   });
@@ -224,6 +295,16 @@ export function useUpdateSystemSettingsMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: updateSystemSettings,
+    onSuccess: (data) => {
+      queryClient.setQueryData(['organization-settings'], data);
+    }
+  });
+}
+
+export function useUpdateSicrediSettingsMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: updateSicrediSettings,
     onSuccess: (data) => {
       queryClient.setQueryData(['organization-settings'], data);
     }

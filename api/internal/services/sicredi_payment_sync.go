@@ -19,7 +19,8 @@ func (s *Service) SyncSicrediPayments(ctx context.Context, daysBack int) (*model
 	if err != nil {
 		return nil, err
 	}
-	if s.Sicredi == nil || !s.Sicredi.Enabled() {
+	client := s.sicrediForOrg(ctx, orgID)
+	if client == nil || !client.Enabled() {
 		return nil, httputil.BusinessError(notifications.SicrediNotConfigured)
 	}
 	if daysBack <= 0 {
@@ -37,7 +38,7 @@ func (s *Service) SyncSicrediPayments(ctx context.Context, daysBack int) (*model
 		day := now.AddDate(0, 0, -i)
 		page := 0
 		for {
-			batch, err := s.Sicredi.ListLiquidadosDia(ctx, day, page)
+			batch, err := client.ListLiquidadosDia(ctx, day, page)
 			if err != nil {
 				return nil, httputil.BusinessError(notifications.N("SICREDI_SYNC_FAILED", err.Error()))
 			}
@@ -70,7 +71,7 @@ func (s *Service) SyncSicrediPayments(ctx context.Context, daysBack int) (*model
 
 		paidItem, found := liquidados[normalizeNossoNumero(doc.SicrediNossoNumero)]
 		if !found {
-			detail, err := s.Sicredi.GetBoleto(ctx, doc.SicrediNossoNumero)
+			detail, err := client.GetBoleto(ctx, doc.SicrediNossoNumero)
 			if err == nil && detail != nil && sicredi.IsSituacaoLiquidada(detail.Situacao) {
 				amount := detail.ValorLiquidado
 				if amount <= 0 {
@@ -116,7 +117,8 @@ func (s *Service) SyncSicrediPaymentForDocument(ctx context.Context, documentID 
 	if err != nil {
 		return nil, err
 	}
-	if s.Sicredi == nil || !s.Sicredi.Enabled() {
+	client := s.sicrediForOrg(ctx, orgID)
+	if client == nil || !client.Enabled() {
 		return nil, httputil.BusinessError(notifications.SicrediNotConfigured)
 	}
 	doc, err := s.GetCustomerBillingDocument(ctx, documentID)
@@ -143,7 +145,7 @@ func (s *Service) SyncSicrediPaymentForDocument(ctx context.Context, documentID 
 	}
 
 	nossoNumero := strings.TrimSpace(*doc.SicrediNossoNumero)
-	detail, err := s.Sicredi.GetBoleto(ctx, nossoNumero)
+	detail, err := client.GetBoleto(ctx, nossoNumero)
 	if err != nil {
 		return nil, httputil.BusinessError(notifications.N("SICREDI_SYNC_FAILED", err.Error()))
 	}
@@ -243,9 +245,6 @@ func (s *Service) applySicrediPayment(ctx context.Context, doc store.UnpaidSicre
 }
 
 func (s *Service) RunSicrediPaymentSyncAllOrgs(ctx context.Context, daysBack int) {
-	if s.Sicredi == nil || !s.Sicredi.Enabled() {
-		return
-	}
 	pending, err := s.Store.ListUnpaidSicrediBillingDocuments(ctx, "")
 	if err != nil || len(pending) == 0 {
 		return
@@ -255,6 +254,10 @@ func (s *Service) RunSicrediPaymentSyncAllOrgs(ctx context.Context, daysBack int
 		orgIDs[doc.OrganizationID] = struct{}{}
 	}
 	for orgID := range orgIDs {
+		client := s.sicrediForOrg(ctx, orgID)
+		if client == nil || !client.Enabled() {
+			continue
+		}
 		bgCtx := auth.WithOrganization(ctx, &auth.Organization{ID: orgID})
 		_, _ = s.SyncSicrediPayments(bgCtx, daysBack)
 	}

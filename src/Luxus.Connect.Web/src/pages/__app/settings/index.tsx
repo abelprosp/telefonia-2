@@ -29,11 +29,13 @@ import { toast } from 'sonner';
 import {
   useOrganizationSettingsQuery,
   useUpdateCompanySettingsMutation,
+  useUpdateSicrediSettingsMutation,
   useUpdateSystemSettingsMutation,
   useUpdateUserProfileMutation,
   useUpdateWhitelabelSettingsMutation,
   useUserProfileQuery,
   type CompanySettings,
+  type SicrediSettings,
   type SystemSettings,
   type WhitelabelSettings
 } from '@/api/settings-api';
@@ -84,6 +86,7 @@ function SettingsPage() {
   const updateCompanyMutation = useUpdateCompanySettingsMutation();
   const updateWhitelabelMutation = useUpdateWhitelabelSettingsMutation();
   const updateSystemMutation = useUpdateSystemSettingsMutation();
+  const updateSicrediMutation = useUpdateSicrediSettingsMutation();
   const exportOrg = useExportOrganizationData();
 
   // Form States - Perfil
@@ -139,6 +142,26 @@ function SettingsPage() {
     prorata_divisor: 30
   });
 
+  const [sicrediForm, setSicrediForm] = useState({
+    enabled: false,
+    sandbox: true,
+    api_key: '',
+    username: '',
+    password: '',
+    cooperativa: '',
+    posto: '',
+    codigo_beneficiario: '',
+    account_number: '',
+    webhook_token: '',
+    public_api_url: ''
+  });
+  const [sicrediMeta, setSicrediMeta] = useState<Pick<SicrediSettings, 'api_key_set' | 'password_set' | 'webhook_token_set' | 'configured'>>({
+    api_key_set: false,
+    password_set: false,
+    webhook_token_set: false,
+    configured: false
+  });
+
   // Carregar dados iniciais de perfil
   useEffect(() => {
     if (userProfile) {
@@ -164,6 +187,28 @@ function SettingsPage() {
       }
       if (orgSettings.system) {
         setSystemForm({ ...orgSettings.system });
+      }
+      if (orgSettings.sicredi) {
+        setSicrediMeta({
+          api_key_set: orgSettings.sicredi.api_key_set,
+          password_set: orgSettings.sicredi.password_set,
+          webhook_token_set: orgSettings.sicredi.webhook_token_set,
+          configured: orgSettings.sicredi.configured
+        });
+        setSicrediForm((prev) => ({
+          ...prev,
+          enabled: orgSettings.sicredi.enabled,
+          sandbox: orgSettings.sicredi.sandbox,
+          username: orgSettings.sicredi.username || '',
+          cooperativa: orgSettings.sicredi.cooperativa || '',
+          posto: orgSettings.sicredi.posto || '',
+          codigo_beneficiario: orgSettings.sicredi.codigo_beneficiario || '',
+          account_number: orgSettings.sicredi.account_number || '',
+          public_api_url: orgSettings.sicredi.public_api_url || '',
+          api_key: '',
+          password: '',
+          webhook_token: ''
+        }));
       }
     }
   }, [orgSettings]);
@@ -247,6 +292,29 @@ function SettingsPage() {
       toast.success('Parâmetros do sistema atualizados com sucesso!');
     } catch (err: any) {
       toast.error(err?.message || 'Falha ao salvar parâmetros.');
+    }
+  };
+
+  const handleSaveSicredi = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await updateSicrediMutation.mutateAsync({
+        enabled: sicrediForm.enabled,
+        sandbox: sicrediForm.sandbox,
+        username: sicrediForm.username,
+        cooperativa: sicrediForm.cooperativa,
+        posto: sicrediForm.posto,
+        codigo_beneficiario: sicrediForm.codigo_beneficiario,
+        account_number: sicrediForm.account_number,
+        public_api_url: sicrediForm.public_api_url,
+        ...(sicrediForm.api_key.trim() ? { api_key: sicrediForm.api_key.trim() } : {}),
+        ...(sicrediForm.password.trim() ? { password: sicrediForm.password.trim() } : {}),
+        ...(sicrediForm.webhook_token.trim() ? { webhook_token: sicrediForm.webhook_token.trim() } : {})
+      });
+      setSicrediForm((prev) => ({ ...prev, api_key: '', password: '', webhook_token: '' }));
+      toast.success('Credenciais Sicredi da empresa salvas com sucesso!');
+    } catch (err: any) {
+      toast.error(err?.message || 'Falha ao salvar Sicredi.');
     }
   };
 
@@ -1103,36 +1171,137 @@ function SettingsPage() {
                     Integração Bancária Sicredi (Boleto & PIX)
                   </CardTitle>
                   <CardDescription>
-                    Emissão de Boletos Híbridos com QR Code PIX dinâmico e conciliação automática via Webhook.
+                    Configure as credenciais Sicredi desta empresa. Cada organização usa a própria conta.
                   </CardDescription>
                 </div>
-                <Badge className="bg-green-600 text-white hover:bg-green-600">Conectado & Ativo</Badge>
+                <Badge
+                  className={
+                    sicrediMeta.configured
+                      ? 'bg-green-600 text-white hover:bg-green-600'
+                      : 'bg-muted text-muted-foreground'
+                  }
+                >
+                  {sicrediMeta.configured ? 'Configurado' : 'Não configurado'}
+                </Badge>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 text-sm">
-                  <div className="rounded-xl bg-muted/40 p-3">
-                    <span className="text-muted-foreground text-xs block">Cooperativa / Agência</span>
-                    <span className="font-semibold text-base">0179</span>
+                <div className="space-y-4">
+                  <div className="flex flex-wrap gap-4">
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={sicrediForm.enabled}
+                        onChange={(e) => setSicrediForm({ ...sicrediForm, enabled: e.target.checked })}
+                      />
+                      Ativar Sicredi nesta empresa
+                    </label>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={sicrediForm.sandbox}
+                        onChange={(e) => setSicrediForm({ ...sicrediForm, sandbox: e.target.checked })}
+                      />
+                      Ambiente sandbox
+                    </label>
                   </div>
-                  <div className="rounded-xl bg-muted/40 p-3">
-                    <span className="text-muted-foreground text-xs block">Posto de Atendimento</span>
-                    <span className="font-semibold text-base">14</span>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    <div className="space-y-2">
+                      <Label>Cooperativa / Agência</Label>
+                      <Input
+                        value={sicrediForm.cooperativa}
+                        onChange={(e) => setSicrediForm({ ...sicrediForm, cooperativa: e.target.value })}
+                        placeholder="Ex: 0179"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Posto</Label>
+                      <Input
+                        value={sicrediForm.posto}
+                        onChange={(e) => setSicrediForm({ ...sicrediForm, posto: e.target.value })}
+                        placeholder="Ex: 14"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Código do Beneficiário</Label>
+                      <Input
+                        value={sicrediForm.codigo_beneficiario}
+                        onChange={(e) =>
+                          setSicrediForm({ ...sicrediForm, codigo_beneficiario: e.target.value })
+                        }
+                        placeholder="Ex: 01048"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Conta corrente (exibição)</Label>
+                      <Input
+                        value={sicrediForm.account_number}
+                        onChange={(e) => setSicrediForm({ ...sicrediForm, account_number: e.target.value })}
+                        placeholder="Ex: 04133-5"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Usuário OAuth</Label>
+                      <Input
+                        value={sicrediForm.username}
+                        onChange={(e) => setSicrediForm({ ...sicrediForm, username: e.target.value })}
+                        placeholder="Opcional se beneficiário+coop."
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>API Key {sicrediMeta.api_key_set ? '(já salva)' : ''}</Label>
+                      <Input
+                        type="password"
+                        value={sicrediForm.api_key}
+                        onChange={(e) => setSicrediForm({ ...sicrediForm, api_key: e.target.value })}
+                        placeholder={sicrediMeta.api_key_set ? 'Deixe em branco para manter' : 'API Key'}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Senha OAuth {sicrediMeta.password_set ? '(já salva)' : ''}</Label>
+                      <Input
+                        type="password"
+                        value={sicrediForm.password}
+                        onChange={(e) => setSicrediForm({ ...sicrediForm, password: e.target.value })}
+                        placeholder={sicrediMeta.password_set ? 'Deixe em branco para manter' : 'Senha'}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Token webhook {sicrediMeta.webhook_token_set ? '(já salvo)' : ''}</Label>
+                      <Input
+                        type="password"
+                        value={sicrediForm.webhook_token}
+                        onChange={(e) => setSicrediForm({ ...sicrediForm, webhook_token: e.target.value })}
+                        placeholder={
+                          sicrediMeta.webhook_token_set ? 'Deixe em branco para manter' : 'Token'
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2 sm:col-span-3">
+                      <Label>URL pública da API (HTTPS)</Label>
+                      <Input
+                        value={sicrediForm.public_api_url}
+                        onChange={(e) => setSicrediForm({ ...sicrediForm, public_api_url: e.target.value })}
+                        placeholder="https://telefonia.redobrai.online/api"
+                      />
+                    </div>
                   </div>
-                  <div className="rounded-xl bg-muted/40 p-3">
-                    <span className="text-muted-foreground text-xs block">Código do Beneficiário</span>
-                    <span className="font-semibold text-base">01048</span>
-                  </div>
-                  <div className="rounded-xl bg-muted/40 p-3">
-                    <span className="text-muted-foreground text-xs block">Conta Corrente</span>
-                    <span className="font-semibold text-base">04133-5</span>
-                  </div>
-                  <div className="rounded-xl bg-muted/40 p-3">
-                    <span className="text-muted-foreground text-xs block">Tipo de Cobrança</span>
-                    <span className="font-semibold text-base">Híbrido (Boleto + PIX)</span>
-                  </div>
-                  <div className="rounded-xl bg-muted/40 p-3">
-                    <span className="text-muted-foreground text-xs block">Webhook de Notificação</span>
-                    <span className="font-semibold text-base text-green-600 dark:text-green-400">Ativo em Produção</span>
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      disabled={updateSicrediMutation.isPending}
+                      className="gap-2"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        void handleSaveSicredi(e as unknown as React.FormEvent);
+                      }}
+                    >
+                      {updateSicrediMutation.isPending ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <Save className="size-4" />
+                      )}
+                      Salvar Sicredi
+                    </Button>
                   </div>
                 </div>
               </CardContent>

@@ -160,8 +160,8 @@ func (s *Service) CreateOrganizationUser(ctx context.Context, input models.Creat
 			}
 		}
 
-		// Inicializa as configurações de empresa e whitelabel para a nova organização
-		defaultSettings := &models.OrganizationSettingsResponse{
+		// Nova organização nasce em branco para o Master configurar.
+		blankSettings := &models.OrganizationSettingsResponse{
 			OrganizationID: targetOrgID,
 			Company: models.CompanySettingsDto{
 				CompanyName: targetOrgName,
@@ -169,19 +169,21 @@ func (s *Service) CreateOrganizationUser(ctx context.Context, input models.Creat
 			},
 			Whitelabel: models.WhitelabelSettingsDto{
 				AppName:      targetOrgName,
-				PrimaryColor: "#10b981",
+				PrimaryColor: "#0f766e",
 			},
 			System: models.SystemSettingsDto{
-				DefaultDueDay:              10,
-				LateFeePercentage:          2.0,
-				InterestRateMonthly:        1.0,
-				DaysBeforeDueReminder:      3,
-				DaysAfterDueReminder:       5,
-				AutoSendInvoiceEmail:       true,
-				AutoSendCollectionReminder: true,
+				DefaultDueDay:         10,
+				LateFeePercentage:     2.0,
+				InterestRateMonthly:   1.0,
+				DaysBeforeDueReminder: 3,
+				DaysAfterDueReminder:  2,
+				ProrataDivisor:        30,
+			},
+			Sicredi: models.SicrediSettingsDto{
+				Sandbox: true,
 			},
 		}
-		_ = s.Store.UpsertOrganizationSettings(ctx, targetOrgID, nil, defaultSettings)
+		_ = s.Store.UpsertOrganizationSettings(ctx, targetOrgID, nil, blankSettings)
 
 	} else {
 		// Usuário comum herda a organização do usuário logado (ex: Luxus Telefonia)

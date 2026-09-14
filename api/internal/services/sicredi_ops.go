@@ -22,7 +22,8 @@ func (s *Service) GetSicrediBoletoPDF(ctx context.Context, documentID string) ([
 	if err != nil {
 		return nil, "", err
 	}
-	if s.Sicredi == nil || !s.Sicredi.Enabled() {
+	client := s.sicrediForOrg(ctx, orgID)
+	if client == nil || !client.Enabled() {
 		return nil, "", httputil.BusinessError(notifications.SicrediNotConfigured)
 	}
 	doc, err := s.GetCustomerBillingDocument(ctx, documentID)
@@ -32,12 +33,11 @@ func (s *Service) GetSicrediBoletoPDF(ctx context.Context, documentID string) ([
 	if doc.SicrediLinhaDigitavel == nil || strings.TrimSpace(*doc.SicrediLinhaDigitavel) == "" {
 		return nil, "", httputil.ValidationError(notifications.N("SICREDI_BOLETO_NOT_ISSUED", "Esta fatura ainda não possui boleto Sicredi."))
 	}
-	pdf, err := s.Sicredi.GetBoletoPDF(ctx, strings.TrimSpace(*doc.SicrediLinhaDigitavel))
+	pdf, err := client.GetBoletoPDF(ctx, strings.TrimSpace(*doc.SicrediLinhaDigitavel))
 	if err != nil {
 		return nil, "", httputil.BusinessError(notifications.N("SICREDI_PDF_FAILED", err.Error()))
 	}
 	filename := "boleto-" + doc.InvoiceNumber + ".pdf"
-	_ = orgID
 	return pdf, filename, nil
 }
 
@@ -46,7 +46,8 @@ func (s *Service) CancelSicrediBoleto(ctx context.Context, documentID string) (*
 	if err != nil {
 		return nil, err
 	}
-	if s.Sicredi == nil || !s.Sicredi.Enabled() {
+	client := s.sicrediForOrg(ctx, orgID)
+	if client == nil || !client.Enabled() {
 		return nil, httputil.BusinessError(notifications.SicrediNotConfigured)
 	}
 	doc, err := s.GetCustomerBillingDocument(ctx, documentID)
@@ -68,7 +69,7 @@ func (s *Service) CancelSicrediBoleto(ctx context.Context, documentID string) (*
 		}
 	}
 	nossoNumero := strings.TrimSpace(*doc.SicrediNossoNumero)
-	if err := s.Sicredi.CancelBoleto(ctx, nossoNumero); err != nil {
+	if err := client.CancelBoleto(ctx, nossoNumero); err != nil {
 		return nil, httputil.BusinessError(notifications.N("SICREDI_CANCEL_FAILED", err.Error()))
 	}
 	now := time.Now().UTC()
@@ -88,7 +89,8 @@ func (s *Service) AlterSicrediBoletoDueDate(ctx context.Context, documentID stri
 	if err != nil {
 		return nil, err
 	}
-	if s.Sicredi == nil || !s.Sicredi.Enabled() {
+	client := s.sicrediForOrg(ctx, orgID)
+	if client == nil || !client.Enabled() {
 		return nil, httputil.BusinessError(notifications.SicrediNotConfigured)
 	}
 	doc, err := s.GetCustomerBillingDocument(ctx, documentID)
@@ -103,7 +105,7 @@ func (s *Service) AlterSicrediBoletoDueDate(ctx context.Context, documentID stri
 		return nil, err
 	}
 	nossoNumero := strings.TrimSpace(*doc.SicrediNossoNumero)
-	if err := s.Sicredi.AlterBoletoDueDate(ctx, nossoNumero, dueDate); err != nil {
+	if err := client.AlterBoletoDueDate(ctx, nossoNumero, dueDate); err != nil {
 		return nil, httputil.BusinessError(notifications.N("SICREDI_ALTER_FAILED", err.Error()))
 	}
 	now := time.Now().UTC()
@@ -115,22 +117,23 @@ func (s *Service) AlterSicrediBoletoDueDate(ctx context.Context, documentID stri
 }
 
 func (s *Service) RegisterSicrediWebhook(ctx context.Context, input *models.RegisterSicrediWebhookInput) (*models.IssueSicrediBoletoResponse, error) {
-	if s.Sicredi == nil || !s.Sicredi.Enabled() {
+	client := s.sicrediForRequest(ctx)
+	if client == nil || !client.Enabled() {
 		return nil, httputil.BusinessError(notifications.SicrediNotConfigured)
 	}
-	cfg := s.Sicredi.Config()
+	cfg := client.Config()
 	publicURL := strings.TrimSpace(cfg.PublicAPIURL)
 	if input != nil && strings.TrimSpace(input.PublicAPIURL) != "" {
 		publicURL = strings.TrimSpace(input.PublicAPIURL)
 	}
 	if publicURL == "" {
-		return nil, httputil.ValidationError(notifications.N("SICREDI_WEBHOOK_URL_REQUIRED", "Configure SICREDI_PUBLIC_API_URL com a URL pública da API (ex.: ngrok)."))
+		return nil, httputil.ValidationError(notifications.N("SICREDI_WEBHOOK_URL_REQUIRED", "Configure a URL pública da API nas configurações Sicredi da empresa."))
 	}
 	if strings.Contains(publicURL, "localhost") || strings.Contains(publicURL, "127.0.0.1") {
-		return nil, httputil.ValidationError(notifications.N("SICREDI_WEBHOOK_URL_LOCAL", "O Sicredi exige URL pública HTTPS para o webhook. Use ngrok/cloudflare tunnel e informe em SICREDI_PUBLIC_API_URL."))
+		return nil, httputil.ValidationError(notifications.N("SICREDI_WEBHOOK_URL_LOCAL", "O Sicredi exige URL pública HTTPS para o webhook."))
 	}
 	webhookURL := strings.TrimRight(publicURL, "/") + "/v1/webhooks/sicredi"
-	if err := s.Sicredi.RegisterWebhookContract(ctx, sicredi.WebhookContractInput{
+	if err := client.RegisterWebhookContract(ctx, sicredi.WebhookContractInput{
 		URL:     webhookURL,
 		Token:   cfg.WebhookToken,
 		Eventos: []string{"LIQUIDACAO", "BAIXA", "REGISTRO", "ALTERACAO"},
@@ -147,18 +150,19 @@ func (s *Service) TestSicrediConnection(ctx context.Context) (*models.SicrediTes
 	if _, err := orgFrom(ctx); err != nil {
 		return nil, err
 	}
-	if s.Sicredi == nil || !s.Sicredi.Enabled() {
+	client := s.sicrediForRequest(ctx)
+	if client == nil || !client.Enabled() {
 		return nil, httputil.BusinessError(notifications.SicrediNotConfigured)
 	}
-	cfg := s.Sicredi.Config()
-	if err := s.Sicredi.Ping(ctx); err != nil {
+	cfg := client.Config()
+	if err := client.Ping(ctx); err != nil {
 		env := "produção"
 		if cfg.Sandbox {
 			env = "sandbox"
 		}
 		return &models.SicrediTestConnectionResponse{
 			Success: false,
-			Message: fmt.Sprintf("Falha na conexão Sicredi (%s): %s", env, err.Error()),
+			Message: fmt.Sprintf("Falha ao autenticar no Sicredi (%s): %v", env, err),
 			Sandbox: cfg.Sandbox,
 		}, nil
 	}
@@ -178,10 +182,11 @@ func (s *Service) GetSicrediStatus(ctx context.Context) (*models.SicrediIntegrat
 	if err != nil {
 		return nil, err
 	}
-	enabled := s.Sicredi != nil && s.Sicredi.Enabled()
+	client := s.sicrediForRequest(ctx)
+	enabled := client != nil && client.Enabled()
 	resp := &models.SicrediIntegrationStatusResponse{Enabled: enabled}
-	if s.Sicredi != nil {
-		cfg := s.Sicredi.Config()
+	if client != nil {
+		cfg := client.Config()
 		resp.Sandbox = cfg.Sandbox
 		resp.Production = cfg.Production
 		resp.Cooperativa = cfg.Cooperativa
@@ -194,11 +199,11 @@ func (s *Service) GetSicrediStatus(ctx context.Context) (*models.SicrediIntegrat
 		if cfg.PublicAPIURL != "" {
 			resp.WebhookURL = strings.TrimRight(cfg.PublicAPIURL, "/") + "/v1/webhooks/sicredi"
 		}
-		if err := s.Sicredi.Ping(ctx); err != nil {
+		if err := client.Ping(ctx); err != nil {
 			resp.ConnectionError = err.Error()
 		} else {
 			resp.Connected = true
-			if contracts, err := s.Sicredi.ListWebhookContracts(ctx); err == nil && len(contracts) > 0 {
+			if contracts, err := client.ListWebhookContracts(ctx); err == nil && len(contracts) > 0 {
 				resp.WebhookRegistered = true
 				if contracts[0].URL != "" {
 					resp.WebhookURL = contracts[0].URL
@@ -211,18 +216,29 @@ func (s *Service) GetSicrediStatus(ctx context.Context) (*models.SicrediIntegrat
 }
 
 func (s *Service) HandleSicrediWebhook(ctx context.Context, r *http.Request) error {
-	if s.Sicredi == nil || !s.Sicredi.Enabled() {
-		return httputil.BusinessError(notifications.SicrediNotConfigured)
-	}
-	cfg := s.Sicredi.Config()
-	if strings.TrimSpace(cfg.WebhookToken) == "" {
-		return httputil.BusinessError(notifications.N("SICREDI_WEBHOOK_TOKEN_REQUIRED", "Configure SICREDI_WEBHOOK_TOKEN para aceitar webhooks."))
-	}
-	if token := strings.TrimSpace(cfg.WebhookToken); token != "" {
-		auth := strings.TrimSpace(r.Header.Get("Authorization"))
-		if auth != "Bearer "+token && auth != token {
-			return httputil.BusinessError(notifications.N("SICREDI_WEBHOOK_UNAUTHORIZED", "Token de webhook inválido."))
+	authHeader := strings.TrimSpace(r.Header.Get("Authorization"))
+	tokenOK := false
+	if s.Sicredi != nil && s.Sicredi.Enabled() {
+		cfg := s.Sicredi.Config()
+		token := strings.TrimSpace(cfg.WebhookToken)
+		if token != "" && (authHeader == "Bearer "+token || authHeader == token) {
+			tokenOK = true
 		}
+	}
+	if !tokenOK {
+		rawToken := strings.TrimPrefix(authHeader, "Bearer ")
+		rawToken = strings.TrimSpace(rawToken)
+		if rawToken == "" {
+			rawToken = authHeader
+		}
+		ids, err := s.Store.FindOrganizationIDsBySicrediWebhookToken(ctx, rawToken)
+		if err != nil {
+			return httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+		}
+		tokenOK = len(ids) > 0
+	}
+	if !tokenOK {
+		return httputil.BusinessError(notifications.N("SICREDI_WEBHOOK_UNAUTHORIZED", "Token de webhook inválido."))
 	}
 
 	raw, err := io.ReadAll(r.Body)

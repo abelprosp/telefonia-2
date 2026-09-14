@@ -8,6 +8,7 @@ import (
 	"github.com/luxus-connect/telefonia/api/internal/httputil"
 	"github.com/luxus-connect/telefonia/api/internal/models"
 	"github.com/luxus-connect/telefonia/api/internal/notifications"
+	"github.com/luxus-connect/telefonia/api/internal/store"
 )
 
 func (s *Service) GetCurrentUserProfile(ctx context.Context) (*models.UserProfileResponse, error) {
@@ -307,6 +308,76 @@ func (s *Service) UpdateSystemSettings(ctx context.Context, input models.UpdateS
 	}
 
 	if err := s.Store.UpsertOrganizationSettings(ctx, orgID, updatedBy, current); err != nil {
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+
+	return s.Store.GetOrganizationSettings(ctx, orgID)
+}
+
+func (s *Service) UpdateSicrediSettings(ctx context.Context, input models.UpdateSicrediSettingsInput) (*models.OrganizationSettingsResponse, error) {
+	org := auth.OrganizationFromContext(ctx)
+	orgID := "default"
+	if org != nil && org.ID != "" {
+		orgID = org.ID
+	}
+
+	sec, err := s.Store.GetOrganizationSicrediSecrets(ctx, orgID)
+	if err != nil {
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+	if sec == nil {
+		sec = &store.OrgSicrediSecrets{Sandbox: true}
+	}
+
+	if input.Enabled != nil {
+		sec.Enabled = *input.Enabled
+	}
+	if input.Sandbox != nil {
+		sec.Sandbox = *input.Sandbox
+	}
+	if input.APIKey != nil {
+		v := strings.TrimSpace(*input.APIKey)
+		if v != "" && v != "********" {
+			sec.APIKey = v
+		}
+	}
+	if input.Username != nil {
+		sec.Username = strings.TrimSpace(*input.Username)
+	}
+	if input.Password != nil {
+		v := strings.TrimSpace(*input.Password)
+		if v != "" && v != "********" {
+			sec.Password = v
+		}
+	}
+	if input.Cooperativa != nil {
+		sec.Cooperativa = strings.TrimSpace(*input.Cooperativa)
+	}
+	if input.Posto != nil {
+		sec.Posto = strings.TrimSpace(*input.Posto)
+	}
+	if input.CodigoBeneficiario != nil {
+		sec.CodigoBeneficiario = strings.TrimSpace(*input.CodigoBeneficiario)
+	}
+	if input.AccountNumber != nil {
+		sec.AccountNumber = strings.TrimSpace(*input.AccountNumber)
+	}
+	if input.WebhookToken != nil {
+		v := strings.TrimSpace(*input.WebhookToken)
+		if v != "" && v != "********" {
+			sec.WebhookToken = v
+		}
+	}
+	if input.PublicAPIURL != nil {
+		sec.PublicAPIURL = strings.TrimRight(strings.TrimSpace(*input.PublicAPIURL), "/")
+	}
+
+	var updatedBy *string
+	if u := auth.UserFromContext(ctx); u != nil {
+		updatedBy = &u.ID
+	}
+
+	if err := s.Store.UpsertOrganizationSicrediSettings(ctx, orgID, updatedBy, *sec); err != nil {
 		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
 
