@@ -816,11 +816,7 @@ export function CustomerDetailView({
               title="Faturamento"
               description="Gere fatura avulsa com boleto Sicredi (código de barras + PIX), sem depender da fatura importada da operadora."
             >
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4">
-                <p className="text-muted-foreground text-sm">
-                  A fatura incluirá linha digitável, código de barras e QR Code PIX quando o Sicredi
-                  estiver configurado.
-                </p>
+              <div className="flex flex-wrap items-center justify-end gap-3 rounded-lg border p-4">
                 <Button type="button" onClick={() => setGenerateInvoiceOpen(true)}>
                   <FileStack className="mr-2 size-4" />
                   Gerar fatura
