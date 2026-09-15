@@ -11,6 +11,8 @@ type PresignedURLModel struct {
 	URL          string    `json:"url"`
 	HTTPMethod   string    `json:"http_method"`
 	ExpiresAtUTC time.Time `json:"expires_at_utc"`
+	BucketName   string    `json:"bucket_name,omitempty"`
+	ObjectKey    string    `json:"object_key,omitempty"`
 }
 
 // --- Providers ---

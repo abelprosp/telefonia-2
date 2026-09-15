@@ -459,7 +459,8 @@ func billingGroupSelectSQL(requireInvoice bool) string {
 	if requireInvoice {
 		invoiceJoin = `
 			JOIN "ProviderInvoicePhoneLines" j ON j."PhoneLinesId" = pl."Id"
-			JOIN "ProviderInvoices" i ON i."Id" = j."ProviderInvoicesId" AND i."ProcessingMonthId" = $2`
+			JOIN "ProviderInvoices" i ON i."Id" = j."ProviderInvoicesId" AND i."ProcessingMonthId" = $2
+			JOIN "ProcessingMonths" pm ON pm."Id" = i."ProcessingMonthId" AND pm."OrganizationId" = $1`
 		alreadyBilled = `EXISTS(
 				SELECT 1 FROM "CustomerBillingDocuments" d
 				WHERE d."OrganizationId" = $1 AND d."CustomerId" = c."Id"

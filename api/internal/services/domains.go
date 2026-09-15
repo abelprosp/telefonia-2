@@ -769,6 +769,9 @@ func (s *Service) RequestProviderInvoiceImport(ctx context.Context, input models
 	if strings.TrimSpace(input.StorageObjectKey) == "" {
 		return nil, httputil.ValidationError(notifications.ImportStorageObjectKeyRequired)
 	}
+	if err := ensureTenantObjectKey(ctx, input.StorageObjectKey); err != nil {
+		return nil, err
+	}
 	ok, err := s.Store.ProviderExists(ctx, orgID, input.ProviderID)
 	if err != nil {
 		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
@@ -843,6 +846,9 @@ func (s *Service) PreviewProviderInvoiceImport(ctx context.Context, input models
 	}
 	if strings.TrimSpace(input.StorageObjectKey) == "" {
 		return nil, httputil.ValidationError(notifications.ImportStorageObjectKeyRequired)
+	}
+	if err := ensureTenantObjectKey(ctx, input.StorageObjectKey); err != nil {
+		return nil, err
 	}
 	ok, err := s.Store.ProviderExists(ctx, orgID, input.ProviderID)
 	if err != nil {

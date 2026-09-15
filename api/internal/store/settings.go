@@ -11,14 +11,15 @@ import (
 	"github.com/luxus-connect/telefonia/api/internal/sicredi"
 )
 
-const defaultLuxusOrgID = "00000000-0000-0000-0000-000000000001"
+const DefaultLuxusOrgID = "00000000-0000-0000-0000-000000000001"
 
-func (s *Store) resolveOrgID(ctx context.Context, orgID string) string {
-	if orgID != "" && orgID != "default" {
-		return orgID
+func (s *Store) resolveOrgID(_ context.Context, orgID string) string {
+	orgID = strings.TrimSpace(orgID)
+	if orgID == "" || orgID == "default" {
+		// Legacy Luxus bootstrap only — never remap a real tenant UUID.
+		return DefaultLuxusOrgID
 	}
-
-	return defaultLuxusOrgID
+	return orgID
 }
 
 // blankOrganizationSettings returns empty company/whitelabel data so each

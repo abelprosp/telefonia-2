@@ -205,7 +205,7 @@ export function InvoiceImportSheet({
   const onSubmit = form.handleSubmit(async (values) => {
     try {
       const file = importFile;
-      const storageObjectKey =
+      let storageObjectKey =
         uploadedKey ??
         (file
           ? buildInvoiceStorageObjectKey(file, values.providerId)
@@ -231,14 +231,21 @@ export function InvoiceImportSheet({
 
         // Stage 2: upload with real XHR progress (10 → 85%)
         onProgressChange?.({ stage: 'uploading', progress: 10, fileName: file.name });
-        await uploadFileFromPresignedUrl(file, defaultBucket, storageObjectKey, (pct) => {
-          // Map XHR 0–100% to the 10–85% range
-          onProgressChange?.({
-            stage: 'uploading',
-            progress: 10 + Math.round(pct * 0.75),
-            fileName: file.name
-          });
-        });
+        const effectiveKey = await uploadFileFromPresignedUrl(
+          file,
+          defaultBucket,
+          storageObjectKey,
+          (pct) => {
+            // Map XHR 0–100% to the 10–85% range
+            onProgressChange?.({
+              stage: 'uploading',
+              progress: 10 + Math.round(pct * 0.75),
+              fileName: file.name
+            });
+          }
+        );
+        storageObjectKey = effectiveKey;
+        setUploadedKey(effectiveKey);
       }
 
       // Stage 3: API registration (85 → ~95%)
@@ -283,15 +290,16 @@ export function InvoiceImportSheet({
     try {
       const storageObjectKey =
         uploadedKey ?? buildInvoiceStorageObjectKey(file, values.providerId);
+      let effectiveKey = storageObjectKey;
       if (!uploadedKey) {
-        await uploadFileFromPresignedUrl(file, defaultBucket, storageObjectKey);
-        setUploadedKey(storageObjectKey);
+        effectiveKey = await uploadFileFromPresignedUrl(file, defaultBucket, storageObjectKey);
+        setUploadedKey(effectiveKey);
       }
       const result = await previewProviderInvoiceImport({
         provider_id: values.providerId,
         processing_month_id: values.processingMonthId,
         storage_bucket: defaultBucket,
-        storage_object_key: storageObjectKey,
+        storage_object_key: effectiveKey,
         original_file_name: values.originalFileName ?? file.name,
         allow_substitute: values.allowSubstitute
       });

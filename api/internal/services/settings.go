@@ -130,10 +130,9 @@ func (s *Service) UpdateCurrentUserProfile(ctx context.Context, input models.Upd
 }
 
 func (s *Service) GetOrganizationSettings(ctx context.Context) (*models.OrganizationSettingsResponse, error) {
-	org := auth.OrganizationFromContext(ctx)
-	orgID := "default"
-	if org != nil && org.ID != "" {
-		orgID = org.ID
+	orgID, err := orgFrom(ctx)
+	if err != nil {
+		return nil, err
 	}
 	settings, err := s.Store.GetOrganizationSettings(ctx, orgID)
 	if err != nil {
@@ -143,10 +142,9 @@ func (s *Service) GetOrganizationSettings(ctx context.Context) (*models.Organiza
 }
 
 func (s *Service) UpdateCompanySettings(ctx context.Context, input models.UpdateCompanySettingsInput) (*models.OrganizationSettingsResponse, error) {
-	org := auth.OrganizationFromContext(ctx)
-	orgID := "default"
-	if org != nil && org.ID != "" {
-		orgID = org.ID
+	orgID, err := orgFrom(ctx)
+	if err != nil {
+		return nil, err
 	}
 
 	current, err := s.Store.GetOrganizationSettings(ctx, orgID)
@@ -210,10 +208,9 @@ func (s *Service) UpdateCompanySettings(ctx context.Context, input models.Update
 }
 
 func (s *Service) UpdateWhitelabelSettings(ctx context.Context, input models.UpdateWhitelabelSettingsInput) (*models.OrganizationSettingsResponse, error) {
-	org := auth.OrganizationFromContext(ctx)
-	orgID := "default"
-	if org != nil && org.ID != "" {
-		orgID = org.ID
+	orgID, err := orgFrom(ctx)
+	if err != nil {
+		return nil, err
 	}
 
 	current, err := s.Store.GetOrganizationSettings(ctx, orgID)
@@ -262,10 +259,9 @@ func (s *Service) UpdateWhitelabelSettings(ctx context.Context, input models.Upd
 }
 
 func (s *Service) UpdateSystemSettings(ctx context.Context, input models.UpdateSystemSettingsInput) (*models.OrganizationSettingsResponse, error) {
-	org := auth.OrganizationFromContext(ctx)
-	orgID := "default"
-	if org != nil && org.ID != "" {
-		orgID = org.ID
+	orgID, err := orgFrom(ctx)
+	if err != nil {
+		return nil, err
 	}
 
 	current, err := s.Store.GetOrganizationSettings(ctx, orgID)
@@ -315,10 +311,9 @@ func (s *Service) UpdateSystemSettings(ctx context.Context, input models.UpdateS
 }
 
 func (s *Service) UpdateSicrediSettings(ctx context.Context, input models.UpdateSicrediSettingsInput) (*models.OrganizationSettingsResponse, error) {
-	org := auth.OrganizationFromContext(ctx)
-	orgID := "default"
-	if org != nil && org.ID != "" {
-		orgID = org.ID
+	orgID, err := orgFrom(ctx)
+	if err != nil {
+		return nil, err
 	}
 
 	sec, err := s.Store.GetOrganizationSicrediSecrets(ctx, orgID)
