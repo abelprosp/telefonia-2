@@ -152,3 +152,21 @@ func (s *Store) UpdateDeviceStockItem(ctx context.Context, orgID, id string, row
 	}
 	return nil
 }
+
+// UpdateDeviceStockStatus changes only the lifecycle state and returns no-op
+// when the item is missing. Keeping this operation separate prevents callers
+// from accidentally overwriting inventory metadata during an assignment.
+func (s *Store) UpdateDeviceStockStatus(ctx context.Context, orgID, id, from, to string) error {
+	tag, err := s.q(ctx).Exec(ctx, `
+		UPDATE "DeviceStockItems"
+		SET "Status" = $4::device_stock_status, "UpdatedAt" = now()
+		WHERE "OrganizationId" = $1 AND "Id" = $2 AND "Status" = $3::device_stock_status`,
+		orgID, id, from, to)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+	return nil
+}

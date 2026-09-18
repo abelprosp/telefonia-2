@@ -8,6 +8,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/luxus-connect/telefonia/api/internal/auth"
 	"github.com/luxus-connect/telefonia/api/internal/httputil"
 	"github.com/luxus-connect/telefonia/api/internal/models"
@@ -211,19 +212,25 @@ func (s *Service) CreateSale(ctx context.Context, input models.CreateSaleInput, 
 	if err != nil {
 		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
-	if err := s.Store.CreateSale(ctx, id, orgID, customerID, user.ID, saleNumber, input.ContractTemplateID, input.Notes, now); err != nil {
-		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
-	}
-
-	for i, item := range input.Items {
-		if err := s.addSaleLineItemInternal(ctx, id, item, int32(i)); err != nil {
+	if err := s.Store.WithTx(ctx, func(txCtx context.Context, tx pgx.Tx) error {
+		txCtx = store.CtxWithTx(txCtx, tx)
+		if err := s.Store.CreateSale(txCtx, id, orgID, customerID, user.ID, saleNumber, input.ContractTemplateID, input.Notes, now); err != nil {
+			return err
+		}
+		for i, item := range input.Items {
+			if err := s.addSaleLineItemInternal(txCtx, id, item, int32(i)); err != nil {
+				return err
+			}
+		}
+		if len(input.Items) > 0 {
+			return s.Store.RecalculateSaleTotal(txCtx, id, now)
+		}
+		return nil
+	}); err != nil {
+		if _, ok := err.(*httputil.AppError); ok {
 			return nil, err
 		}
-	}
-	if len(input.Items) > 0 {
-		if err := s.Store.RecalculateSaleTotal(ctx, id, now); err != nil {
-			return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
-		}
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
 	return s.GetSale(ctx, id)
 }

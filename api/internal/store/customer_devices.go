@@ -143,6 +143,20 @@ func (s *Store) EndCustomerDeviceLink(ctx context.Context, orgID, customerID, li
 	return nil
 }
 
+func (s *Store) DeleteCustomerDeviceLink(ctx context.Context, orgID, customerID, linkID string) error {
+	tag, err := s.q(ctx).Exec(ctx, `
+		DELETE FROM "CustomerDeviceLinks" d USING "Customers" c
+		WHERE c."Id" = d."CustomerId" AND c."OrganizationId" = $1
+		  AND d."CustomerId" = $2 AND d."Id" = $3 AND d."EndDate" IS NULL`, orgID, customerID, linkID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+	return nil
+}
+
 func (s *Store) ListCustomerBillingItems(ctx context.Context, customerID string) ([]CustomerBillingItemRow, error) {
 	rows, err := s.q(ctx).Query(ctx, `
 		SELECT

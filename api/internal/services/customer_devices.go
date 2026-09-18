@@ -106,6 +106,16 @@ func (s *Service) AssignCustomerDevice(ctx context.Context, customerID string, i
 	if err := s.Store.CreateCustomerDeviceLink(ctx, id, customerID, deviceStockID, description, brand, model, input.MonthlyAmount, start, now); err != nil {
 		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
+	if deviceStockID != nil {
+		if err := s.Store.UpdateDeviceStockStatus(ctx, orgID, *deviceStockID, "in_stock", "sold"); err != nil {
+			// The link must not leave inventory claiming the device is available.
+			_ = s.Store.DeleteCustomerDeviceLink(ctx, orgID, customerID, id)
+			if isPgNoRows(err) {
+				return nil, httputil.BusinessError(notifications.N("DEVICE_STOCK_NOT_AVAILABLE", "Device is no longer available in stock."))
+			}
+			return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+		}
+	}
 	s.maybeGenerateAutomaticContract(ctx, orgID, customerID, "", "device", "Aquisição de aparelho: "+description)
 	if input.RenewFidelity != nil {
 		lines, _, err := s.Store.ListCustomerPhoneLines(ctx, orgID, customerID, httputil.PageSearch{PageSize: 100})
@@ -158,11 +168,23 @@ func (s *Service) UnassignCustomerDevice(ctx context.Context, customerID, linkID
 		}
 		end = parsed
 	}
+	link, err := s.Store.GetCustomerDeviceLink(ctx, orgID, customerID, linkID)
+	if err != nil || link == nil {
+		if err != nil {
+			return httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+		}
+		return httputil.NotFoundError(notifications.CustomerDeviceNotFound)
+	}
 	if err := s.Store.EndCustomerDeviceLink(ctx, orgID, customerID, linkID, end); err != nil {
 		if isPgNoRows(err) {
 			return httputil.NotFoundError(notifications.CustomerDeviceNotFound)
 		}
 		return httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+	if link.DeviceStockItemID != nil {
+		if err := s.Store.UpdateDeviceStockStatus(ctx, orgID, *link.DeviceStockItemID, "sold", "in_stock"); err != nil && !isPgNoRows(err) {
+			return httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+		}
 	}
 	return nil
 }

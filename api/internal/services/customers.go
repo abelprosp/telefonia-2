@@ -27,16 +27,16 @@ type ImportProcessor interface {
 }
 
 type Service struct {
-	Store                      *store.Store
-	Publisher                  EventPublisher
-	Processor                  ImportProcessor
-	Keycloak                   *keycloak.AdminClient
-	Mailer                     *email.Sender
-	Sicredi                    SicrediBoletoIssuer
-	ZapSign                    *zapsign.Client
-	StateMachine               *statemachine.Engine
-	FinancialAgentPublicURL    string
-	FinancialAgentConfigured   bool
+	Store                    *store.Store
+	Publisher                EventPublisher
+	Processor                ImportProcessor
+	Keycloak                 *keycloak.AdminClient
+	Mailer                   *email.Sender
+	Sicredi                  SicrediBoletoIssuer
+	ZapSign                  *zapsign.Client
+	StateMachine             *statemachine.Engine
+	FinancialAgentPublicURL  string
+	FinancialAgentConfigured bool
 }
 
 func (s *Service) SM() *statemachine.Engine {
@@ -393,18 +393,27 @@ func (s *Service) CreateCustomer(ctx context.Context, input models.CreateCustome
 	customerType := httputil.CustomerTypeFromInput(input.Type)
 	docType := httputil.DocumentTypeForCustomer(customerType)
 	id := uuid.New().String()
-	if err := s.Store.CreateCustomer(ctx, orgID, id, providerID, customerType,
-		strings.TrimSpace(input.Name), doc, docType, input.LegalName, input.StateRegistration,
-		input.ResponsibleSalespersonUserID, birthDate); err != nil {
-		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
-	}
-	if err := s.applyCustomerCommercial(ctx, id, input.CommercialActivationDate, input.ContractedLuxusCnpj); err != nil {
-		return nil, err
-	}
-	for _, addr := range input.Addresses {
-		if err := s.Store.CreateCustomerAddress(ctx, id, addr); err != nil {
-			return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	if err := s.Store.WithTx(ctx, func(txCtx context.Context, tx pgx.Tx) error {
+		txCtx = store.CtxWithTx(txCtx, tx)
+		if err := s.Store.CreateCustomer(txCtx, orgID, id, providerID, customerType,
+			strings.TrimSpace(input.Name), doc, docType, input.LegalName, input.StateRegistration,
+			input.ResponsibleSalespersonUserID, birthDate); err != nil {
+			return err
 		}
+		if err := s.applyCustomerCommercial(txCtx, id, input.CommercialActivationDate, input.ContractedLuxusCnpj); err != nil {
+			return err
+		}
+		for _, addr := range input.Addresses {
+			if err := s.Store.CreateCustomerAddress(txCtx, id, addr); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		if _, ok := err.(*httputil.AppError); ok {
+			return nil, err
+		}
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
 	return s.GetCustomer(ctx, id)
 }
