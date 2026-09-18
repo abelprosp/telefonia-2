@@ -130,7 +130,7 @@ function UsersPage() {
         cell: ({ row }) => (
           <div className="flex items-center gap-1.5 font-medium text-xs">
             <Building2 className="size-3.5 text-muted-foreground" />
-            <span>{row.original.organization_name || 'Luxus Telefonia'}</span>
+            <span>{row.original.organization_name || row.original.organization_id || '—'}</span>
           </div>
         )
       },
@@ -197,6 +197,10 @@ function UsersPage() {
   );
 
   const handleCreate = () => {
+    if (createProfile === 'master' && !createOrgName.trim()) {
+      toast.error('Informe o nome da nova empresa para o usuário Master.');
+      return;
+    }
     createMutation.mutate(
       {
         username: createUsername.trim(),
@@ -206,13 +210,13 @@ function UsersPage() {
         password: createPassword,
         profile: createProfile,
         organization_name:
-          createProfile === 'master' && createOrgName.trim() ? createOrgName.trim() : undefined
+          createProfile === 'master' ? createOrgName.trim() : undefined
       },
       {
-        onSuccess: () => {
+        onSuccess: (data) => {
           toast.success(
             createProfile === 'master'
-              ? 'Usuário Master criado com nova organização própria!'
+              ? `Master criado na empresa "${data.organization_name || createOrgName}" (${data.organization_id || 'nova org'}).`
               : 'Usuário cadastrado na sua organização com sucesso!'
           );
           setCreateOpen(false);
@@ -358,7 +362,7 @@ function UsersPage() {
               <div className="rounded-xl border bg-muted/40 p-3 text-xs text-muted-foreground flex items-center gap-2">
                 <Building2 className="size-4 text-primary shrink-0" />
                 <span>
-                  Este usuário pertencerá à sua organização atual (<strong>Luxus Telefonia</strong>).
+                  Este usuário pertencerá à <strong>sua organização atual</strong> (isolada das demais empresas).
                 </span>
               </div>
             )}
@@ -367,7 +371,14 @@ function UsersPage() {
             <Button variant="outline" onClick={() => setCreateOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleCreate} disabled={createMutation.isPending} className="gap-2">
+            <Button
+              onClick={handleCreate}
+              disabled={
+                createMutation.isPending ||
+                (createProfile === 'master' && !createOrgName.trim())
+              }
+              className="gap-2"
+            >
               {createMutation.isPending ? 'Criando...' : 'Cadastrar Usuário'}
             </Button>
           </SheetFooter>
@@ -396,7 +407,9 @@ function UsersPage() {
                 </div>
                 <div className="text-right">
                   <span className="text-muted-foreground block">Organização</span>
-                  <span className="font-semibold text-xs">{editingUser.organization_name || 'Luxus Telefonia'}</span>
+                  <span className="font-semibold text-xs">
+                    {editingUser.organization_name || editingUser.organization_id || '—'}
+                  </span>
                 </div>
               </div>
 

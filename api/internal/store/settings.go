@@ -15,7 +15,7 @@ const DefaultLuxusOrgID = "00000000-0000-0000-0000-000000000001"
 
 func (s *Store) resolveOrgID(_ context.Context, orgID string) string {
 	orgID = strings.TrimSpace(orgID)
-	if orgID == "" || orgID == "default" {
+	if orgID == "" || orgID == "default" || strings.EqualFold(orgID, "luxus") {
 		// Legacy Luxus bootstrap only — never remap a real tenant UUID.
 		return DefaultLuxusOrgID
 	}

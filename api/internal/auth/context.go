@@ -177,27 +177,42 @@ func firstOrganization(orgs map[string]organizationClaimEntry) (*Organization, e
 	return nil, nil
 }
 
-// normalizeOrganization fills a missing org ID from alias/name heuristics.
+// NormalizeOrganization fills a missing org ID from alias/name heuristics.
 // Keycloak Organizations claims usually look like {"alias":{"name":["..."]}}
-// without a nested "id"; newer user attributes use the UUID as the map key.
-func normalizeOrganization(org *Organization) *Organization {
+// without a nested "id"; newer user attributes embed id in the JSON value.
+func NormalizeOrganization(org *Organization) *Organization {
 	if org == nil {
 		return nil
 	}
-	if strings.TrimSpace(org.ID) != "" {
+	id := strings.TrimSpace(org.ID)
+	// Legacy mistake: attribute used id:"luxus" instead of the real UUID.
+	if id == "luxus" || id == "default" {
+		org.ID = DefaultLuxusOrganizationID
+		if strings.TrimSpace(org.Alias) == "" {
+			org.Alias = "luxus"
+		}
+		return org
+	}
+	if id != "" {
 		return org
 	}
 	aliasRaw := strings.TrimSpace(org.Alias)
 	alias := strings.ToLower(aliasRaw)
-	name := strings.ToLower(strings.TrimSpace(org.Name))
 	if looksLikeUUID(aliasRaw) {
 		org.ID = aliasRaw
 		return org
 	}
-	if alias == "luxus" || strings.Contains(alias, "luxus") || strings.Contains(name, "luxus") {
+	// Only the exact legacy Luxus alias remaps — never substring matches
+	// like "luxus-connect" company names belonging to other tenants.
+	if alias == "luxus" {
 		org.ID = DefaultLuxusOrganizationID
 	}
 	return org
+}
+
+// normalizeOrganization is kept for internal call sites.
+func normalizeOrganization(org *Organization) *Organization {
+	return NormalizeOrganization(org)
 }
 
 func looksLikeUUID(v string) bool {

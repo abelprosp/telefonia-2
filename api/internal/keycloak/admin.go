@@ -240,29 +240,44 @@ func (c *AdminClient) CreateUser(ctx context.Context, payload CreateUserPayload)
 }
 
 func (c *AdminClient) SetUserEnabled(ctx context.Context, userID string, enabled bool) error {
-	path := fmt.Sprintf("/admin/realms/%s/users/%s", c.realm, userID)
-	resp, err := c.do(ctx, http.MethodPut, path, map[string]any{"enabled": enabled})
+	current, err := c.GetUserByID(ctx, userID)
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= 300 {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("update user: %s", string(body))
-	}
-	return nil
+	return c.putUserRepresentation(ctx, userID, map[string]any{
+		"username":      current.Username,
+		"email":         current.Email,
+		"firstName":     current.FirstName,
+		"lastName":      current.LastName,
+		"enabled":       enabled,
+		"emailVerified": true,
+		"attributes":    current.Attributes,
+	})
 }
 
 func (c *AdminClient) UpdateUserProfile(ctx context.Context, userID, firstName, lastName, email string) error {
-	path := fmt.Sprintf("/admin/realms/%s/users/%s", c.realm, userID)
+	current, err := c.GetUserByID(ctx, userID)
+	if err != nil {
+		return err
+	}
 	payload := map[string]any{
-		"firstName": firstName,
-		"lastName":  lastName,
+		"username":      current.Username,
+		"firstName":     firstName,
+		"lastName":      lastName,
+		"enabled":       current.Enabled,
+		"emailVerified": true,
+		"attributes":    current.Attributes,
 	}
 	if strings.TrimSpace(email) != "" {
 		payload["email"] = strings.TrimSpace(email)
-		payload["emailVerified"] = true
+	} else {
+		payload["email"] = current.Email
 	}
+	return c.putUserRepresentation(ctx, userID, payload)
+}
+
+func (c *AdminClient) putUserRepresentation(ctx context.Context, userID string, payload map[string]any) error {
+	path := fmt.Sprintf("/admin/realms/%s/users/%s", c.realm, userID)
 	resp, err := c.do(ctx, http.MethodPut, path, payload)
 	if err != nil {
 		return err
@@ -270,7 +285,7 @@ func (c *AdminClient) UpdateUserProfile(ctx context.Context, userID, firstName, 
 	defer resp.Body.Close()
 	if resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("update user profile: %s", string(body))
+		return fmt.Errorf("update user: %s", string(body))
 	}
 	return nil
 }
@@ -414,11 +429,51 @@ func (c *AdminClient) ResetPassword(ctx context.Context, userID, password string
 }
 
 func DefaultOrganizationAttribute(orgID, orgName string) map[string][]string {
-	alias := strings.TrimSpace(orgID)
-	if alias == "" {
-		alias = "org"
-	}
+	orgID = strings.TrimSpace(orgID)
 	safeName := strings.ReplaceAll(strings.TrimSpace(orgName), `"`, "")
+	alias := organizationAlias(orgID, safeName)
 	raw := fmt.Sprintf(`{"%s":{"id":"%s","name":["%s"]}}`, alias, orgID, safeName)
 	return map[string][]string{"organization": {raw}}
+}
+
+// organizationAlias builds a stable claim key. Never use a raw UUID as the only
+// identity signal without nested id — always embed orgID in the JSON value.
+func organizationAlias(orgID, orgName string) string {
+	const luxusID = "00000000-0000-0000-0000-000000000001"
+	if orgID == luxusID {
+		return "luxus"
+	}
+	alias := slugifyOrgName(orgName)
+	if alias == "" || alias == "luxus" || strings.HasPrefix(alias, "luxus") {
+		compact := strings.ReplaceAll(orgID, "-", "")
+		if len(compact) >= 8 {
+			return "org-" + compact[:8]
+		}
+		return "org"
+	}
+	return alias
+}
+
+func slugifyOrgName(name string) string {
+	name = strings.ToLower(strings.TrimSpace(name))
+	var b strings.Builder
+	lastDash := false
+	for _, r := range name {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+			b.WriteRune(r)
+			lastDash = false
+		case r == ' ' || r == '-' || r == '_' || r == '.':
+			if b.Len() > 0 && !lastDash {
+				b.WriteByte('-')
+				lastDash = true
+			}
+		}
+	}
+	out := strings.Trim(b.String(), "-")
+	if len(out) > 48 {
+		out = out[:48]
+		out = strings.Trim(out, "-")
+	}
+	return out
 }

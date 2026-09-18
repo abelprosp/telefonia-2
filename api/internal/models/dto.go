@@ -1108,12 +1108,13 @@ type CreateOrganizationUserInput struct {
 }
 
 type UpdateOrganizationUserInput struct {
-	FirstName *string `json:"first_name"`
-	LastName  *string `json:"last_name"`
-	Email     *string `json:"email"`
-	Profile   *string `json:"profile"`
-	Enabled   *bool   `json:"enabled"`
-	Password  *string `json:"password"`
+	FirstName        *string `json:"first_name"`
+	LastName         *string `json:"last_name"`
+	Email            *string `json:"email"`
+	Profile          *string `json:"profile"`
+	Enabled          *bool   `json:"enabled"`
+	Password         *string `json:"password"`
+	OrganizationName *string `json:"organization_name,omitempty"`
 }
 
 // --- Customer billing & email ---

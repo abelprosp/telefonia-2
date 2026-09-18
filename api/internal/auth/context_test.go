@@ -78,7 +78,18 @@ func TestNormalizeOrganization_luxusConnectAlias(t *testing.T) {
 		Alias: "luxus-connect",
 		Name:  "Telefonia",
 	})
+	if org == nil || org.ID != "" {
+		t.Fatalf("expected no luxus remap for luxus-connect alias, got %+v", org)
+	}
+}
+
+func TestNormalizeOrganization_legacyLuxusID(t *testing.T) {
+	org := normalizeOrganization(&Organization{
+		ID:    "luxus",
+		Alias: "luxus",
+		Name:  "Luxus Telefonia",
+	})
 	if org == nil || org.ID != DefaultLuxusOrganizationID {
-		t.Fatalf("expected luxus default id, got %+v", org)
+		t.Fatalf("expected luxus id remap, got %+v", org)
 	}
 }
