@@ -173,24 +173,37 @@ func (s *Service) AssignPhoneLineCustomer(ctx context.Context, phoneLineID strin
 		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
 	if !hasProvider {
-		_ = s.Store.AddCustomerProviderLink(ctx, input.CustomerID, providerID, start)
+		if err := s.Store.AddCustomerProviderLink(ctx, input.CustomerID, providerID, start); err != nil {
+			return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+		}
 	}
-	_, prevCustomerID, _ := s.Store.GetActivePhoneLineCustomerLink(ctx, phoneLineID)
+	_, prevCustomerID, err := s.Store.GetActivePhoneLineCustomerLink(ctx, phoneLineID)
+	if err != nil {
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
 	if err := s.Store.AssignPhoneLineCustomer(ctx, phoneLineID, input.CustomerID, start, input.MonthlyAmount); err != nil {
 		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
 	linkID, _, _ := s.Store.GetActivePhoneLineCustomerLink(ctx, phoneLineID)
 	if linkID != "" {
-		_ = s.EnsureBillingProcessingsForLink(ctx, linkID, input.CustomerID, input.MonthlyAmount)
+		if err := s.EnsureBillingProcessingsForLink(ctx, linkID, input.CustomerID, input.MonthlyAmount); err != nil {
+			return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+		}
 	}
-	_ = s.Store.UpdatePhoneLineStatus(ctx, phoneLineID, "active")
-	_ = s.Store.ReactivateCustomer(ctx, input.CustomerID)
+	if err := s.Store.UpdatePhoneLineStatus(ctx, phoneLineID, "active"); err != nil {
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+	if err := s.Store.ReactivateCustomer(ctx, input.CustomerID); err != nil {
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
 
 	var actorUserID *string
 	if u := auth.UserFromContext(ctx); u != nil && u.ID != "" {
 		actorUserID = &u.ID
 	}
-	_ = s.SM().RecordTransition(ctx, orgID, statemachine.EntityPhoneLine, phoneLineID, line.Status, "active", "assign_customer", nil, actorUserID, nil)
+	if err := s.SM().RecordTransition(ctx, orgID, statemachine.EntityPhoneLine, phoneLineID, line.Status, "active", "assign_customer", nil, actorUserID, nil); err != nil {
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
 
 	s.auditLog(ctx, "Assign", "PhoneLineCustomerLink", phoneLineID, map[string]any{"previous_customer_id": prevCustomerID},
 		map[string]any{"customer_id": input.CustomerID, "start_date": start.Format("2006-01-02")})
@@ -315,13 +328,17 @@ func (s *Service) UnassignPhoneLineCustomer(ctx context.Context, phoneLineID str
 		}
 		return httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
-	_ = s.Store.UpdatePhoneLineStatus(ctx, phoneLineID, "in_stock")
+	if err := s.Store.UpdatePhoneLineStatus(ctx, phoneLineID, "in_stock"); err != nil {
+		return httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
 
 	var actorUserID *string
 	if u := auth.UserFromContext(ctx); u != nil && u.ID != "" {
 		actorUserID = &u.ID
 	}
-	_ = s.SM().RecordTransition(ctx, orgID, statemachine.EntityPhoneLine, phoneLineID, line.Status, "in_stock", "unassign_customer", nil, actorUserID, nil)
+	if err := s.SM().RecordTransition(ctx, orgID, statemachine.EntityPhoneLine, phoneLineID, line.Status, "in_stock", "unassign_customer", nil, actorUserID, nil); err != nil {
+		return httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
 
 	s.auditLog(ctx, "Unassign", "PhoneLineCustomerLink", phoneLineID,
 		map[string]any{"customer_id": activeCustomerID}, map[string]any{"end_date": end.Format("2006-01-02")})

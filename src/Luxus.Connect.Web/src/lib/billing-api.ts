@@ -38,6 +38,7 @@ export type CustomerBillingDocument = {
   sicredi_linha_digitavel?: string | null;
   sicredi_codigo_barras?: string | null;
   sicredi_pix_qr_code?: string | null;
+  sicredi_pix_qr_code_data_url?: string;
   sicredi_pix_tx_id?: string | null;
   sicredi_boleto_status?: string | null;
   sicredi_boleto_error?: string | null;

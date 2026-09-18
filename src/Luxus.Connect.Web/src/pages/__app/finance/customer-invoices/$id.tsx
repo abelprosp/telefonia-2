@@ -364,27 +364,40 @@ function CustomerInvoiceDetailPage() {
                 <p className="text-destructive mb-3 text-sm">{doc.sicredi_boleto_error}</p>
               )}
               {doc.sicredi_nosso_numero ? (
-                <dl className="space-y-2 text-sm">
-                  <div>
-                    <dt className="text-muted-foreground">Nosso número</dt>
-                    <dd className="font-mono">{doc.sicredi_nosso_numero}</dd>
+                <div className="space-y-4 text-sm">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-xl border bg-muted/30 p-3">
+                      <dt className="text-muted-foreground text-xs">Nosso número</dt>
+                      <dd className="mt-1 font-mono font-medium">{doc.sicredi_nosso_numero}</dd>
+                    </div>
+                    <div className="rounded-xl border bg-muted/30 p-3">
+                      <dt className="text-muted-foreground text-xs">Status do boleto</dt>
+                      <dd className="mt-1 font-medium">{formatSicrediBoletoStatus(doc.sicredi_boleto_status ?? 'issued', doc.sicredi_paid_at)}</dd>
+                    </div>
                   </div>
-                  {doc.sicredi_linha_digitavel && (
-                    <div>
-                      <dt className="text-muted-foreground">Linha digitável</dt>
-                      <dd className="font-mono break-all text-xs">{doc.sicredi_linha_digitavel}</dd>
+                  {doc.sicredi_codigo_barras && (
+                    <div className="rounded-xl border p-4">
+                      <dt className="text-muted-foreground text-xs">Código de barras</dt>
+                      <div className="my-3 h-12 rounded bg-white p-2" aria-label="Código de barras">
+                        <div className="h-full w-full opacity-90" style={{ backgroundImage: 'repeating-linear-gradient(90deg,#111 0 2px,transparent 2px 5px,#111 5px 6px,transparent 6px 9px)' }} />
+                      </div>
+                      <dd className="font-mono text-center text-xs tracking-widest break-all">{doc.sicredi_codigo_barras}</dd>
                     </div>
                   )}
-                  {doc.sicredi_codigo_barras && (
-                    <div>
-                      <dt className="text-muted-foreground">Código de barras</dt>
-                      <dd className="font-mono break-all text-xs">{doc.sicredi_codigo_barras}</dd>
+                  {doc.sicredi_linha_digitavel && (
+                    <div className="rounded-xl border p-3">
+                      <dt className="text-muted-foreground text-xs">Linha digitável</dt>
+                      <dd className="mt-1 font-mono text-xs break-all">{doc.sicredi_linha_digitavel}</dd>
                     </div>
                   )}
                   {doc.sicredi_pix_qr_code && (
-                    <div>
-                      <dt className="text-muted-foreground">PIX copia e cola</dt>
-                      <dd className="font-mono break-all text-xs">{doc.sicredi_pix_qr_code}</dd>
+                    <div className="grid gap-4 rounded-xl border bg-emerald-50/50 p-4 sm:grid-cols-[auto_1fr] sm:items-center">
+                      {doc.sicredi_pix_qr_code_data_url ? <img src={doc.sicredi_pix_qr_code_data_url} alt="QR Code Pix para pagamento" className="size-40 rounded-lg bg-white p-2" /> : null}
+                      <div className="min-w-0">
+                        <p className="font-semibold text-emerald-900">Pagamento via Pix</p>
+                        <p className="text-muted-foreground mt-1 text-xs">Escaneie o QR Code ou copie o código abaixo.</p>
+                        <p className="mt-3 rounded-lg bg-white p-2 font-mono text-xs break-all">{doc.sicredi_pix_qr_code}</p>
+                      </div>
                     </div>
                   )}
                   {boletoActive && (
@@ -411,7 +424,7 @@ function CustomerInvoiceDetailPage() {
                       </div>
                     </div>
                   )}
-                </dl>
+                </div>
               ) : (
                 <p className="text-muted-foreground text-sm">
                   O boleto híbrido (código de barras + QR PIX) é gerado automaticamente ao criar a fatura,

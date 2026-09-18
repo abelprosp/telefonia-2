@@ -419,6 +419,10 @@ func (s *Service) CreateCustomer(ctx context.Context, input models.CreateCustome
 }
 
 func validateCreateCustomer(input models.CreateCustomerInput) error {
+	typ := httputil.CustomerTypeFromInput(input.Type)
+	if typ != "pf" && typ != "pj" {
+		return httputil.ValidationError(notifications.N("CUSTOMER_TYPE_INVALID", "Tipo de cliente deve ser PF ou PJ."))
+	}
 	if strings.TrimSpace(input.Name) == "" {
 		return httputil.ValidationError(notifications.CustomerNameRequired)
 	}
@@ -428,21 +432,35 @@ func validateCreateCustomer(input models.CreateCustomerInput) error {
 	if strings.TrimSpace(input.Document) == "" {
 		return httputil.ValidationError(notifications.CustomerDocumentRequired)
 	}
-	if utf8.RuneCountInString(input.Document) > 20 {
+	digits := httputil.NormalizeDigits(input.Document)
+	if (typ == "pf" && len(digits) != 11) || (typ == "pj" && len(digits) != 14) {
 		return httputil.ValidationError(notifications.CustomerDocumentMaxLength)
 	}
-	if httputil.CustomerTypeFromInput(input.Type) == "pj" && (input.LegalName == nil || strings.TrimSpace(*input.LegalName) == "") {
+	if typ == "pj" && (input.LegalName == nil || strings.TrimSpace(*input.LegalName) == "") {
 		return httputil.ValidationError(notifications.CustomerLegalNameRequiredForPJ)
+	}
+	if typ == "pf" && (nonEmpty(input.LegalName) || nonEmpty(input.StateRegistration) || nonEmpty(input.ContractedLuxusCnpj)) {
+		return httputil.ValidationError(notifications.N("CUSTOMER_PF_FIELDS_INVALID", "PF deve conter apenas dados pessoais."))
 	}
 	return nil
 }
 
+func nonEmpty(value *string) bool { return value != nil && strings.TrimSpace(*value) != "" }
+
 func (s *Service) UpdateCustomer(ctx context.Context, id string, input models.UpdateCustomerInput) error {
-	if _, err := s.requireCustomer(ctx, id); err != nil {
+	current, err := s.requireCustomer(ctx, id)
+	if err != nil {
 		return err
 	}
 	if strings.TrimSpace(input.Name) == "" {
 		return httputil.ValidationError(notifications.CustomerNameRequired)
+	}
+	typ := httputil.CustomerTypeFromInput(current.Type)
+	if typ == "pf" && (nonEmpty(input.LegalName) || nonEmpty(input.StateRegistration) || nonEmpty(input.ContractedLuxusCnpj)) {
+		return httputil.ValidationError(notifications.N("CUSTOMER_PF_FIELDS_INVALID", "PF deve conter apenas dados pessoais."))
+	}
+	if typ == "pj" && input.LegalName != nil && strings.TrimSpace(*input.LegalName) == "" {
+		return httputil.ValidationError(notifications.CustomerLegalNameRequiredForPJ)
 	}
 	birthDate, err := httputil.ParseOptionalDate(input.BirthOrOpeningDate)
 	if err != nil {

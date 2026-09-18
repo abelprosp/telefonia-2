@@ -160,6 +160,9 @@ func (s *Service) GetCustomerBillingDocument(ctx context.Context, id string) (*m
 	if doc == nil {
 		return nil, httputil.NotFoundError(notifications.BillingDocumentNotFound)
 	}
+	if doc.SicrediPixQrCode != nil {
+		doc.SicrediPixQrCodeDataURL = invoicelayout.PixQRCodeDataURL(*doc.SicrediPixQrCode)
+	}
 	return doc, nil
 }
 

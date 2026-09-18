@@ -35,10 +35,7 @@ const formSchema = z
     type: z.enum(['PF', 'PJ']),
     name: z.string().min(1, 'Informe o nome').max(256, 'Nome muito longo'),
     legal_name: z.string().optional(),
-    document: z
-      .string()
-      .min(11, 'Documento inválido')
-      .max(20, 'Documento inválido'),
+    document: z.string().min(11, 'Documento inválido').max(20, 'Documento inválido'),
     state_registration: z.string().optional(),
     birth_or_opening_date: z.string().optional(),
     responsible_salesperson_user_id: z
@@ -53,6 +50,13 @@ const formSchema = z
         message: 'Razão social é obrigatória para PJ',
         path: ['legal_name']
       });
+    }
+    const digits = data.document.replace(/\D/g, '');
+    if (data.type === 'PF' && digits.length !== 11) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'CPF deve ter 11 dígitos', path: ['document'] });
+    }
+    if (data.type === 'PJ' && digits.length !== 14) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'CNPJ deve ter 14 dígitos', path: ['document'] });
     }
   });
 
@@ -149,9 +153,13 @@ export function CustomerCreateSheet({
                   <FieldLabel>Tipo</FieldLabel>
                   <Select
                     value={field.value}
-                    onValueChange={(value) =>
-                      field.onChange((value ?? 'PJ') as 'PF' | 'PJ')
-                    }
+                    onValueChange={(value) => {
+                      field.onChange((value ?? 'PJ') as 'PF' | 'PJ');
+                      form.setValue('legal_name', '');
+                      form.setValue('state_registration', '');
+                      form.setValue('birth_or_opening_date', '');
+                      form.setValue('document', '');
+                    }}
                   >
                     <SelectTrigger className="border-input bg-background rounded-xl border">
                       <SelectValue />
@@ -185,7 +193,7 @@ export function CustomerCreateSheet({
               )}
             />
 
-            <Controller
+            {customerType === 'PJ' ? <Controller
               control={form.control}
               name="legal_name"
               render={({ field, fieldState }) => (
@@ -200,7 +208,7 @@ export function CustomerCreateSheet({
                   ) : null}
                 </Field>
               )}
-            />
+            /> : null}
 
             <Controller
               control={form.control}
@@ -231,7 +239,7 @@ export function CustomerCreateSheet({
               )}
             />
 
-            <Controller
+            {customerType === 'PJ' ? <Controller
               control={form.control}
               name="state_registration"
               render={({ field, fieldState }) => (
@@ -246,14 +254,14 @@ export function CustomerCreateSheet({
                   ) : null}
                 </Field>
               )}
-            />
+            /> : null}
 
-            <Controller
+            {customerType === 'PF' ? <Controller
               control={form.control}
               name="birth_or_opening_date"
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel>Data de nascimento/abertura</FieldLabel>
+                  <FieldLabel>Data de nascimento</FieldLabel>
                   <DatePicker
                     className="border-input rounded-xl border"
                     name={field.name}
@@ -269,7 +277,17 @@ export function CustomerCreateSheet({
                   ) : null}
                 </Field>
               )}
-            />
+            /> : <Controller
+              control={form.control}
+              name="birth_or_opening_date"
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel>Data de abertura</FieldLabel>
+                  <DatePicker className="border-input rounded-xl border" name={field.name} ref={field.ref} value={field.value} onBlur={field.onBlur} onChange={(date) => field.onChange(date ? format(date, 'yyyy-MM-dd') : '')} />
+                  {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
+                </Field>
+              )}
+            />}
 
             <Controller
               control={form.control}
