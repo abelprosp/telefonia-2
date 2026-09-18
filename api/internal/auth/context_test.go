@@ -30,3 +30,19 @@ func TestParseOrganizationFromClaims_map(t *testing.T) {
 		t.Fatalf("unexpected org: %+v", org)
 	}
 }
+
+func TestParseOrganizationFromClaims_mapWithoutID(t *testing.T) {
+	claim := map[string]interface{}{
+		"luxus": map[string]interface{}{
+			"name": "Luxus Connect",
+		},
+	}
+	org, err := ParseOrganizationFromClaims(claim)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	org = normalizeOrganization(org)
+	if org == nil || org.ID != DefaultLuxusOrganizationID {
+		t.Fatalf("expected luxus default id, got %+v", org)
+	}
+}

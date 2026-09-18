@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 type contextKey int
@@ -71,7 +72,34 @@ func IsAdmin(ctx context.Context) bool {
 
 type organizationClaimEntry struct {
 	ID   string   `json:"id"`
-	Name []string `json:"name"`
+	Name []string `json:"-"`
+}
+
+func (e *organizationClaimEntry) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		ID   string          `json:"id"`
+		Name json.RawMessage `json:"name"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	e.ID = raw.ID
+	if len(raw.Name) == 0 {
+		return nil
+	}
+	var names []string
+	if err := json.Unmarshal(raw.Name, &names); err == nil {
+		e.Name = names
+		return nil
+	}
+	var single string
+	if err := json.Unmarshal(raw.Name, &single); err == nil {
+		if single != "" {
+			e.Name = []string{single}
+		}
+		return nil
+	}
+	return nil
 }
 
 func ParseOrganizationClaim(raw string) (*Organization, error) {
@@ -106,7 +134,26 @@ func firstOrganization(orgs map[string]organizationClaimEntry) (*Organization, e
 		if len(entry.Name) > 0 {
 			name = entry.Name[0]
 		}
-		return &Organization{ID: entry.ID, Name: name, Alias: alias}, nil
+		id := strings.TrimSpace(entry.ID)
+		return &Organization{ID: id, Name: name, Alias: alias}, nil
 	}
 	return nil, nil
 }
+
+// normalizeOrganization fills a missing org ID for the legacy Luxus tenant.
+func normalizeOrganization(org *Organization) *Organization {
+	if org == nil {
+		return nil
+	}
+	if strings.TrimSpace(org.ID) != "" {
+		return org
+	}
+	alias := strings.ToLower(strings.TrimSpace(org.Alias))
+	name := strings.ToLower(strings.TrimSpace(org.Name))
+	if alias == "luxus" || strings.Contains(name, "luxus") {
+		org.ID = DefaultLuxusOrganizationID
+	}
+	return org
+}
+
+const DefaultLuxusOrganizationID = "00000000-0000-0000-0000-000000000001"

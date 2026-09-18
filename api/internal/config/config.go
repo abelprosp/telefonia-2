@@ -90,6 +90,15 @@ func Load() Config {
 		env = "Development"
 	}
 
+	objectStorageServiceURL := strings.TrimRight(strings.TrimSpace(os.Getenv("OBJECT_STORAGE_SERVICE_URL")), "/")
+	objectStoragePublicURL := firstNonEmpty(os.Getenv("OBJECT_STORAGE_PUBLIC_URL"), objectStorageServiceURL)
+	if strings.EqualFold(env, "Production") {
+		objectStoragePublicURL = sanitizeProductionStoragePublicURL(objectStoragePublicURL)
+		if objectStorageServiceURL == "" {
+			objectStorageServiceURL = "http://minio:9000"
+		}
+	}
+
 	return Config{
 		DatabaseURL:                 dbURL,
 		RabbitMQURL:                 os.Getenv("RABBITMQ_URL"),
@@ -97,8 +106,8 @@ func Load() Config {
 		KeycloakAuthServerURL:       strings.TrimRight(os.Getenv("KEYCLOAK_AUTH_SERVER_URL"), "/"),
 		KeycloakPublicAuthServerURL: strings.TrimRight(firstNonEmpty(os.Getenv("KEYCLOAK_PUBLIC_AUTH_SERVER_URL"), os.Getenv("KEYCLOAK_AUTH_SERVER_URL")), "/"),
 		KeycloakResource:            os.Getenv("KEYCLOAK_RESOURCE"),
-		ObjectStorageServiceURL:     os.Getenv("OBJECT_STORAGE_SERVICE_URL"),
-		ObjectStoragePublicURL:      firstNonEmpty(os.Getenv("OBJECT_STORAGE_PUBLIC_URL"), os.Getenv("OBJECT_STORAGE_SERVICE_URL")),
+		ObjectStorageServiceURL:     objectStorageServiceURL,
+		ObjectStoragePublicURL:      objectStoragePublicURL,
 		ObjectStorageAccessKeyID:    os.Getenv("OBJECT_STORAGE_ACCESS_KEY_ID"),
 		ObjectStorageSecretKey:      os.Getenv("OBJECT_STORAGE_SECRET_ACCESS_KEY"),
 		CORSOrigins:                 origins,
@@ -222,6 +231,46 @@ func GetEnvInt(key string, def int) int {
 		return def
 	}
 	return n
+}
+
+// sanitizeProductionStoragePublicURL forces a browser-reachable HTTPS endpoint.
+// VPS .env files often set http://IP:19000 which browsers block as mixed content.
+func sanitizeProductionStoragePublicURL(raw string) string {
+	const secureDefault = "https://telefonia.redobrai.online"
+	raw = strings.TrimRight(strings.TrimSpace(raw), "/")
+	if raw == "" {
+		return secureDefault
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme != "https" || u.Host == "" {
+		return secureDefault
+	}
+	host := strings.ToLower(u.Hostname())
+	if host == "localhost" || host == "127.0.0.1" || host == "::1" || host == "minio" {
+		return secureDefault
+	}
+	// Bare IP hosts are almost always internal MinIO bindings and break HTTPS pages.
+	if looksLikeIP(host) {
+		return secureDefault
+	}
+	// Path suffixes like /storage break MinIO signature verification.
+	if u.Path != "" && u.Path != "/" {
+		return secureDefault
+	}
+	return raw
+}
+
+func looksLikeIP(host string) bool {
+	if host == "" {
+		return false
+	}
+	for _, r := range host {
+		if (r >= '0' && r <= '9') || r == '.' || r == ':' {
+			continue
+		}
+		return false
+	}
+	return strings.Contains(host, ".") || strings.Contains(host, ":")
 }
 
 // GetEnvBool lê um booleano de ambiente. Ausente = def. "false"/"0"/"no" desligam.

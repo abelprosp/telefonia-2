@@ -70,10 +70,17 @@ func (m *Middleware) Authenticate(next http.Handler) http.Handler {
 				org = parsed
 			}
 		}
-		if org == nil && user != nil {
-			org = m.resolveOrganizationFromKeycloak(r.Context(), user.ID)
+		// Keycloak JWT org claims often omit "id". Fall back to the user attribute
+		// whenever the claim is missing or incomplete.
+		if (org == nil || strings.TrimSpace(org.ID) == "") && user != nil {
+			if resolved := m.resolveOrganizationFromKeycloak(r.Context(), user.ID); resolved != nil {
+				org = resolved
+			}
 		}
-		if org != nil {
+		if org != nil && strings.TrimSpace(org.ID) == "" {
+			org = normalizeOrganization(org)
+		}
+		if org != nil && strings.TrimSpace(org.ID) != "" {
 			ctx = WithOrganization(ctx, org)
 		}
 

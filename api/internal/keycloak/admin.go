@@ -414,6 +414,11 @@ func (c *AdminClient) ResetPassword(ctx context.Context, userID, password string
 }
 
 func DefaultOrganizationAttribute(orgID, orgName string) map[string][]string {
-	raw := fmt.Sprintf(`{"luxus":{"id":"%s","name":["%s"]}}`, orgID, orgName)
+	alias := strings.TrimSpace(orgID)
+	if alias == "" {
+		alias = "org"
+	}
+	safeName := strings.ReplaceAll(strings.TrimSpace(orgName), `"`, "")
+	raw := fmt.Sprintf(`{"%s":{"id":"%s","name":["%s"]}}`, alias, orgID, safeName)
 	return map[string][]string{"organization": {raw}}
 }

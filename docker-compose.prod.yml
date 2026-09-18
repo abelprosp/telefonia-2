@@ -99,8 +99,8 @@ services:
       - KEYCLOAK_RESOURCE=connect-cli
       - KEYCLOAK_ADMIN_USERNAME=${KC_ADMIN_USERNAME:-admin}
       - KEYCLOAK_ADMIN_PASSWORD=${KC_ADMIN_PWD}
-      - OBJECT_STORAGE_SERVICE_URL=${OBJECT_STORAGE_SERVICE_URL:-http://minio:9000}
-      - OBJECT_STORAGE_PUBLIC_URL=${OBJECT_STORAGE_PUBLIC_URL:-https://telefonia.redobrai.online/storage}
+      - OBJECT_STORAGE_SERVICE_URL=http://minio:9000
+      - OBJECT_STORAGE_PUBLIC_URL=https://telefonia.redobrai.online
       - OBJECT_STORAGE_ACCESS_KEY_ID=${OBJECT_STORAGE_ACCESS_KEY_ID:-minioadmin}
       - OBJECT_STORAGE_SECRET_ACCESS_KEY=${OBJECT_STORAGE_SECRET_ACCESS_KEY:-minioadmin}
       - CORS_ORIGINS=https://telefonia.redobrai.online
