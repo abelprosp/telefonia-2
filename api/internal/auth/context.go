@@ -140,7 +140,9 @@ func firstOrganization(orgs map[string]organizationClaimEntry) (*Organization, e
 	return nil, nil
 }
 
-// normalizeOrganization fills a missing org ID for the legacy Luxus tenant.
+// normalizeOrganization fills a missing org ID from alias/name heuristics.
+// Keycloak Organizations claims usually look like {"alias":{"name":["..."]}}
+// without a nested "id"; newer user attributes use the UUID as the map key.
 func normalizeOrganization(org *Organization) *Organization {
 	if org == nil {
 		return nil
@@ -148,12 +150,37 @@ func normalizeOrganization(org *Organization) *Organization {
 	if strings.TrimSpace(org.ID) != "" {
 		return org
 	}
-	alias := strings.ToLower(strings.TrimSpace(org.Alias))
+	aliasRaw := strings.TrimSpace(org.Alias)
+	alias := strings.ToLower(aliasRaw)
 	name := strings.ToLower(strings.TrimSpace(org.Name))
-	if alias == "luxus" || strings.Contains(name, "luxus") {
+	if looksLikeUUID(aliasRaw) {
+		org.ID = aliasRaw
+		return org
+	}
+	if alias == "luxus" || strings.Contains(alias, "luxus") || strings.Contains(name, "luxus") {
 		org.ID = DefaultLuxusOrganizationID
 	}
 	return org
+}
+
+func looksLikeUUID(v string) bool {
+	v = strings.TrimSpace(v)
+	if len(v) != 36 {
+		return false
+	}
+	for i, r := range v {
+		switch i {
+		case 8, 13, 18, 23:
+			if r != '-' {
+				return false
+			}
+		default:
+			if (r < '0' || r > '9') && (r < 'a' || r > 'f') && (r < 'A' || r > 'F') {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 const DefaultLuxusOrganizationID = "00000000-0000-0000-0000-000000000001"

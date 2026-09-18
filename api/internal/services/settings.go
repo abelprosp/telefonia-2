@@ -132,7 +132,8 @@ func (s *Service) UpdateCurrentUserProfile(ctx context.Context, input models.Upd
 func (s *Service) GetOrganizationSettings(ctx context.Context) (*models.OrganizationSettingsResponse, error) {
 	orgID, err := orgFrom(ctx)
 	if err != nil {
-		return nil, err
+		// Public/whitelabel read before login (or token without org claim).
+		orgID = auth.DefaultLuxusOrganizationID
 	}
 	settings, err := s.Store.GetOrganizationSettings(ctx, orgID)
 	if err != nil {

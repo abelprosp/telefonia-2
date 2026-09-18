@@ -248,7 +248,7 @@ func main() {
 	r.Get("/health/live", observability.LivenessHandler())
 	r.Get("/metrics/operations", observability.MetricsHandler())
 
-	h.RegisterRoutes(r, authMW.Authenticate, authMW.RequireOperational, authMW.RequireFinancialAccess, authMW.RequireMaster, authMW.RequirePartner)
+	h.RegisterRoutes(r, authMW.Authenticate, authMW.OptionalAuthenticate, authMW.RequireOperational, authMW.RequireFinancialAccess, authMW.RequireMaster, authMW.RequirePartner)
 
 	addr := fmt.Sprintf(":%s", cfg.Port)
 	server := &http.Server{Addr: addr, Handler: r, ReadHeaderTimeout: 10 * time.Second}

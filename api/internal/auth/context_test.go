@@ -46,3 +46,23 @@ func TestParseOrganizationFromClaims_mapWithoutID(t *testing.T) {
 		t.Fatalf("expected luxus default id, got %+v", org)
 	}
 }
+
+func TestNormalizeOrganization_uuidAlias(t *testing.T) {
+	org := normalizeOrganization(&Organization{
+		Alias: "00000000-0000-0000-0000-000000000001",
+		Name:  "Acme",
+	})
+	if org == nil || org.ID != "00000000-0000-0000-0000-000000000001" {
+		t.Fatalf("expected uuid alias as id, got %+v", org)
+	}
+}
+
+func TestNormalizeOrganization_luxusConnectAlias(t *testing.T) {
+	org := normalizeOrganization(&Organization{
+		Alias: "luxus-connect",
+		Name:  "Telefonia",
+	})
+	if org == nil || org.ID != DefaultLuxusOrganizationID {
+		t.Fatalf("expected luxus default id, got %+v", org)
+	}
+}

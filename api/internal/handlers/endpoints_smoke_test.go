@@ -112,7 +112,7 @@ func newTestServer(t *testing.T, st *store.Store) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
 	r.Get("/health/live", observability.LivenessHandler())
-	h.RegisterRoutes(r, testAuth, testAuth, testAuth, testAuth, testAuth)
+	h.RegisterRoutes(r, testAuth, testAuth, testAuth, testAuth, testAuth, testAuth)
 	return r
 }
 

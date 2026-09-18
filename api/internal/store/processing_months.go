@@ -55,11 +55,27 @@ func (s *Store) ListProcessingMonths(ctx context.Context, orgID string, page htt
 }
 
 func (s *Store) GetProcessingMonth(ctx context.Context, orgID, id string) (*ProcessingMonthRow, error) {
+	m, err := s.scanProcessingMonth(ctx, orgID, id, true)
+	if err != nil && isUndefinedColumn(err) {
+		_ = s.ensureProcessingMonthSchema(ctx)
+		m, err = s.scanProcessingMonth(ctx, orgID, id, true)
+		if err != nil && isUndefinedColumn(err) {
+			m, err = s.scanProcessingMonth(ctx, orgID, id, false)
+		}
+	}
+	return m, err
+}
+
+func (s *Store) scanProcessingMonth(ctx context.Context, orgID, id string, withHash bool) (*ProcessingMonthRow, error) {
+	hashSelect := `NULL`
+	if withHash {
+		hashSelect = `"ConsolidationHash"`
+	}
 	var m ProcessingMonthRow
 	err := s.q(ctx).QueryRow(ctx, `
 		SELECT "Id", "OrganizationId", "ProviderId", "Year", "Month", "DisplayName",
 			"Status"::text, "ClosedAt", "ClosedBy", "ClosedInContingency", "ContingencyJustification",
-			"ConsolidationHash"
+			`+hashSelect+`
 		FROM "ProcessingMonths"
 		WHERE "OrganizationId" = $1 AND "Id" = $2`, orgID, id).
 		Scan(&m.ID, &m.OrganizationID, &m.ProviderID, &m.Year, &m.Month, &m.DisplayName,
@@ -69,6 +85,15 @@ func (s *Store) GetProcessingMonth(ctx context.Context, orgID, id string) (*Proc
 		return nil, nil
 	}
 	return &m, err
+}
+
+func (s *Store) ensureProcessingMonthSchema(ctx context.Context) error {
+	_, err := s.pool.Exec(ctx, `
+		ALTER TABLE IF EXISTS "ProcessingMonths"
+		    ADD COLUMN IF NOT EXISTS "ConsolidationHash" character varying(64);
+		ALTER TABLE IF EXISTS "ProviderInvoiceImportRequests"
+		    ADD COLUMN IF NOT EXISTS "AllowSubstitute" boolean NOT NULL DEFAULT false`)
+	return err
 }
 
 func (s *Store) ProcessingMonthDuplicateExists(ctx context.Context, orgID, providerID string, year, month int) (bool, error) {

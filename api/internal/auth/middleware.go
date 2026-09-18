@@ -38,54 +38,77 @@ func NewMiddleware(cfg config.Config, logger *slog.Logger, kc *keycloak.AdminCli
 
 func (m *Middleware) Authenticate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		authHeader := r.Header.Get("Authorization")
-		if !strings.HasPrefix(authHeader, "Bearer ") {
-			httputil.WriteFail(w, http.StatusUnauthorized, notifications.N("UNAUTHORIZED", "Missing or invalid authorization header"))
+		req, err := m.authenticateRequest(r, true)
+		if err != nil {
+			httputil.WriteFail(w, http.StatusUnauthorized, notifications.N("UNAUTHORIZED", err.Error()))
 			return
 		}
-		tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
-
-		token, err := jwt.Parse(tokenStr, m.jwks.Keyfunc)
-		if err != nil || !token.Valid {
-			httputil.WriteFail(w, http.StatusUnauthorized, notifications.N("UNAUTHORIZED", "Invalid token"))
-			return
-		}
-
-		claims, ok := token.Claims.(jwt.MapClaims)
-		if !ok {
-			httputil.WriteFail(w, http.StatusUnauthorized, notifications.N("UNAUTHORIZED", "Invalid token claims"))
-			return
-		}
-
-		user := extractUser(claims)
-		user = m.enrichUserIdentity(r.Context(), tokenStr, claims, user)
-		ctx := WithUser(r.Context(), user)
-
-		var org *Organization
-		if claim, ok := claims["organization"]; ok && claim != nil {
-			parsed, err := ParseOrganizationFromClaims(claim)
-			if err != nil {
-				m.logger.Warn("failed to parse organization claim", "error", err)
-			} else {
-				org = parsed
-			}
-		}
-		// Keycloak JWT org claims often omit "id". Fall back to the user attribute
-		// whenever the claim is missing or incomplete.
-		if (org == nil || strings.TrimSpace(org.ID) == "") && user != nil {
-			if resolved := m.resolveOrganizationFromKeycloak(r.Context(), user.ID); resolved != nil {
-				org = resolved
-			}
-		}
-		if org != nil && strings.TrimSpace(org.ID) == "" {
-			org = normalizeOrganization(org)
-		}
-		if org != nil && strings.TrimSpace(org.ID) != "" {
-			ctx = WithOrganization(ctx, org)
-		}
-
-		next.ServeHTTP(w, r.WithContext(ctx))
+		next.ServeHTTP(w, req)
 	})
+}
+
+// OptionalAuthenticate parses a Bearer token when present so public routes
+// (e.g. organization-settings) can resolve the tenant. Invalid/missing tokens
+// continue without blocking the request.
+func (m *Middleware) OptionalAuthenticate(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		req, err := m.authenticateRequest(r, false)
+		if err != nil {
+			next.ServeHTTP(w, r)
+			return
+		}
+		next.ServeHTTP(w, req)
+	})
+}
+
+func (m *Middleware) authenticateRequest(r *http.Request, required bool) (*http.Request, error) {
+	authHeader := r.Header.Get("Authorization")
+	if !strings.HasPrefix(authHeader, "Bearer ") {
+		if required {
+			return nil, fmt.Errorf("Missing or invalid authorization header")
+		}
+		return r, nil
+	}
+	tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
+
+	token, err := jwt.Parse(tokenStr, m.jwks.Keyfunc)
+	if err != nil || !token.Valid {
+		return nil, fmt.Errorf("Invalid token")
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return nil, fmt.Errorf("Invalid token claims")
+	}
+
+	user := extractUser(claims)
+	user = m.enrichUserIdentity(r.Context(), tokenStr, claims, user)
+	ctx := WithUser(r.Context(), user)
+
+	var org *Organization
+	if claim, ok := claims["organization"]; ok && claim != nil {
+		parsed, err := ParseOrganizationFromClaims(claim)
+		if err != nil {
+			m.logger.Warn("failed to parse organization claim", "error", err)
+		} else {
+			org = parsed
+		}
+	}
+	// Keycloak JWT org claims often omit "id". Fall back to the user attribute
+	// whenever the claim is missing or incomplete.
+	if (org == nil || strings.TrimSpace(org.ID) == "") && user != nil {
+		if resolved := m.resolveOrganizationFromKeycloak(r.Context(), user.ID); resolved != nil {
+			org = resolved
+		}
+	}
+	if org != nil {
+		org = normalizeOrganization(org)
+	}
+	if org != nil && strings.TrimSpace(org.ID) != "" {
+		ctx = WithOrganization(ctx, org)
+	}
+
+	return r.WithContext(ctx), nil
 }
 
 func (m *Middleware) RequireAdmin(next http.Handler) http.Handler {

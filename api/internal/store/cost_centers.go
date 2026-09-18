@@ -70,6 +70,15 @@ func (s *Store) GetImportRequest(ctx context.Context, id string) (*ImportRequest
 }
 
 func (s *Store) CreateImportRequest(ctx context.Context, r ImportRequestRow) error {
+	err := s.insertImportRequest(ctx, r)
+	if err != nil && isUndefinedColumn(err) {
+		_ = s.ensureProcessingMonthSchema(ctx)
+		err = s.insertImportRequest(ctx, r)
+	}
+	return err
+}
+
+func (s *Store) insertImportRequest(ctx context.Context, r ImportRequestRow) error {
 	_, err := s.q(ctx).Exec(ctx, `
 		INSERT INTO "ProviderInvoiceImportRequests"
 		("Id", "OrganizationId", "ProviderId", "ProcessingMonthId", "StorageBucket",

@@ -41,5 +41,5 @@ func (m *Middleware) resolveOrganizationFromKeycloak(ctx context.Context, userID
 		m.logger.Warn("failed to parse organization attribute", "error", err)
 		return nil
 	}
-	return org
+	return normalizeOrganization(org)
 }

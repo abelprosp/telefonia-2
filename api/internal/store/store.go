@@ -38,6 +38,9 @@ func New(ctx context.Context, databaseURL string) (*Store, error) {
 	if err := s.ensureOrganizationSettingsSchema(ctx); err != nil {
 		fmt.Fprintf(os.Stderr, "ensure OrganizationSettings schema: %v\n", err)
 	}
+	if err := s.ensureProcessingMonthSchema(ctx); err != nil {
+		fmt.Fprintf(os.Stderr, "ensure ProcessingMonths schema: %v\n", err)
+	}
 	if err := s.ensureFinancialAgentSchema(ctx); err != nil {
 		fmt.Fprintf(os.Stderr, "ensure FinancialAgent schema: %v\n", err)
 	}

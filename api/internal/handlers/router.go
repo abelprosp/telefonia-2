@@ -48,6 +48,8 @@ func (h *Handler) RegisterRoutes(
 
 	auth func(http.Handler) http.Handler,
 
+	optionalAuth func(http.Handler) http.Handler,
+
 	operational func(http.Handler) http.Handler,
 
 	financial func(http.Handler) http.Handler,
@@ -80,11 +82,15 @@ func (h *Handler) RegisterRoutes(
 			})
 		})
 
-		// Configurações visuais e de marca com leitura pública para login/whitelabel
-		r.Get("/organization-settings", h.getOrganizationSettings)
-		r.Get("/company-settings", h.getOrganizationSettings)
-		r.Get("/whitelabel-settings", h.getOrganizationSettings)
-		r.Get("/system-settings", h.getOrganizationSettings)
+		// Configurações visuais e de marca com leitura pública para login/whitelabel.
+		// Optional auth resolves the tenant when a Bearer token is present.
+		r.Group(func(r chi.Router) {
+			r.Use(optionalAuth)
+			r.Get("/organization-settings", h.getOrganizationSettings)
+			r.Get("/company-settings", h.getOrganizationSettings)
+			r.Get("/whitelabel-settings", h.getOrganizationSettings)
+			r.Get("/system-settings", h.getOrganizationSettings)
+		})
 
 		r.Group(func(r chi.Router) {
 
