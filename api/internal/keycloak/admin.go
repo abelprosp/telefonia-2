@@ -277,6 +277,18 @@ func (c *AdminClient) UpdateUserProfile(ctx context.Context, userID, firstName, 
 }
 
 func (c *AdminClient) putUserRepresentation(ctx context.Context, userID string, payload map[string]any) error {
+	// Keycloak user profile may require non-empty names on update.
+	if v, _ := payload["firstName"].(string); strings.TrimSpace(v) == "" {
+		payload["firstName"] = "-"
+	}
+	if v, _ := payload["lastName"].(string); strings.TrimSpace(v) == "" {
+		payload["lastName"] = "-"
+	}
+	if payload["attributes"] == nil {
+		payload["attributes"] = map[string][]string{}
+	}
+	payload["id"] = userID
+
 	path := fmt.Sprintf("/admin/realms/%s/users/%s", c.realm, userID)
 	resp, err := c.do(ctx, http.MethodPut, path, payload)
 	if err != nil {
@@ -350,6 +362,7 @@ func (c *AdminClient) ReplaceUserRealmRoles(ctx context.Context, userID string, 
 
 	manageable := map[string]struct{}{
 		"master": {}, "admin": {}, "employee": {}, "financial": {}, "partner": {},
+		"operator": {}, "sales": {}, "viewer": {}, "user": {},
 	}
 	var toRemove []roleRepresentation
 	for _, name := range current {
@@ -433,7 +446,10 @@ func DefaultOrganizationAttribute(orgID, orgName string) map[string][]string {
 	safeName := strings.ReplaceAll(strings.TrimSpace(orgName), `"`, "")
 	alias := organizationAlias(orgID, safeName)
 	raw := fmt.Sprintf(`{"%s":{"id":"%s","name":["%s"]}}`, alias, orgID, safeName)
-	return map[string][]string{"organization": {raw}}
+	return map[string][]string{
+		"organization":    {raw},
+		"organization_id": {orgID},
+	}
 }
 
 // organizationAlias builds a stable claim key. Never use a raw UUID as the only

@@ -50,6 +50,12 @@
       "displayName": "Organization",
       "permissions": { "view": ["admin", "user"], "edit": ["admin"] },
       "multivalued": false
+    },
+    {
+      "name": "organization_id",
+      "displayName": "Organization ID",
+      "permissions": { "view": ["admin", "user"], "edit": ["admin"] },
+      "multivalued": false
     }
   ],
   "groups": [

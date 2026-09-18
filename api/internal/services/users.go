@@ -185,7 +185,7 @@ func (s *Service) CreateOrganizationUser(ctx context.Context, input models.Creat
 			},
 		}
 		if err := s.Store.UpsertOrganizationSettings(ctx, targetOrgID, nil, blankSettings); err != nil {
-			return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+			return nil, httputil.BusinessError(notifications.N("ORG_SETTINGS_CREATE_FAILED", truncateErr("Falha ao criar organização no banco", err)))
 		}
 	} else {
 		// Usuário comum herda a organização do usuário autenticado.
@@ -205,11 +205,20 @@ func (s *Service) CreateOrganizationUser(ctx context.Context, input models.Creat
 		}
 	}
 
+	firstName := strings.TrimSpace(input.FirstName)
+	lastName := strings.TrimSpace(input.LastName)
+	if firstName == "" {
+		firstName = username
+	}
+	if lastName == "" {
+		lastName = "-"
+	}
+
 	userID, err := s.Keycloak.CreateUser(ctx, keycloak.CreateUserPayload{
 		Username:      username,
 		Email:         email,
-		FirstName:     strings.TrimSpace(input.FirstName),
-		LastName:      strings.TrimSpace(input.LastName),
+		FirstName:     firstName,
+		LastName:      lastName,
 		Enabled:       true,
 		EmailVerified: true,
 		Attributes:    keycloak.DefaultOrganizationAttribute(targetOrgID, targetOrgName),
@@ -221,29 +230,57 @@ func (s *Service) CreateOrganizationUser(ctx context.Context, input models.Creat
 		if strings.Contains(err.Error(), "already exists") {
 			return nil, httputil.BusinessError(notifications.N("USER_USERNAME_DUPLICATED", "Username already exists."))
 		}
-		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+		return nil, httputil.BusinessError(notifications.N("USER_CREATE_FAILED", truncateErr("Falha ao criar usuário no Keycloak", err)))
 	}
 
 	// Garante o atributo organization no Keycloak (PUT parcial de outros fluxos já não apaga mais).
 	if err := s.Keycloak.SetUserOrganizationAttribute(ctx, userID, targetOrgID, targetOrgName); err != nil {
-		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+		return nil, httputil.BusinessError(notifications.N("USER_ORG_ATTRIBUTE_FAILED", truncateErr("Falha ao gravar organização do usuário", err)))
 	}
 
 	if err := s.Keycloak.ReplaceUserRealmRoles(ctx, userID, roleNames); err != nil {
-		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+		return nil, httputil.BusinessError(notifications.N("USER_ROLES_FAILED", truncateErr("Falha ao atribuir perfil do usuário", err)))
 	}
 
-	created, err := s.Keycloak.GetUserByID(ctx, userID)
-	if err != nil {
-		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	item := models.ListOrganizationUserResponse{
+		ID:               userID,
+		Username:         username,
+		Email:            email,
+		FirstName:        firstName,
+		LastName:         lastName,
+		FullName:         strings.TrimSpace(firstName + " " + lastName),
+		Profile:          profileFromRoles(roleNames),
+		Enabled:          true,
+		OrganizationID:   targetOrgID,
+		OrganizationName: targetOrgName,
 	}
-	item := toListUser(*created)
-	if strings.TrimSpace(item.OrganizationID) == "" || item.OrganizationID != targetOrgID {
-		return nil, httputil.InternalError(notifications.SharedUnexpectedError(
-			"user created without organization attribute; check Keycloak organization mapper",
+
+	// Confirma no Keycloak; se o GET omitir attributes, ainda devolvemos o que gravamos.
+	if created, err := s.Keycloak.GetUserByID(ctx, userID); err == nil && created != nil {
+		listed := toListUser(*created)
+		if listed.OrganizationID != "" {
+			item.OrganizationID = listed.OrganizationID
+			item.OrganizationName = listed.OrganizationName
+		}
+	}
+	if raw, err := s.Keycloak.GetUserOrganizationAttribute(ctx, userID); err != nil || !strings.Contains(raw, targetOrgID) {
+		return nil, httputil.BusinessError(notifications.N(
+			"USER_ORG_ATTRIBUTE_MISSING",
+			"Usuário criado, mas o atributo organization não ficou gravado no Keycloak. Verifique o user profile (organization).",
 		))
 	}
 	return &item, nil
+}
+
+func truncateErr(prefix string, err error) string {
+	if err == nil {
+		return prefix
+	}
+	msg := strings.TrimSpace(err.Error())
+	if len(msg) > 240 {
+		msg = msg[:240] + "…"
+	}
+	return prefix + ": " + msg
 }
 
 

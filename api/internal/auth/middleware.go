@@ -94,6 +94,16 @@ func (m *Middleware) authenticateRequest(r *http.Request, required bool) (*http.
 			org = parsed
 		}
 	}
+	// Optional plain claim used by some mappers: organization_id=<uuid>
+	if (org == nil || strings.TrimSpace(org.ID) == "") {
+		if id := strings.TrimSpace(claimString(claims["organization_id"])); id != "" {
+			name := ""
+			if org != nil {
+				name = org.Name
+			}
+			org = &Organization{ID: id, Name: name}
+		}
+	}
 	// Keycloak JWT org claims often omit "id". Fall back to the user attribute
 	// whenever the claim is missing or incomplete.
 	if (org == nil || strings.TrimSpace(org.ID) == "") && user != nil {
@@ -103,13 +113,6 @@ func (m *Middleware) authenticateRequest(r *http.Request, required bool) (*http.
 	}
 	if org != nil {
 		org = normalizeOrganization(org)
-	}
-	// The original deployment is single-tenant and older Keycloak sessions can
-	// lack the organization scope. Keep authenticated users usable while the
-	// token is renewed; an explicit organization claim always takes precedence.
-	if (org == nil || strings.TrimSpace(org.ID) == "") && user != nil && strings.TrimSpace(user.ID) != "" {
-		org = &Organization{ID: DefaultLuxusOrganizationID, Name: "Luxus Connect", Alias: "luxus"}
-		m.logger.Warn("organization claim missing; using single-tenant default", "user_id", user.ID)
 	}
 	if org != nil && strings.TrimSpace(org.ID) != "" {
 		ctx = WithOrganization(ctx, org)
