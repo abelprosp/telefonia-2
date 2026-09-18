@@ -110,6 +110,14 @@ func (h *Handler) getProviderInvoice(w http.ResponseWriter, r *http.Request) {
 	httputil.WriteJSON(w, http.StatusOK, item)
 }
 
+func (h *Handler) undoProviderInvoice(w http.ResponseWriter, r *http.Request) {
+	if err := h.Svc.CancelProviderInvoice(r.Context(), chi.URLParam(r, "id")); err != nil {
+		httputil.HandleServiceError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (h *Handler) createProviderPlanService(w http.ResponseWriter, r *http.Request) {
 	var input models.CreateProviderPlanServiceInput
 	if err := decodeJSON(r, &input); err != nil {

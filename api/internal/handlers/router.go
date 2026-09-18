@@ -170,6 +170,7 @@ func (h *Handler) RegisterRoutes(
 				r.Get("/import-requests/{id}", h.getImportRequestStatus)
 
 				r.Get("/{id}", h.getProviderInvoice)
+				r.Post("/{id}/undo", h.undoProviderInvoice)
 				r.Post("/{id}/apportion-discount", h.apportionProviderInvoiceDiscount)
 
 			})

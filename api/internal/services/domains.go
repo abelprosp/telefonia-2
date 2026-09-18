@@ -765,6 +765,14 @@ func (s *Service) GetProviderInvoice(ctx context.Context, id string) (*models.Ge
 	return inv, nil
 }
 
+func (s *Service) CancelProviderInvoice(ctx context.Context, id string) error {
+	orgID, err := orgFrom(ctx)
+	if err != nil {
+		return err
+	}
+	return s.Store.CancelProviderInvoice(ctx, orgID, id)
+}
+
 func (s *Service) RequestProviderInvoiceImport(ctx context.Context, input models.ProviderInvoiceImportRequestInput) (*models.RequestProviderInvoiceImportResponse, error) {
 	orgID, err := orgFrom(ctx)
 	if err != nil {

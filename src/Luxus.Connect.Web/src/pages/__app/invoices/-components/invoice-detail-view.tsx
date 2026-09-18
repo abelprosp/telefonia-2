@@ -21,6 +21,7 @@ import {
 } from '@/lib/format';
 import { useAuthRoles } from '@/lib/auth-roles';
 import { cn } from '@/lib/utils';
+import { useUndoProviderInvoice } from '@/lib/ops-api';
 
 import { InvoiceFinancialActions } from './invoice-financial-actions';
 
@@ -97,6 +98,7 @@ export function InvoiceDetailView({
   listSearch
 }: InvoiceDetailViewProps) {
   const { canAccessFinance } = useAuthRoles();
+  const undoInvoice = useUndoProviderInvoice();
   const backLink = {
     to: '/invoices' as const,
     search: {
@@ -125,6 +127,11 @@ export function InvoiceDetailView({
               {invoice.number}
             </p>
           </div>
+          {invoice.status !== 'cancelled' && invoice.status !== 'substituted' && (
+            <Button variant="destructive" disabled={undoInvoice.isPending} onClick={() => {
+              if (window.confirm('Desfazer esta importação? A fatura será cancelada e deixará de compor os totais.')) undoInvoice.mutate(invoice.id!);
+            }}>Desfazer importação</Button>
+          )}
         </div>
       </div>
 

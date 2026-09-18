@@ -371,3 +371,12 @@ func (s *Store) MarkInvoiceSubstituted(ctx context.Context, id string) error {
 		WHERE "Id" = $1 AND "Status" <> 'substituted'::provider_invoice_status`, id)
 	return err
 }
+
+func (s *Store) CancelProviderInvoice(ctx context.Context, orgID, id string) error {
+	_, err := s.q(ctx).Exec(ctx, `
+		UPDATE "ProviderInvoices" i SET "Status" = 'cancelled'::provider_invoice_status
+		FROM "ContractingCompanies" cc JOIN "Providers" p ON p."Id" = cc."ProviderId"
+		WHERE i."ContractingCompanyId" = cc."Id" AND p."OrganizationId" = $1
+			AND i."Id" = $2 AND i."Status" NOT IN ('cancelled'::provider_invoice_status, 'substituted'::provider_invoice_status)`, orgID, id)
+	return err
+}
