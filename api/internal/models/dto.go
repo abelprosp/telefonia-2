@@ -592,6 +592,9 @@ type ListProviderInvoiceResponse struct {
 	SubtotalInstallments   float64   `json:"subtotal_installments"`
 	AccountPayableID       *string   `json:"account_payable_id"`
 	AccountPayableStatus   *string   `json:"account_payable_status"`
+	DigitableLine          *string   `json:"digitable_line,omitempty"`
+	PixQrCode              *string   `json:"pix_qr_code,omitempty"`
+	Barcode                *string   `json:"barcode,omitempty"`
 }
 
 type ApportionGlobalDiscountInput struct {

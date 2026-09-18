@@ -77,7 +77,7 @@ func (s *Store) GetProviderInvoice(ctx context.Context, orgID, id string) (*mode
 			i."IssueDate", i."DueDate", i."TotalAmount", i."Status"::text,
 			i."SubtotalServices", i."SubtotalUsage", i."SubtotalTaxes",
 			i."SubtotalDiscounts", i."SubtotalInstallments", i."Number",
-			ap."Id", ap."Status"::text
+			ap."Id", ap."Status"::text, i."DigitableLine", i."PixQrCode", i."Barcode"
 		FROM "ProviderInvoices" i
 		JOIN "ProviderAccounts" pa ON pa."Id" = i."ProviderAccountId"
 		JOIN "ContractingCompanies" cc ON cc."Id" = i."ContractingCompanyId"
@@ -95,7 +95,7 @@ func (s *Store) GetProviderInvoice(ctx context.Context, orgID, id string) (*mode
 			&item.ParentInvoiceID, &item.IssueDate, &item.DueDate, &item.TotalAmount, &item.Status,
 			&item.SubtotalServices, &item.SubtotalUsage, &item.SubtotalTaxes,
 			&item.SubtotalDiscounts, &item.SubtotalInstallments, &item.Number,
-			&item.AccountPayableID, &item.AccountPayableStatus)
+			&item.AccountPayableID, &item.AccountPayableStatus, &item.DigitableLine, &item.PixQrCode, &item.Barcode)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -208,13 +208,13 @@ func (s *Store) CreateProviderInvoice(ctx context.Context, inv ProviderInvoiceIn
 		INSERT INTO "ProviderInvoices" ("Id", "Number", "ProviderAccountId", "ContractingCompanyId",
 			"BillingCycleId", "ProcessingMonthId", "IssueDate", "DueDate", "TotalAmount", "Status",
 			"SubtotalServices", "SubtotalUsage", "SubtotalTaxes", "SubtotalDiscounts", "SubtotalInstallments",
-			"ParentInvoiceId", "ContentSHA256", "SubstitutionImpact")
+			"ParentInvoiceId", "ContentSHA256", "SubstitutionImpact", "DigitableLine", "PixQrCode", "Barcode")
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending'::provider_invoice_status,
-			$10, $11, $12, $13, $14, $15, $16, $17)`,
+			$10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)`,
 		inv.ID, inv.Number, inv.ProviderAccountID, inv.ContractingCompanyID,
 		inv.BillingCycleID, inv.ProcessingMonthID, inv.IssueDate, inv.DueDate, inv.TotalAmount,
 		inv.SubtotalServices, inv.SubtotalUsage, inv.SubtotalTaxes, inv.SubtotalDiscounts, inv.SubtotalInstallments,
-		inv.ParentInvoiceID, inv.ContentSHA256, inv.SubstitutionImpact)
+		inv.ParentInvoiceID, inv.ContentSHA256, inv.SubstitutionImpact, inv.DigitableLine, inv.PixQrCode, inv.Barcode)
 	return err
 }
 
@@ -246,23 +246,26 @@ func (s *Store) CreateInvoiceService(ctx context.Context, svc InvoiceServiceInse
 }
 
 type ProviderInvoiceInsert struct {
-	ID                    string
-	Number                string
-	ProviderAccountID     string
-	ContractingCompanyID  string
-	BillingCycleID        string
-	ProcessingMonthID     string
-	IssueDate             time.Time
-	DueDate               time.Time
-	TotalAmount           float64
-	SubtotalServices      float64
-	SubtotalUsage         float64
-	SubtotalTaxes         float64
-	SubtotalDiscounts     float64
-	SubtotalInstallments  float64
-	ParentInvoiceID       *string
-	ContentSHA256         *string
-	SubstitutionImpact    *float64
+	ID                   string
+	Number               string
+	ProviderAccountID    string
+	ContractingCompanyID string
+	BillingCycleID       string
+	ProcessingMonthID    string
+	IssueDate            time.Time
+	DueDate              time.Time
+	TotalAmount          float64
+	SubtotalServices     float64
+	SubtotalUsage        float64
+	SubtotalTaxes        float64
+	SubtotalDiscounts    float64
+	SubtotalInstallments float64
+	ParentInvoiceID      *string
+	ContentSHA256        *string
+	SubstitutionImpact   *float64
+	DigitableLine        *string
+	PixQrCode            *string
+	Barcode              *string
 }
 
 type InvoiceItemInsert struct {
@@ -316,12 +319,12 @@ func (s *Store) SumProviderInvoiceTotalsForMonth(ctx context.Context, orgID, pro
 }
 
 type ProviderInvoiceIdentity struct {
-	ID                    string
-	TotalAmount           float64
-	ProviderAccountID     string
-	ProcessingMonthID     *string
-	DueDate               time.Time
-	Status                string
+	ID                string
+	TotalAmount       float64
+	ProviderAccountID string
+	ProcessingMonthID *string
+	DueDate           time.Time
+	Status            string
 }
 
 func (s *Store) FindActiveInvoiceByContentSHA256(ctx context.Context, hash string) (*ProviderInvoiceIdentity, error) {

@@ -195,6 +195,18 @@ func (p *Processor) processInner(ctx context.Context, req *store.ImportRequestRo
 	}
 
 	invoiceID := uuid.New().String()
+	var digitableLine, pixQrCode *string
+	for _, record := range parsed {
+		if payment, ok := record.(*vivo.Line020DPayment); ok {
+			if value := strings.TrimSpace(payment.DigitableLine); value != "" {
+				digitableLine = &value
+			}
+			if value := strings.TrimSpace(payment.PixQrCode); value != "" {
+				pixQrCode = &value
+			}
+			break
+		}
+	}
 	inv := store.ProviderInvoiceInsert{
 		ID: invoiceID, Number: header.ReferenceMonth,
 		ProviderAccountID: account.ID, ContractingCompanyID: company.ID,
@@ -202,6 +214,7 @@ func (p *Processor) processInner(ctx context.Context, req *store.ImportRequestRo
 		IssueDate: header.IssueDate, DueDate: header.DueDate, TotalAmount: header.TotalAmount,
 		SubtotalServices: header.SubtotalServices, SubtotalUsage: header.SubtotalUsageExceeded,
 		ParentInvoiceID: parentID, ContentSHA256: &fileHash, SubstitutionImpact: impact,
+		DigitableLine: digitableLine, PixQrCode: pixQrCode,
 	}
 
 	if err := p.Store.CreateProviderInvoice(ctx, inv); err != nil {
@@ -436,6 +449,15 @@ func (p *Processor) changeLineStatus(ctx context.Context, orgID, lineID, from, t
 }
 
 func (p *Processor) processLines(ctx context.Context, orgID, providerID, accountID, invoiceID string, parsed []any, customerID string, numbers map[string]struct{}, header *vivo.Line010DHeader) error {
+	consumptionByLine := make(map[string]float64)
+	for _, rec := range parsed {
+		if detail, ok := rec.(*vivo.InvoiceFranchiseLineDetail); ok {
+			number := httputil.NormalizeDigits(detail.PhoneNumber)
+			if number != "" && detail.UsageAmount > 0 {
+				consumptionByLine[number] += detail.UsageAmount
+			}
+		}
+	}
 	seen := map[string]struct{}{}
 	activation := header.IssueDate
 	if !header.BillingStartDate.IsZero() {
@@ -553,7 +575,13 @@ func (p *Processor) processLines(ctx context.Context, orgID, providerID, account
 			}
 		}
 
-		if err := p.Store.UpdatePhoneLineCosts(ctx, pl.ID, line.LineTotal, line.LineTotal, invoiceID); err != nil {
+		withConsumption := line.LineTotal
+		consumption := consumptionByLine[numberKey]
+		base := withConsumption - consumption
+		if base < 0 {
+			base = 0
+		}
+		if err := p.Store.UpdatePhoneLineCosts(ctx, pl.ID, base, withConsumption, invoiceID); err != nil {
 			return err
 		}
 		if err := p.Store.LinkInvoicePhoneLine(ctx, invoiceID, pl.ID); err != nil {
