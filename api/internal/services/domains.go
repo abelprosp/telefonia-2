@@ -766,11 +766,14 @@ func (s *Service) GetProviderInvoice(ctx context.Context, id string) (*models.Ge
 }
 
 func (s *Service) CancelProviderInvoice(ctx context.Context, id string) error {
+	if !auth.IsMaster(ctx) && !auth.IsFinancial(ctx) {
+		return httputil.ForbiddenError(notifications.N("INVOICE_UNDO_FORBIDDEN", "Somente o administrador ou financeiro pode desfazer uma importação e seus lançamentos."))
+	}
 	orgID, err := orgFrom(ctx)
 	if err != nil {
 		return err
 	}
-	return s.Store.CancelProviderInvoice(ctx, orgID, id)
+	return s.Store.CancelProviderInvoice(ctx, orgID, id, auth.UserFromContext(ctx).ID)
 }
 
 func (s *Service) RequestProviderInvoiceImport(ctx context.Context, input models.ProviderInvoiceImportRequestInput) (*models.RequestProviderInvoiceImportResponse, error) {

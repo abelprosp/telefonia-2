@@ -170,7 +170,6 @@ func (h *Handler) RegisterRoutes(
 				r.Get("/import-requests/{id}", h.getImportRequestStatus)
 
 				r.Get("/{id}", h.getProviderInvoice)
-				r.Post("/{id}/undo", h.undoProviderInvoice)
 				r.Post("/{id}/apportion-discount", h.apportionProviderInvoiceDiscount)
 
 			})
@@ -445,6 +444,7 @@ func (h *Handler) RegisterRoutes(
 		r.Group(func(r chi.Router) {
 
 			r.Use(auth, financial)
+			r.Post("/provider-invoices/{id}/undo", h.undoProviderInvoice)
 
 			r.Get("/financial/summary", h.getFinancialSummary)
 

@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import { ChevronLeft } from 'lucide-react';
+import { toast } from 'sonner';
 
 import type { GetProviderInvoiceResponse } from '@/api';
 import { Button } from '@/components/ui/button';
@@ -22,6 +23,7 @@ import {
 import { useAuthRoles } from '@/lib/auth-roles';
 import { cn } from '@/lib/utils';
 import { useUndoProviderInvoice } from '@/lib/ops-api';
+import { getErrorMessage } from '@/lib/api-error';
 
 import { InvoiceFinancialActions } from './invoice-financial-actions';
 
@@ -99,6 +101,7 @@ export function InvoiceDetailView({
 }: InvoiceDetailViewProps) {
   const { canAccessFinance } = useAuthRoles();
   const undoInvoice = useUndoProviderInvoice();
+  const undone = Boolean((invoice as GetProviderInvoiceResponse & { undone_at?: string }).undone_at);
   const backLink = {
     to: '/invoices' as const,
     search: {
@@ -127,11 +130,17 @@ export function InvoiceDetailView({
               {invoice.number}
             </p>
           </div>
-          {invoice.status !== 'cancelled' && invoice.status !== 'substituted' && (
+          {canAccessFinance && !undone && invoice.status !== 'substituted' && (
             <Button variant="destructive" disabled={undoInvoice.isPending} onClick={() => {
-              if (window.confirm('Desfazer esta importação? A fatura será cancelada e deixará de compor os totais.')) undoInvoice.mutate(invoice.id!);
-            }}>Desfazer importação</Button>
+              if (window.confirm('Desfazer toda a importação? As linhas criadas serão removidas, as alterações registradas serão revertidas e as contas a pagar, a receber e cobranças vinculadas serão canceladas. Se houver pagamentos, boletos ativos ou vínculos posteriores, nada será alterado e a pendência será informada.')) {
+                undoInvoice.mutate(invoice.id!, {
+                  onSuccess: () => toast.success('Importação desfeita: linhas removidas, alterações revertidas e lançamentos vinculados cancelados.'),
+                  onError: (error) => toast.error(getErrorMessage(error))
+                });
+              }
+            }}>{undoInvoice.isPending ? 'Desfazendo…' : 'Desfazer toda a importação'}</Button>
           )}
+          {undone && <p className="text-muted-foreground text-sm" role="status">Importação desfeita.</p>}
         </div>
       </div>
 
@@ -181,6 +190,7 @@ export function InvoiceDetailView({
             description="Vincule esta fatura da operadora a uma conta a pagar para o refaturamento."
           >
             <InvoiceFinancialActions
+              canManageFinance={!undone && invoice.status !== 'cancelled' && invoice.status !== 'substituted'}
               invoiceId={invoice.id}
               totalAmount={invoice.total_amount}
               accountPayableId={invoice.account_payable_id}

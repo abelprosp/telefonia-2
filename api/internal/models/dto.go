@@ -115,6 +115,8 @@ type CreateCustomerAddressInput struct {
 }
 
 type CreateCustomerInput struct {
+	Profile                      *CustomerRegistrationProfile `json:"profile,omitempty"`
+	BillingEmail                 *string                      `json:"billing_email,omitempty"`
 	ProviderID                   string                       `json:"provider_id,omitempty"`
 	Type                         string                       `json:"type"`
 	Name                         string                       `json:"name"`
@@ -129,31 +131,35 @@ type CreateCustomerInput struct {
 }
 
 type UpdateCustomerInput struct {
-	Name                         string  `json:"name"`
-	LegalName                    *string `json:"legal_name"`
-	StateRegistration            *string `json:"state_registration"`
-	BirthOrOpeningDate           *string `json:"birth_or_opening_date"`
-	ResponsibleSalespersonUserID *string `json:"responsible_salesperson_user_id"`
-	BillingEmail                 *string `json:"billing_email"`
-	IsReseller                   *bool   `json:"is_reseller"`
-	CommercialActivationDate     *string `json:"commercial_activation_date"`
-	ContractedLuxusCnpj          *string `json:"contracted_luxus_cnpj"`
+	Profile                      *CustomerRegistrationProfile  `json:"profile,omitempty"`
+	Addresses                    *[]CreateCustomerAddressInput `json:"addresses,omitempty"`
+	Name                         string                        `json:"name"`
+	LegalName                    *string                       `json:"legal_name"`
+	StateRegistration            *string                       `json:"state_registration"`
+	BirthOrOpeningDate           *string                       `json:"birth_or_opening_date"`
+	ResponsibleSalespersonUserID *string                       `json:"responsible_salesperson_user_id"`
+	BillingEmail                 *string                       `json:"billing_email"`
+	IsReseller                   *bool                         `json:"is_reseller"`
+	CommercialActivationDate     *string                       `json:"commercial_activation_date"`
+	ContractedLuxusCnpj          *string                       `json:"contracted_luxus_cnpj"`
 }
 
 type ListCustomerResponse struct {
-	ID                           string     `json:"id"`
-	Active                       bool       `json:"active"`
-	Type                         string     `json:"type"`
-	Name                         string     `json:"name"`
-	CpfCnpj                      string     `json:"cpf_cnpj"`
-	StateRegistration            *string    `json:"state_registration"`
-	LegalName                    *string    `json:"legal_name"`
-	BirthOrOpeningDate           *time.Time `json:"birth_or_opening_date"`
-	ResponsibleSalespersonUserID *string    `json:"responsible_salesperson_user_id"`
-	BillingEmail                 *string    `json:"billing_email"`
-	IsReseller                   bool       `json:"is_reseller"`
-	CommercialActivationDate     *time.Time `json:"commercial_activation_date"`
-	ContractedLuxusCnpj          *string    `json:"contracted_luxus_cnpj"`
+	Profile                      *CustomerRegistrationProfile `json:"profile,omitempty"`
+	Addresses                    []CreateCustomerAddressInput `json:"addresses,omitempty"`
+	ID                           string                       `json:"id"`
+	Active                       bool                         `json:"active"`
+	Type                         string                       `json:"type"`
+	Name                         string                       `json:"name"`
+	CpfCnpj                      string                       `json:"cpf_cnpj"`
+	StateRegistration            *string                      `json:"state_registration"`
+	LegalName                    *string                      `json:"legal_name"`
+	BirthOrOpeningDate           *time.Time                   `json:"birth_or_opening_date"`
+	ResponsibleSalespersonUserID *string                      `json:"responsible_salesperson_user_id"`
+	BillingEmail                 *string                      `json:"billing_email"`
+	IsReseller                   bool                         `json:"is_reseller"`
+	CommercialActivationDate     *time.Time                   `json:"commercial_activation_date"`
+	ContractedLuxusCnpj          *string                      `json:"contracted_luxus_cnpj"`
 }
 
 type CreateCustomerResponse = ListCustomerResponse
@@ -569,32 +575,33 @@ type RequestProviderInvoiceImportResponse struct {
 }
 
 type ListProviderInvoiceResponse struct {
-	ID                     string    `json:"id"`
-	ProviderAccountID      string    `json:"provider_account_id"`
-	ProviderAccountNumber  string    `json:"provider_account_number"`
-	ContractingCompanyID   string    `json:"contracting_company_id"`
-	ContractingCompanyName string    `json:"contracting_company_name"`
-	ProviderID             string    `json:"provider_id"`
-	ProviderName           string    `json:"provider_name"`
-	BillingCycleID         string    `json:"billing_cycle_id"`
-	BillingCycleName       string    `json:"billing_cycle_name"`
-	ProcessingMonthID      *string   `json:"processing_month_id"`
-	CostCenterID           *string   `json:"cost_center_id"`
-	ParentInvoiceID        *string   `json:"parent_invoice_id"`
-	IssueDate              time.Time `json:"issue_date"`
-	DueDate                time.Time `json:"due_date"`
-	TotalAmount            float64   `json:"total_amount"`
-	Status                 string    `json:"status"`
-	SubtotalServices       float64   `json:"subtotal_services"`
-	SubtotalUsage          float64   `json:"subtotal_usage"`
-	SubtotalTaxes          float64   `json:"subtotal_taxes"`
-	SubtotalDiscounts      float64   `json:"subtotal_discounts"`
-	SubtotalInstallments   float64   `json:"subtotal_installments"`
-	AccountPayableID       *string   `json:"account_payable_id"`
-	AccountPayableStatus   *string   `json:"account_payable_status"`
-	DigitableLine          *string   `json:"digitable_line,omitempty"`
-	PixQrCode              *string   `json:"pix_qr_code,omitempty"`
-	Barcode                *string   `json:"barcode,omitempty"`
+	ID                     string     `json:"id"`
+	ProviderAccountID      string     `json:"provider_account_id"`
+	ProviderAccountNumber  string     `json:"provider_account_number"`
+	ContractingCompanyID   string     `json:"contracting_company_id"`
+	ContractingCompanyName string     `json:"contracting_company_name"`
+	ProviderID             string     `json:"provider_id"`
+	ProviderName           string     `json:"provider_name"`
+	BillingCycleID         string     `json:"billing_cycle_id"`
+	BillingCycleName       string     `json:"billing_cycle_name"`
+	ProcessingMonthID      *string    `json:"processing_month_id"`
+	CostCenterID           *string    `json:"cost_center_id"`
+	ParentInvoiceID        *string    `json:"parent_invoice_id"`
+	IssueDate              time.Time  `json:"issue_date"`
+	DueDate                time.Time  `json:"due_date"`
+	TotalAmount            float64    `json:"total_amount"`
+	Status                 string     `json:"status"`
+	SubtotalServices       float64    `json:"subtotal_services"`
+	SubtotalUsage          float64    `json:"subtotal_usage"`
+	SubtotalTaxes          float64    `json:"subtotal_taxes"`
+	SubtotalDiscounts      float64    `json:"subtotal_discounts"`
+	SubtotalInstallments   float64    `json:"subtotal_installments"`
+	AccountPayableID       *string    `json:"account_payable_id"`
+	AccountPayableStatus   *string    `json:"account_payable_status"`
+	DigitableLine          *string    `json:"digitable_line,omitempty"`
+	PixQrCode              *string    `json:"pix_qr_code,omitempty"`
+	Barcode                *string    `json:"barcode,omitempty"`
+	UndoneAt               *time.Time `json:"undone_at,omitempty"`
 }
 
 type ApportionGlobalDiscountInput struct {

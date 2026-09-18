@@ -28,17 +28,18 @@ func (s *Store) GetFinancialSummary(ctx context.Context, orgID string) (*models.
 			 JOIN "ProviderAccounts" pa ON pa."Id" = i."ProviderAccountId"
 			 JOIN "ContractingCompanies" cc ON cc."Id" = pa."ContractingCompanyId"
 			 JOIN "Providers" p ON p."Id" = cc."ProviderId"
-			 WHERE p."OrganizationId" = $1), 0),
+				 WHERE p."OrganizationId" = $1 AND i."Status" NOT IN ('cancelled','substituted')), 0),
 			COALESCE((SELECT SUM(i."TotalAmount") FROM "ProviderInvoices" i
 			 JOIN "ProviderAccounts" pa ON pa."Id" = i."ProviderAccountId"
 			 JOIN "ContractingCompanies" cc ON cc."Id" = pa."ContractingCompanyId"
 			 JOIN "Providers" p ON p."Id" = cc."ProviderId"
-			 WHERE p."OrganizationId" = $1), 0),
+				 WHERE p."OrganizationId" = $1 AND i."Status" NOT IN ('cancelled','substituted')), 0),
 			COALESCE((SELECT COUNT(*)::int FROM "ProviderInvoices" i
 			 JOIN "ProviderAccounts" pa ON pa."Id" = i."ProviderAccountId"
 			 JOIN "ContractingCompanies" cc ON cc."Id" = pa."ContractingCompanyId"
 			 JOIN "Providers" p ON p."Id" = cc."ProviderId"
-			 WHERE p."OrganizationId" = $1
+				 WHERE p."OrganizationId" = $1
+				   AND i."Status" NOT IN ('cancelled','substituted')
 			   AND NOT EXISTS (
 			     SELECT 1 FROM "AccountsPayable" ap
 			     WHERE ap."OrganizationId" = $1 AND ap."ProviderInvoiceId" = i."Id"
@@ -113,14 +114,20 @@ func (s *Store) ListAccountsPayable(ctx context.Context, orgID string, status *s
 }
 
 func (s *Store) CreateAccountPayable(ctx context.Context, id, orgID, description, vendorName string, providerInvoiceID, partnerUserID *string, issueDate, dueDate time.Time, amount float64, notes *string, now time.Time) error {
-	_, err := s.q(ctx).Exec(ctx, `
+	tag, err := s.q(ctx).Exec(ctx, `
 		INSERT INTO "AccountsPayable" (
 			"Id", "OrganizationId", "Description", "VendorName", "ProviderInvoiceId",
 			"PartnerSalespersonUserId", "IssueDate", "DueDate", "Amount", "PaidAmount",
 			"Status", "Notes", "CreatedAt", "UpdatedAt"
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 0, 'open'::financial_entry_status, $10, $11, $11)`,
+		) SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, 0, 'open'::financial_entry_status, $10, $11, $11
+		WHERE $5::varchar IS NULL OR EXISTS (SELECT 1 FROM "ProviderInvoices" i
+		JOIN "ContractingCompanies" cc ON cc."Id"=i."ContractingCompanyId" JOIN "Providers" p ON p."Id"=cc."ProviderId"
+		WHERE i."Id"=$5 AND p."OrganizationId"=$2 AND i."Status" NOT IN ('cancelled','substituted'))`,
 		id, orgID, description, vendorName, providerInvoiceID, partnerUserID,
 		issueDate, dueDate, amount, notes, now)
+	if err == nil && tag.RowsAffected() == 0 {
+		return undoBlocked("A fatura foi cancelada ou substituída e não pode gerar uma conta a pagar.")
+	}
 	return err
 }
 
@@ -155,7 +162,7 @@ func (s *Store) RegisterPayablePayment(ctx context.Context, paymentID, orgID, ac
 		var dueDate time.Time
 		err := tx.QueryRow(ctx, `
 			SELECT "Amount", "PaidAmount", "DueDate" FROM "AccountsPayable"
-			WHERE "OrganizationId" = $1 AND "Id" = $2 FOR UPDATE`, orgID, accountID).Scan(&totalAmount, &paidAmount, &dueDate)
+			WHERE "OrganizationId" = $1 AND "Id" = $2 AND "Status" <> 'cancelled' FOR UPDATE`, orgID, accountID).Scan(&totalAmount, &paidAmount, &dueDate)
 		if err != nil {
 			return err
 		}
@@ -264,7 +271,7 @@ func (s *Store) RegisterReceivablePayment(ctx context.Context, paymentID, orgID,
 		var dueDate time.Time
 		err := tx.QueryRow(ctx, `
 			SELECT "Amount", "ReceivedAmount", "DueDate" FROM "AccountsReceivable"
-			WHERE "OrganizationId" = $1 AND "Id" = $2 FOR UPDATE`, orgID, accountID).Scan(&totalAmount, &receivedAmount, &dueDate)
+			WHERE "OrganizationId" = $1 AND "Id" = $2 AND "Status" <> 'cancelled' FOR UPDATE`, orgID, accountID).Scan(&totalAmount, &receivedAmount, &dueDate)
 		if err != nil {
 			return err
 		}
@@ -549,7 +556,8 @@ func (s *Store) ProviderInvoiceExistsInOrg(ctx context.Context, orgID, invoiceID
 			JOIN "ProviderAccounts" pa ON pa."Id" = i."ProviderAccountId"
 			JOIN "ContractingCompanies" cc ON cc."Id" = pa."ContractingCompanyId"
 			JOIN "Providers" p ON p."Id" = cc."ProviderId"
-			WHERE p."OrganizationId" = $1 AND i."Id" = $2)`, orgID, invoiceID).Scan(&exists)
+			WHERE p."OrganizationId" = $1 AND i."Id" = $2
+			AND i."Status" NOT IN ('cancelled', 'substituted'))`, orgID, invoiceID).Scan(&exists)
 	return exists, err
 }
 

@@ -258,7 +258,7 @@ func (s *Service) createBillingDocumentForAmount(
 ) (documentID, receivableID string, err error) {
 	receivableID = uuid.New().String()
 	now := time.Now().UTC()
-	if err := s.Store.CreateAccountReceivable(ctx, receivableID, orgID, customerID, description, processingMonthID, issueDate, dueDate, amount, nil, now); err != nil {
+	if err := s.Store.CreateBillingReceivable(ctx, receivableID, orgID, customerID, description, processingMonthID, phoneLineID, issueDate, dueDate, amount, now); err != nil {
 		return "", "", httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
 	rec, err := s.Store.GetReceivableForBilling(ctx, orgID, receivableID)

@@ -77,7 +77,7 @@ func (s *Store) GetProviderInvoice(ctx context.Context, orgID, id string) (*mode
 			i."IssueDate", i."DueDate", i."TotalAmount", i."Status"::text,
 			i."SubtotalServices", i."SubtotalUsage", i."SubtotalTaxes",
 			i."SubtotalDiscounts", i."SubtotalInstallments", i."Number",
-			ap."Id", ap."Status"::text, i."DigitableLine", i."PixQrCode", i."Barcode"
+			ap."Id", ap."Status"::text, i."DigitableLine", i."PixQrCode", i."Barcode", i."UndoneAt"
 		FROM "ProviderInvoices" i
 		JOIN "ProviderAccounts" pa ON pa."Id" = i."ProviderAccountId"
 		JOIN "ContractingCompanies" cc ON cc."Id" = i."ContractingCompanyId"
@@ -95,7 +95,7 @@ func (s *Store) GetProviderInvoice(ctx context.Context, orgID, id string) (*mode
 			&item.ParentInvoiceID, &item.IssueDate, &item.DueDate, &item.TotalAmount, &item.Status,
 			&item.SubtotalServices, &item.SubtotalUsage, &item.SubtotalTaxes,
 			&item.SubtotalDiscounts, &item.SubtotalInstallments, &item.Number,
-			&item.AccountPayableID, &item.AccountPayableStatus, &item.DigitableLine, &item.PixQrCode, &item.Barcode)
+			&item.AccountPayableID, &item.AccountPayableStatus, &item.DigitableLine, &item.PixQrCode, &item.Barcode, &item.UndoneAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -186,7 +186,7 @@ func (s *Store) InvoiceDuplicateExists(ctx context.Context, accountID, companyID
 			SELECT 1 FROM "ProviderInvoices"
 			WHERE "ProviderAccountId" = $1 AND "ContractingCompanyId" = $2
 				AND "ProcessingMonthId" = $3 AND "DueDate" = $4
-				AND "Status" <> 'substituted'::provider_invoice_status)`,
+				AND "Status" NOT IN ('substituted', 'cancelled'))`,
 		accountID, companyID, processingMonthID, dueDate).Scan(&exists)
 	return exists, err
 }
@@ -198,7 +198,7 @@ func (s *Store) InvoiceExistsInOtherProcessingMonth(ctx context.Context, account
 			SELECT 1 FROM "ProviderInvoices"
 			WHERE "ProviderAccountId" = $1 AND "ContractingCompanyId" = $2
 				AND "DueDate" = $3 AND "ProcessingMonthId" != $4
-				AND "Status" <> 'substituted'::provider_invoice_status)`,
+				AND "Status" NOT IN ('substituted', 'cancelled'))`,
 		accountID, companyID, dueDate, processingMonthID).Scan(&exists)
 	return exists, err
 }
@@ -208,13 +208,13 @@ func (s *Store) CreateProviderInvoice(ctx context.Context, inv ProviderInvoiceIn
 		INSERT INTO "ProviderInvoices" ("Id", "Number", "ProviderAccountId", "ContractingCompanyId",
 			"BillingCycleId", "ProcessingMonthId", "IssueDate", "DueDate", "TotalAmount", "Status",
 			"SubtotalServices", "SubtotalUsage", "SubtotalTaxes", "SubtotalDiscounts", "SubtotalInstallments",
-			"ParentInvoiceId", "ContentSHA256", "SubstitutionImpact", "DigitableLine", "PixQrCode", "Barcode")
+			"ParentInvoiceId", "ContentSHA256", "SubstitutionImpact", "DigitableLine", "PixQrCode", "Barcode", "UndoParentStatus")
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending'::provider_invoice_status,
-			$10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)`,
+			$10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)`,
 		inv.ID, inv.Number, inv.ProviderAccountID, inv.ContractingCompanyID,
 		inv.BillingCycleID, inv.ProcessingMonthID, inv.IssueDate, inv.DueDate, inv.TotalAmount,
 		inv.SubtotalServices, inv.SubtotalUsage, inv.SubtotalTaxes, inv.SubtotalDiscounts, inv.SubtotalInstallments,
-		inv.ParentInvoiceID, inv.ContentSHA256, inv.SubstitutionImpact, inv.DigitableLine, inv.PixQrCode, inv.Barcode)
+		inv.ParentInvoiceID, inv.ContentSHA256, inv.SubstitutionImpact, inv.DigitableLine, inv.PixQrCode, inv.Barcode, inv.UndoParentStatus)
 	return err
 }
 
@@ -266,6 +266,7 @@ type ProviderInvoiceInsert struct {
 	DigitableLine        *string
 	PixQrCode            *string
 	Barcode              *string
+	UndoParentStatus     *string
 }
 
 type InvoiceItemInsert struct {
@@ -335,7 +336,7 @@ func (s *Store) FindActiveInvoiceByContentSHA256(ctx context.Context, hash strin
 	err := s.q(ctx).QueryRow(ctx, `
 		SELECT "Id", "TotalAmount", "ProviderAccountId", "ProcessingMonthId", "DueDate", "Status"::text
 		FROM "ProviderInvoices"
-		WHERE "ContentSHA256" = $1 AND "Status" <> 'substituted'::provider_invoice_status
+		WHERE "ContentSHA256" = $1 AND "Status" NOT IN ('substituted', 'cancelled')
 		LIMIT 1`, hash).Scan(&row.ID, &row.TotalAmount, &row.ProviderAccountID, &row.ProcessingMonthID, &row.DueDate, &row.Status)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -352,7 +353,7 @@ func (s *Store) FindActiveInvoiceByBusinessKey(ctx context.Context, accountID, p
 		SELECT "Id", "TotalAmount", "ProviderAccountId", "ProcessingMonthId", "DueDate", "Status"::text
 		FROM "ProviderInvoices"
 		WHERE "ProviderAccountId" = $1 AND "ProcessingMonthId" = $2 AND "DueDate" = $3
-			AND "Status" <> 'substituted'::provider_invoice_status
+			AND "Status" NOT IN ('substituted', 'cancelled')
 		LIMIT 1`, accountID, processingMonthID, dueDate).
 		Scan(&row.ID, &row.TotalAmount, &row.ProviderAccountID, &row.ProcessingMonthID, &row.DueDate, &row.Status)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -369,14 +370,5 @@ func (s *Store) MarkInvoiceSubstituted(ctx context.Context, id string) error {
 		UPDATE "ProviderInvoices"
 		SET "Status" = 'substituted'::provider_invoice_status
 		WHERE "Id" = $1 AND "Status" <> 'substituted'::provider_invoice_status`, id)
-	return err
-}
-
-func (s *Store) CancelProviderInvoice(ctx context.Context, orgID, id string) error {
-	_, err := s.q(ctx).Exec(ctx, `
-		UPDATE "ProviderInvoices" i SET "Status" = 'cancelled'::provider_invoice_status
-		FROM "ContractingCompanies" cc JOIN "Providers" p ON p."Id" = cc."ProviderId"
-		WHERE i."ContractingCompanyId" = cc."Id" AND p."OrganizationId" = $1
-			AND i."Id" = $2 AND i."Status" NOT IN ('cancelled'::provider_invoice_status, 'substituted'::provider_invoice_status)`, orgID, id)
 	return err
 }

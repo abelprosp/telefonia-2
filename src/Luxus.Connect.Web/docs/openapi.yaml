@@ -2415,6 +2415,64 @@ components:
         country:
           type: string
           default: Brasil
+    CustomerRegistrationProfile:
+      type: object
+      properties:
+        service_unit:
+          type: string
+        ua:
+          type: string
+        show_ua:
+          type: boolean
+        account:
+          type: string
+        show_account:
+          type: boolean
+        birthplace:
+          type: string
+        sex:
+          type: string
+          enum: ['', female, male, other, not_informed]
+        identity_type:
+          type: string
+          enum: ['', rg, cnh, passport, rne, other]
+        identity_issued_on:
+          type: string
+        identity_issuer:
+          type: string
+        identity_state:
+          type: string
+        rg:
+          type: string
+        father_name:
+          type: string
+        mother_name:
+          type: string
+        contact_phone:
+          type: string
+        phone:
+          type: string
+        mobile:
+          type: string
+        emails:
+          type: array
+          items:
+            type: string
+            format: email
+        contact_name:
+          type: string
+        marital_status:
+          type: string
+          enum: ['', single, married, divorced, widowed, separated, civil_union]
+        spouse_cpf:
+          type: string
+        profession:
+          type: string
+        notes:
+          type: string
+          maxLength: 4000
+        show_notes:
+          type: boolean
     CreateCustomerCommand:
       required:
         - type
@@ -2422,6 +2480,10 @@ components:
         - document
       type: object
       properties:
+        profile:
+          $ref: '#/components/schemas/CustomerRegistrationProfile'
+        billing_email:
+          type: string
         provider_id:
           type: string
         type:
@@ -2464,6 +2526,14 @@ components:
         - responsible_salesperson_user_id
       type: object
       properties:
+        profile:
+          $ref: '#/components/schemas/CustomerRegistrationProfile'
+        addresses:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreateCustomerAddressCommand'
+        billing_email:
+          type: [string, 'null']
         id:
           type: string
         active:
@@ -3497,6 +3567,14 @@ components:
         - responsible_salesperson_user_id
       type: object
       properties:
+        profile:
+          $ref: '#/components/schemas/CustomerRegistrationProfile'
+        addresses:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreateCustomerAddressCommand'
+        billing_email:
+          type: [string, 'null']
         id:
           type: string
         active:
@@ -4038,6 +4116,21 @@ components:
         - name
       type: object
       properties:
+        profile:
+          $ref: '#/components/schemas/CustomerRegistrationProfile'
+        addresses:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreateCustomerAddressCommand'
+        billing_email:
+          type: [string, 'null']
+        is_reseller:
+          type: [boolean, 'null']
+        commercial_activation_date:
+          type: [string, 'null']
+          format: date
+        contracted_luxus_cnpj:
+          type: [string, 'null']
         name:
           type: string
         legal_name:

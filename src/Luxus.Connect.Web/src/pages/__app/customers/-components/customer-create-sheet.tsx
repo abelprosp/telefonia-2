@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
@@ -29,6 +30,8 @@ import {
 } from '@/components/ui/sheet';
 import { getErrorMessage, isApiHttpError } from '@/lib/api-error';
 import { invalidateDashboardCaches } from '@/lib/query-utils';
+import { emptyCustomerAddress, hasCustomerAddress, registrationDraft, registrationPayload } from '@/lib/customer-registration';
+import { CustomerRegistrationFields } from './customer-registration-fields';
 
 const formSchema = z
   .object({
@@ -82,6 +85,10 @@ export function CustomerCreateSheet({
   onOpenChange
 }: CustomerCreateSheetProps) {
   const queryClient = useQueryClient();
+  const [profile, setProfile] = useState(() => registrationDraft());
+  const [address, setAddress] = useState(emptyCustomerAddress);
+  const [billingEmail, setBillingEmail] = useState('');
+  const resetRegistration = () => { setProfile(registrationDraft()); setAddress(emptyCustomerAddress()); setBillingEmail(''); };
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -100,6 +107,7 @@ export function CustomerCreateSheet({
         await invalidateDashboardCaches(queryClient);
         onOpenChange(false);
         form.reset(defaultValues);
+        resetRegistration();
       },
       onError: (e) => {
         toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e));
@@ -112,13 +120,14 @@ export function CustomerCreateSheet({
       data: {
         type: values.type,
         name: values.name.trim(),
-        legal_name: values.legal_name?.trim() || null,
+        legal_name: values.type === 'PJ' ? values.legal_name?.trim() || null : null,
         document: values.document.replace(/\D/g, ''),
-        state_registration: values.state_registration?.trim() || null,
+        state_registration: values.type === 'PJ' ? values.state_registration?.trim() || null : null,
         birth_or_opening_date: values.birth_or_opening_date?.trim() || null,
         responsible_salesperson_user_id:
           values.responsible_salesperson_user_id?.trim() || null,
-        addresses: []
+        addresses: hasCustomerAddress(address) ? [address] : [],
+        ...{ profile: registrationPayload(profile, values.type === 'PJ'), billing_email: billingEmail.trim() }
       }
     });
   });
@@ -129,17 +138,16 @@ export function CustomerCreateSheet({
       onOpenChange={(next) => {
         if (!next) {
           form.reset(defaultValues);
+          resetRegistration();
         }
         onOpenChange(next);
       }}
     >
-      <SheetContent side="right" className="flex w-full flex-col sm:max-w-lg">
+      <SheetContent side="right" className="flex w-full flex-col sm:max-w-3xl">
         <SheetHeader>
           <SheetTitle>Novo cliente</SheetTitle>
           <SheetDescription>
-            Cadastre o cliente com tipo e documento. A operadora pode ser
-            vinculada depois, ao associar uma linha. Opcional: identificador do
-            vendedor responsável (ex.: sub do Keycloak).
+            Preencha os dados do cliente, contatos e endereço. Os campos se ajustam ao tipo de pessoa.
           </SheetDescription>
         </SheetHeader>
 
@@ -159,6 +167,7 @@ export function CustomerCreateSheet({
                       form.setValue('state_registration', '');
                       form.setValue('birth_or_opening_date', '');
                       form.setValue('document', '');
+                      if (value === 'PJ') setProfile(registrationDraft(registrationPayload(profile, true)));
                     }}
                   >
                     <SelectTrigger className="border-input bg-background rounded-xl border">
@@ -306,6 +315,8 @@ export function CustomerCreateSheet({
                 </Field>
               )}
             />
+            <CustomerRegistrationFields value={profile} onChange={setProfile} address={address} onAddressChange={setAddress}
+              billingEmail={billingEmail} onBillingEmailChange={setBillingEmail} isPj={customerType === 'PJ'} disabled={createMutation.isPending} />
           </div>
 
           <SheetFooter className="mt-auto gap-2 border-t px-6 py-4 sm:justify-end">

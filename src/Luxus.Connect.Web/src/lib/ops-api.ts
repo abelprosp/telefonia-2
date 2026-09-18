@@ -6,7 +6,8 @@ export function useUndoProviderInvoice() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (invoiceId: string) => { await client({ url: `/v1/provider-invoices/${invoiceId}/undo`, method: 'POST' }); },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['/v1/provider-invoices'] })
+    // Reversal affects invoices, lines, customers, billing and dashboard totals.
+    onSuccess: () => queryClient.invalidateQueries()
   });
 }
 

@@ -67,6 +67,8 @@ import { CustomerContractsSection } from './customer-contracts-section';
 import { AssignCustomerDeviceSheet } from './assign-customer-device-sheet';
 import { GenerateCustomerInvoiceSheet } from './generate-customer-invoice-sheet';
 import { LinkCustomerLineSheet } from '@/components/link-customer-line-sheet';
+import { emptyCustomerAddress, hasCustomerAddress, registrationDraft, registrationPayload, type RegisteredCustomer } from '@/lib/customer-registration';
+import { CustomerRegistrationFields } from './customer-registration-fields';
 
 type ListSearch = {
   page: number;
@@ -147,6 +149,11 @@ export function CustomerDetailView({
 }: CustomerDetailViewProps) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const registeredCustomer = customer as RegisteredCustomer;
+  const [profile, setProfile] = useState(() => registrationDraft(registeredCustomer.profile));
+  const [address, setAddress] = useState(() => registeredCustomer.addresses?.[0] ?? emptyCustomerAddress());
+  const [billingEmail, setBillingEmail] = useState(registeredCustomer.billing_email ?? '');
+  const [birthOrOpeningDate, setBirthOrOpeningDate] = useState((customer.birth_or_opening_date ?? '').slice(0,10));
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [linkLineOpen, setLinkLineOpen] = useState(false);
   const [linkDeviceOpen, setLinkDeviceOpen] = useState(false);
@@ -179,6 +186,11 @@ export function CustomerDetailView({
   });
 
   useEffect(() => {
+    const next = customer as RegisteredCustomer;
+    setProfile(registrationDraft(next.profile));
+    setAddress(next.addresses?.[0] ?? emptyCustomerAddress());
+    setBillingEmail(next.billing_email ?? '');
+    setBirthOrOpeningDate((customer.birth_or_opening_date ?? '').slice(0,10));
     form.reset({
       name: customer.name,
       legal_name: customer.legal_name ?? '',
@@ -273,6 +285,13 @@ export function CustomerDetailView({
         </div>
       </div>
 
+      {(registeredCustomer.profile?.show_ua || registeredCustomer.profile?.show_account || registeredCustomer.profile?.show_notes) && (
+        <aside className="bg-muted/40 space-y-2 rounded-xl border p-4 text-sm" aria-label="Informações de atendimento">
+          {registeredCustomer.profile.show_ua && registeredCustomer.profile.ua && <p><strong>UA:</strong> {registeredCustomer.profile.ua}</p>}
+          {registeredCustomer.profile.show_account && registeredCustomer.profile.account && <p><strong>Conta:</strong> {registeredCustomer.profile.account}</p>}
+          {registeredCustomer.profile.show_notes && registeredCustomer.profile.notes && <p className="whitespace-pre-wrap"><strong>Observação:</strong> {registeredCustomer.profile.notes}</p>}
+        </aside>
+      )}
       {!isActive ? (
         <div className="border-border bg-muted/40 rounded-lg border px-4 py-3 text-sm">
           Este cliente está <strong>inativo</strong> e não aparece nas listagens
@@ -289,20 +308,23 @@ export function CustomerDetailView({
             data: {
               name: v.name.trim(),
               legal_name: isPj ? v.legal_name.trim() : null,
-              state_registration: v.state_registration.trim() || null,
-              birth_or_opening_date: customer.birth_or_opening_date ?? null,
+              state_registration: isPj ? v.state_registration.trim() || null : null,
+              birth_or_opening_date: birthOrOpeningDate || null,
               responsible_salesperson_user_id:
                 v.responsible_salesperson_user_id.trim() || null,
               ...(isPj ? { is_reseller: isReseller } : {}),
               commercial_activation_date: commercialActivation || null,
-              contracted_luxus_cnpj: luxusCnpj || null
+              contracted_luxus_cnpj: isPj ? luxusCnpj || null : null,
+              billing_email: billingEmail.trim(),
+              ...{ profile: registrationPayload(profile, isPj),
+                addresses: [...(hasCustomerAddress(address) ? [address] : []), ...(registeredCustomer.addresses?.slice(1) ?? [])] }
             }
           })
         )}
       >
         <DetailSection
           title="Dados do cliente"
-          description="Tipo e documento são fixos após o cadastro. Nome fantasia, razão social, inscrição estadual e vendedor responsável podem ser ajustados."
+          description="Atualize os dados cadastrais. Tipo e CPF/CNPJ permanecem fixos após o cadastro."
         >
           <FieldGroup className="gap-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -356,7 +378,7 @@ export function CustomerDetailView({
                   </p>
                 </Field>
               ) : null}
-              <Field>
+              {isPj && <Field>
                 <FieldLabel htmlFor="customer-ie">
                   Inscrição estadual (IE)
                 </FieldLabel>
@@ -368,16 +390,10 @@ export function CustomerDetailView({
                 <FieldError
                   errors={[form.formState.errors.state_registration]}
                 />
-              </Field>
+              </Field>}
               <Field>
-                <FieldLabel>Data de nascimento / abertura</FieldLabel>
-                <ReadOnlyInput
-                  value={
-                    customer.birth_or_opening_date?.formatAsDate(
-                      'dd/MM/yyyy'
-                    ) ?? '—'
-                  }
-                />
+                <FieldLabel htmlFor="customer-birth-date">{isPj ? 'Data de abertura' : 'Data de nascimento'}</FieldLabel>
+                <Input id="customer-birth-date" type="date" value={birthOrOpeningDate} disabled={!isActive} onChange={event => setBirthOrOpeningDate(event.target.value)} />
               </Field>
               <Field>
                 <FieldLabel htmlFor="customer-activation">Data de ativação comercial</FieldLabel>
@@ -389,7 +405,7 @@ export function CustomerDetailView({
                   onChange={(e) => setCommercialActivation(e.target.value)}
                 />
               </Field>
-              <Field>
+              {isPj && <Field>
                 <FieldLabel htmlFor="customer-luxus-cnpj">CNPJ Luxus (contratada)</FieldLabel>
                 <Input
                   id="customer-luxus-cnpj"
@@ -398,7 +414,7 @@ export function CustomerDetailView({
                   value={luxusCnpj}
                   onChange={(e) => setLuxusCnpj(e.target.value)}
                 />
-              </Field>
+              </Field>}
               <Field>
                 <FieldLabel htmlFor="customer-salesperson">
                   Vendedor responsável (ID do usuário)
@@ -419,6 +435,12 @@ export function CustomerDetailView({
           </FieldGroup>
         </DetailSection>
 
+        <Separator />
+
+        <DetailSection title="Cadastro completo" description="Atendimento, contatos, endereço e observações. Dados de identidade e família aparecem somente para pessoa física.">
+          <CustomerRegistrationFields value={profile} onChange={setProfile} address={address} onAddressChange={setAddress}
+            billingEmail={billingEmail} onBillingEmailChange={setBillingEmail} isPj={isPj} disabled={!isActive || saveMutation.isPending} />
+        </DetailSection>
         <Separator />
 
         <DetailSection

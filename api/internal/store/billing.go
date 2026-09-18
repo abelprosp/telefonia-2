@@ -200,17 +200,22 @@ func (s *Store) GetCustomerBillingDocument(ctx context.Context, orgID, id string
 }
 
 func (s *Store) CreateCustomerBillingDocument(ctx context.Context, doc models.CustomerBillingDocumentRow) error {
-	_, err := s.q(ctx).Exec(ctx, `
+	tag, err := s.q(ctx).Exec(ctx, `
 		INSERT INTO "CustomerBillingDocuments" (
 			"Id", "OrganizationId", "CustomerId", "AccountsReceivableId", "ProcessingMonthId",
 			"InvoiceNumber", "IssueDate", "DueDate", "Amount", "Status",
 			"RecipientEmail", "EmailSubject", "EmailBodyHtml", "CreatedAt", "UpdatedAt",
 			"PhoneLineId", "BillingGroupType"
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::customer_billing_document_status, $11, $12, $13, $14, $14, $15, $16)`,
+		) SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10::customer_billing_document_status, $11, $12, $13, $14, $14, $15, $16
+		WHERE $4::varchar IS NULL OR EXISTS (SELECT 1 FROM "AccountsReceivable" r
+		WHERE r."Id"=$4 AND r."OrganizationId"=$2 AND r."Status" <> 'cancelled')`,
 		doc.ID, doc.OrganizationID, doc.CustomerID, doc.AccountsReceivableID, doc.ProcessingMonthID,
 		doc.InvoiceNumber, doc.IssueDate, doc.DueDate, doc.Amount, doc.Status,
 		doc.RecipientEmail, doc.EmailSubject, doc.EmailBodyHTML, doc.CreatedAt,
 		doc.PhoneLineID, doc.BillingGroupType)
+	if err == nil && tag.RowsAffected() == 0 {
+		return undoBlocked("A conta a receber foi cancelada e não pode gerar uma cobrança.")
+	}
 	return err
 }
 
@@ -449,7 +454,8 @@ func (s *Store) CountProviderInvoicesForMonth(ctx context.Context, orgID, proces
 		JOIN "ProviderAccounts" pa ON pa."Id" = i."ProviderAccountId"
 		JOIN "ContractingCompanies" cc ON cc."Id" = pa."ContractingCompanyId"
 		JOIN "Providers" p ON p."Id" = cc."ProviderId"
-		WHERE p."OrganizationId" = $1 AND i."ProcessingMonthId" = $2`, orgID, processingMonthID).Scan(&count)
+		WHERE p."OrganizationId" = $1 AND i."ProcessingMonthId" = $2
+		AND i."Status" NOT IN ('cancelled', 'substituted')`, orgID, processingMonthID).Scan(&count)
 	return count, err
 }
 
@@ -642,13 +648,13 @@ func manualBillingEligibility(item models.BulkBillingPreviewItem) (bool, string)
 }
 
 type CustomerProviderInvoiceLayoutContext struct {
-	PeriodStart     time.Time
-	PeriodEnd       time.Time
-	IssueDate       time.Time
-	DueDate         time.Time
-	ServicesTotal   float64
-	DiscountsTotal  float64
-	ReferenceMonth  string
+	PeriodStart    time.Time
+	PeriodEnd      time.Time
+	IssueDate      time.Time
+	DueDate        time.Time
+	ServicesTotal  float64
+	DiscountsTotal float64
+	ReferenceMonth string
 }
 
 func (s *Store) ListCustomerBillingItemsForProcessingMonth(ctx context.Context, customerID, processingMonthID string) ([]CustomerBillingItemRow, error) {
@@ -706,7 +712,7 @@ func (s *Store) ListCustomerBillingItemsForProcessingMonth(ctx context.Context, 
 			SELECT
 				COALESCE(pp."Name", pl."Number") || ' — ' || pl."Number" AS description,
 				'Mensal' AS item_type,
-				` + lineLuxusBillingAmountSQL + ` AS amount
+				`+lineLuxusBillingAmountSQL+` AS amount
 			FROM "PhoneLineCustomerLinks" l
 			JOIN "PhoneLines" pl ON pl."Id" = l."PhoneLineId"
 			LEFT JOIN "ProviderPlans" pp ON pp."Id" = pl."ProviderPlanId"

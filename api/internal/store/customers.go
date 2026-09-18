@@ -101,6 +101,9 @@ func (s *Store) GetCustomerInOrg(ctx context.Context, orgID, id string, salesper
 	if err != nil {
 		return nil, err
 	}
+	if err := s.loadCustomerRegistration(ctx, &item); err != nil {
+		return nil, err
+	}
 	return &item, nil
 }
 
@@ -369,6 +372,7 @@ func (s *Store) AnonymizeCustomer(ctx context.Context, orgID, customerID string)
 			"LegalName" = NULL,
 			"BillingEmail" = NULL,
 			"BirthOrOpeningDate" = NULL,
+			"RegistrationProfile" = '{}'::jsonb,
 			"Active" = false
 		WHERE "OrganizationId" = $1 AND "Id" = $2`, orgID, customerID)
 	if err != nil {

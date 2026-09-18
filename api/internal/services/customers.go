@@ -368,6 +368,9 @@ func (s *Service) CreateCustomer(ctx context.Context, input models.CreateCustome
 	if err := validateCreateCustomer(input); err != nil {
 		return nil, err
 	}
+	if err := normalizeCustomerRegistration(input.Type, input.Profile, input.Addresses, input.BillingEmail); err != nil {
+		return nil, err
+	}
 	birthDate, err := httputil.ParseOptionalDate(input.BirthOrOpeningDate)
 	if err != nil {
 		return nil, httputil.ValidationError(notifications.N("INVALID_DATE", "Invalid birth or opening date."))
@@ -407,6 +410,12 @@ func (s *Service) CreateCustomer(ctx context.Context, input models.CreateCustome
 			if err := s.Store.CreateCustomerAddress(txCtx, id, addr); err != nil {
 				return err
 			}
+		}
+		if err := s.Store.SetCustomerRegistration(txCtx, id, input.Profile, nil); err != nil {
+			return err
+		}
+		if input.BillingEmail != nil {
+			return s.Store.UpdateCustomerBillingEmail(txCtx, orgID, id, *input.BillingEmail)
 		}
 		return nil
 	}); err != nil {
@@ -456,6 +465,13 @@ func (s *Service) UpdateCustomer(ctx context.Context, id string, input models.Up
 		return httputil.ValidationError(notifications.CustomerNameRequired)
 	}
 	typ := httputil.CustomerTypeFromInput(current.Type)
+	var addresses []models.CreateCustomerAddressInput
+	if input.Addresses != nil {
+		addresses = *input.Addresses
+	}
+	if err := normalizeCustomerRegistration(typ, input.Profile, addresses, input.BillingEmail); err != nil {
+		return err
+	}
 	if typ == "pf" && (nonEmpty(input.LegalName) || nonEmpty(input.StateRegistration) || nonEmpty(input.ContractedLuxusCnpj)) {
 		return httputil.ValidationError(notifications.N("CUSTOMER_PF_FIELDS_INVALID", "PF deve conter apenas dados pessoais."))
 	}
@@ -466,47 +482,50 @@ func (s *Service) UpdateCustomer(ctx context.Context, id string, input models.Up
 	if err != nil {
 		return httputil.ValidationError(notifications.N("INVALID_DATE", "Invalid birth or opening date."))
 	}
-	if err := s.Store.UpdateCustomer(ctx, id, strings.TrimSpace(input.Name), input.LegalName,
-		input.StateRegistration, input.ResponsibleSalespersonUserID, birthDate); err != nil {
-		if isPgNoRows(err) {
-			return httputil.NotFoundError(notifications.CustomerNotFound)
-		}
-		return httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
-	}
-	if input.BillingEmail != nil {
-		orgID, err := orgFrom(ctx)
-		if err != nil {
-			return err
-		}
-		if err := s.Store.UpdateCustomerBillingEmail(ctx, orgID, id, strings.TrimSpace(*input.BillingEmail)); err != nil && !isPgNoRows(err) {
-			return httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
-		}
-	}
-	if err := s.applyCustomerCommercial(ctx, id, input.CommercialActivationDate, input.ContractedLuxusCnpj); err != nil {
-		return err
-	}
-	if input.IsReseller != nil {
-		orgID, err := orgFrom(ctx)
-		if err != nil {
-			return err
-		}
-		if err := s.Store.UpdateCustomerIsReseller(ctx, orgID, id, *input.IsReseller); err != nil {
+	return s.Store.WithTx(ctx, func(ctx context.Context, tx pgx.Tx) error {
+		ctx = store.CtxWithTx(ctx, tx)
+		if err := s.Store.UpdateCustomer(ctx, id, strings.TrimSpace(input.Name), input.LegalName,
+			input.StateRegistration, input.ResponsibleSalespersonUserID, birthDate); err != nil {
 			if isPgNoRows(err) {
 				return httputil.NotFoundError(notifications.CustomerNotFound)
 			}
 			return httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 		}
-		if *input.IsReseller {
-			linkIDs, err := s.Store.ListActiveCustomerLinkIDs(ctx, id)
+		if input.BillingEmail != nil {
+			orgID, err := orgFrom(ctx)
 			if err != nil {
+				return err
+			}
+			if err := s.Store.UpdateCustomerBillingEmail(ctx, orgID, id, strings.TrimSpace(*input.BillingEmail)); err != nil && !isPgNoRows(err) {
 				return httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 			}
-			for _, linkID := range linkIDs {
-				_ = s.EnsureBillingProcessingsForLink(ctx, linkID, id, nil)
+		}
+		if err := s.applyCustomerCommercial(ctx, id, input.CommercialActivationDate, input.ContractedLuxusCnpj); err != nil {
+			return err
+		}
+		if input.IsReseller != nil {
+			orgID, err := orgFrom(ctx)
+			if err != nil {
+				return err
+			}
+			if err := s.Store.UpdateCustomerIsReseller(ctx, orgID, id, *input.IsReseller); err != nil {
+				if isPgNoRows(err) {
+					return httputil.NotFoundError(notifications.CustomerNotFound)
+				}
+				return httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+			}
+			if *input.IsReseller {
+				linkIDs, err := s.Store.ListActiveCustomerLinkIDs(ctx, id)
+				if err != nil {
+					return httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+				}
+				for _, linkID := range linkIDs {
+					_ = s.EnsureBillingProcessingsForLink(ctx, linkID, id, nil)
+				}
 			}
 		}
-	}
-	return nil
+		return s.Store.SetCustomerRegistration(ctx, id, input.Profile, input.Addresses)
+	})
 }
 
 func (s *Service) applyCustomerCommercial(ctx context.Context, id string, activationDate, cnpj *string) error {

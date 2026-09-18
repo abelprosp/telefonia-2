@@ -167,6 +167,7 @@ func (p *Processor) processInner(ctx context.Context, req *store.ImportRequestRo
 	}
 
 	var parentID *string
+	var undoParentStatus *string
 	var impact *float64
 	if existingKey != nil {
 		if !req.AllowSubstitute {
@@ -176,6 +177,7 @@ func (p *Processor) processInner(ctx context.Context, req *store.ImportRequestRo
 			return err
 		}
 		parentID = &existingKey.ID
+		undoParentStatus = &existingKey.Status
 		delta := header.TotalAmount - existingKey.TotalAmount
 		impact = &delta
 	}
@@ -215,6 +217,7 @@ func (p *Processor) processInner(ctx context.Context, req *store.ImportRequestRo
 		SubtotalServices: header.SubtotalServices, SubtotalUsage: header.SubtotalUsageExceeded,
 		ParentInvoiceID: parentID, ContentSHA256: &fileHash, SubstitutionImpact: impact,
 		DigitableLine: digitableLine, PixQrCode: pixQrCode,
+		UndoParentStatus: undoParentStatus,
 	}
 
 	if err := p.Store.CreateProviderInvoice(ctx, inv); err != nil {
@@ -222,6 +225,9 @@ func (p *Processor) processInner(ctx context.Context, req *store.ImportRequestRo
 	}
 
 	if err := p.processInvoiceServices(ctx, req.ProviderID, invoiceID, parsed, header); err != nil {
+		return err
+	}
+	if err := p.Store.BeginInvoiceUndoTracking(ctx, invoiceID); err != nil {
 		return err
 	}
 
@@ -236,8 +242,7 @@ func (p *Processor) processInner(ctx context.Context, req *store.ImportRequestRo
 	if err := p.applyAutomaticExceedances(ctx, orgID, invoiceID, parsed); err != nil {
 		return err
 	}
-
-	return nil
+	return p.Store.EndInvoiceUndoTracking(ctx)
 }
 
 func (p *Processor) resolveContext(ctx context.Context, orgID string, req *store.ImportRequestRow, parsed []any,
