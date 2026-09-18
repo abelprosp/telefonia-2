@@ -31,6 +31,22 @@ func TestParseOrganizationFromClaims_map(t *testing.T) {
 	}
 }
 
+func TestParseOrganizationFromClaims_directObject(t *testing.T) {
+	claim := map[string]interface{}{"id": "11111111-1111-1111-1111-111111111111", "name": "Empresa"}
+	org, err := ParseOrganizationFromClaims(claim)
+	if err != nil || org == nil || org.ID != claim["id"] || org.Name != "Empresa" {
+		t.Fatalf("unexpected org: %+v, %v", org, err)
+	}
+}
+
+func TestParseOrganizationFromClaims_list(t *testing.T) {
+	claim := []interface{}{map[string]interface{}{"id": "22222222-2222-2222-2222-222222222222", "name": []interface{}{"Empresa"}}}
+	org, err := ParseOrganizationFromClaims(claim)
+	if err != nil || org == nil || org.ID != "22222222-2222-2222-2222-222222222222" {
+		t.Fatalf("unexpected org: %+v, %v", org, err)
+	}
+}
+
 func TestParseOrganizationFromClaims_mapWithoutID(t *testing.T) {
 	claim := map[string]interface{}{
 		"luxus": map[string]interface{}{

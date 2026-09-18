@@ -116,16 +116,53 @@ func ParseOrganizationFromClaims(claim any) (*Organization, error) {
 		if v == "" {
 			return nil, nil
 		}
+		var direct struct {
+			ID   string `json:"id"`
+			Name any    `json:"name"`
+		}
+		if err := json.Unmarshal([]byte(v), &direct); err == nil && strings.TrimSpace(direct.ID) != "" {
+			return &Organization{ID: strings.TrimSpace(direct.ID), Name: organizationName(direct.Name)}, nil
+		}
 		return ParseOrganizationClaim(v)
 	case map[string]interface{}:
+		if id, ok := v["id"].(string); ok && strings.TrimSpace(id) != "" {
+			return &Organization{ID: strings.TrimSpace(id), Name: organizationName(v["name"])}, nil
+		}
 		raw, err := json.Marshal(v)
 		if err != nil {
 			return nil, err
 		}
 		return ParseOrganizationClaim(string(raw))
+	case []interface{}:
+		for _, entry := range v {
+			if org, err := ParseOrganizationFromClaims(entry); err != nil {
+				return nil, err
+			} else if org != nil {
+				return org, nil
+			}
+		}
+		return nil, nil
 	default:
 		return nil, fmt.Errorf("unsupported organization claim type %T", claim)
 	}
+}
+
+func organizationName(raw any) string {
+	switch value := raw.(type) {
+	case string:
+		return value
+	case []interface{}:
+		if len(value) > 0 {
+			if name, ok := value[0].(string); ok {
+				return name
+			}
+		}
+	case []string:
+		if len(value) > 0 {
+			return value[0]
+		}
+	}
+	return ""
 }
 
 func firstOrganization(orgs map[string]organizationClaimEntry) (*Organization, error) {
