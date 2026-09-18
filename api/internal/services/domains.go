@@ -792,6 +792,9 @@ func (s *Service) RequestProviderInvoiceImport(ctx context.Context, input models
 	if month.Status != "open" {
 		return nil, httputil.BusinessError(notifications.ProcessingMonthNotOpen)
 	}
+	if s.Processor == nil && s.Publisher == nil {
+		return nil, httputil.BusinessError(notifications.ObjectStorageUnavailable)
+	}
 	id := uuid.New().String()
 	row := store.ImportRequestRow{
 		ID: id, OrganizationID: orgID, ProviderID: input.ProviderID,
@@ -802,20 +805,28 @@ func (s *Service) RequestProviderInvoiceImport(ctx context.Context, input models
 	if err := s.Store.CreateImportRequest(ctx, row); err != nil {
 		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
+	var dispatchErr error
 	if s.Processor != nil {
-		_ = s.Processor.ProcessImport(ctx, id)
-	} else if s.Publisher != nil {
-		_ = s.Publisher.PublishInvoiceImportRequested(ctx, id, input.StorageBucket, input.StorageObjectKey, input.OriginalFileName, user.ID)
+		dispatchErr = s.Processor.ProcessImport(ctx, id)
+	} else {
+		dispatchErr = s.Publisher.PublishInvoiceImportRequested(ctx, id, input.StorageBucket, input.StorageObjectKey, input.OriginalFileName, user.ID)
 	}
-
-	status := 0
-	var errMsg *string
-	var completedAt *time.Time
-	if req, err := s.Store.GetImportRequest(ctx, id); err == nil && req != nil {
-		status = req.Status
-		errMsg = req.Error
-		completedAt = req.CompletedAt
+	req, err := s.Store.GetImportRequest(ctx, id)
+	if err != nil {
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
+	if req == nil {
+		return nil, httputil.NotFoundError(notifications.ImportRequestNotFound)
+	}
+	if dispatchErr != nil && req.Status == 0 {
+		now := time.Now().UTC()
+		message := "Não foi possível iniciar a importação. Tente novamente."
+		if err := s.Store.UpdateImportRequestStatus(ctx, id, 3, &message, &now); err != nil {
+			return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+		}
+		req.Status, req.Error, req.CompletedAt = 3, &message, &now
+	}
+	status, errMsg, completedAt := req.Status, req.Error, req.CompletedAt
 
 	return &models.RequestProviderInvoiceImportResponse{
 		ID:                id,
@@ -856,6 +867,19 @@ func (s *Service) PreviewProviderInvoiceImport(ctx context.Context, input models
 	}
 	if !ok {
 		return nil, httputil.BusinessError(notifications.ProviderNotFound)
+	}
+	month, err := s.Store.GetProcessingMonth(ctx, orgID, input.ProcessingMonthID)
+	if err != nil {
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+	if month == nil {
+		return nil, httputil.BusinessError(notifications.ProcessingMonthNotFound)
+	}
+	if month.ProviderID != input.ProviderID {
+		return nil, httputil.BusinessError(notifications.ProcessingMonthProviderMismatch)
+	}
+	if month.Status != "open" {
+		return nil, httputil.BusinessError(notifications.ProcessingMonthNotOpen)
 	}
 	previewer, ok := s.Processor.(InvoicePreviewer)
 	if !ok || previewer == nil {

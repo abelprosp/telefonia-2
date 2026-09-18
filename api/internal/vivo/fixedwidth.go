@@ -13,10 +13,10 @@ const (
 
 // ParserOptions controla leitura do tipo de registro e fatias de campo.
 type ParserOptions struct {
-	RecordTypeOffset  int
-	RecordTypeLength  int
-	TrimRecordType    bool
-	TrimFieldValues   bool
+	RecordTypeOffset int
+	RecordTypeLength int
+	TrimRecordType   bool
+	TrimFieldValues  bool
 }
 
 // DefaultParserOptions espelha FixedWidthTextParserOptions do C#.
@@ -30,34 +30,22 @@ func DefaultParserOptions() ParserOptions {
 }
 
 func readRecordType(line string, opts ParserOptions) string {
-	o := opts.RecordTypeOffset
-	length := opts.RecordTypeLength
-	if o < 0 || length <= 0 || o >= len(line) {
-		return ""
-	}
-	take := length
-	if o+take > len(line) {
-		take = len(line) - o
-	}
-	s := line[o : o+take]
-	if opts.TrimRecordType {
-		s = strings.TrimSpace(s)
-	}
-	return s
+	return sliceField(line, opts.RecordTypeOffset, opts.RecordTypeLength, opts.TrimRecordType)
 }
 
 func sliceField(line string, offset, length int, trim bool) string {
 	if offset < 0 || length <= 0 {
 		return ""
 	}
-	if offset >= len(line) {
+	chars := []rune(line)
+	if offset >= len(chars) {
 		return ""
 	}
 	end := offset + length
-	if end > len(line) {
-		end = len(line)
+	if end > len(chars) {
+		end = len(chars)
 	}
-	s := line[offset:end]
+	s := string(chars[offset:end])
 	if trim {
 		s = strings.TrimSpace(s)
 	}
@@ -128,8 +116,7 @@ func splitLines(text string) []string {
 	})
 	out := make([]string, 0, len(raw))
 	for _, line := range raw {
-		line = strings.TrimSpace(line)
-		if line != "" {
+		if strings.TrimSpace(line) != "" {
 			out = append(out, line)
 		}
 	}

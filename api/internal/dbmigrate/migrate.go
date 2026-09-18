@@ -5,7 +5,6 @@ import (
 	"embed"
 	"fmt"
 	"io/fs"
-	"os"
 	"sort"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -14,9 +13,8 @@ import (
 //go:embed sql/*.sql
 var sqlFS embed.FS
 
-// Apply runs bundled SQL (021+) on startup. Each file is independent: a failure
-// is logged and the next file still runs, so PortalCustomerLinks can exist even
-// if a later unique index in 021 fails on existing data.
+// Apply runs bundled SQL in order, committing each file before the next one.
+// A failed migration prevents startup with an incompatible schema.
 func Apply(ctx context.Context, pool *pgxpool.Pool) error {
 	entries, err := fs.Glob(sqlFS, "sql/*.sql")
 	if err != nil {
@@ -38,20 +36,16 @@ func Apply(ctx context.Context, pool *pgxpool.Pool) error {
 		_, _ = conn.Exec(context.Background(), `SELECT pg_advisory_unlock(hashtext('luxus-connect-schema'))`)
 	}()
 
-	var first error
 	for _, name := range entries {
 		body, err := sqlFS.ReadFile(name)
 		if err != nil {
 			return err
 		}
 		if err := execMulti(ctx, conn, string(body)); err != nil {
-			fmt.Fprintf(os.Stderr, "dbmigrate %s: %v\n", name, err)
-			if first == nil {
-				first = fmt.Errorf("%s: %w", name, err)
-			}
+			return fmt.Errorf("%s: %w", name, err)
 		}
 	}
-	return first
+	return nil
 }
 
 func execMulti(ctx context.Context, conn *pgxpool.Conn, sql string) error {

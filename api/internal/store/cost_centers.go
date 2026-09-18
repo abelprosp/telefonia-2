@@ -69,6 +69,23 @@ func (s *Store) GetImportRequest(ctx context.Context, id string) (*ImportRequest
 	return &r, err
 }
 
+func (s *Store) GetImportRequestForUpdate(ctx context.Context, id string) (*ImportRequestRow, error) {
+	var r ImportRequestRow
+	err := s.q(ctx).QueryRow(ctx, `
+		SELECT "Id", "OrganizationId", "ProviderId", "ProcessingMonthId",
+			"StorageBucket", "StorageObjectKey", "OriginalFileName", "Status",
+			"Error", "CompletedAt", "CreatedBy", COALESCE("AllowSubstitute", false)
+		FROM "ProviderInvoiceImportRequests"
+		WHERE "Id" = $1 FOR UPDATE`, id).
+		Scan(&r.ID, &r.OrganizationID, &r.ProviderID, &r.ProcessingMonthID,
+			&r.StorageBucket, &r.StorageObjectKey, &r.OriginalFileName, &r.Status,
+			&r.Error, &r.CompletedAt, &r.CreatedBy, &r.AllowSubstitute)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	return &r, err
+}
+
 func (s *Store) CreateImportRequest(ctx context.Context, r ImportRequestRow) error {
 	err := s.insertImportRequest(ctx, r)
 	if err != nil && isUndefinedColumn(err) {

@@ -8,11 +8,9 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 ALTER TABLE "OrganizationSettings"
     ADD COLUMN IF NOT EXISTS "ProrataDivisor" integer NOT NULL DEFAULT 30;
 
--- Status substituta: as duas faturas permanecem
-DO $$ BEGIN
-    ALTER TYPE provider_invoice_status ADD VALUE 'substituted';
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
+-- Status substituted is committed separately in 020a_invoice_status.sql.
+-- Replace initial global unique index with a status-aware index.
+DROP INDEX IF EXISTS "IX_ProviderInvoices_ProviderAccountId_ContractingCompanyId_Pro~";
 
 ALTER TABLE "ProviderInvoices"
     ADD COLUMN IF NOT EXISTS "ContentSHA256" character varying(64),

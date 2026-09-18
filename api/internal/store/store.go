@@ -33,7 +33,8 @@ func New(ctx context.Context, databaseURL string) (*Store, error) {
 	}
 	s := &Store{pool: pool}
 	if err := dbmigrate.Apply(ctx, pool); err != nil {
-		fmt.Fprintf(os.Stderr, "dbmigrate: %v\n", err)
+		pool.Close()
+		return nil, fmt.Errorf("dbmigrate: %w", err)
 	}
 	if err := s.ensureOrganizationSettingsSchema(ctx); err != nil {
 		fmt.Fprintf(os.Stderr, "ensure OrganizationSettings schema: %v\n", err)

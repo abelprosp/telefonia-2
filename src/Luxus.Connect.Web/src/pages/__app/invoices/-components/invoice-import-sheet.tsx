@@ -100,6 +100,7 @@ export function InvoiceImportSheet({
   onProgressChange
 }: InvoiceImportSheetProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const busyRef = useRef(false);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [previewing, setPreviewing] = useState(false);
@@ -203,8 +204,12 @@ export function InvoiceImportSheet({
   });
 
   const onSubmit = form.handleSubmit(async (values) => {
+    if (busyRef.current) return;
+    const file = importFile;
+    if (!file) { toast.error('Anexe o TXT da operadora para importar.'); return; }
+    if (!defaultBucket.trim()) { toast.error('O armazenamento de arquivos não está configurado. Contate o suporte.'); return; }
+    busyRef.current = true;
     try {
-      const file = importFile;
       let storageObjectKey =
         uploadedKey ??
         (file
@@ -255,13 +260,13 @@ export function InvoiceImportSheet({
         fileName: file?.name ?? values.originalFileName ?? ''
       });
 
-      importMutation.mutate({
+      await importMutation.mutateAsync({
         data: {
           provider_id: values.providerId,
           processing_month_id: values.processingMonthId,
           storage_bucket: defaultBucket,
           storage_object_key: storageObjectKey,
-          original_file_name: values.originalFileName ?? null,
+          original_file_name: values.originalFileName || file.name,
           allow_substitute: values.allowSubstitute
         }
       });
@@ -274,9 +279,11 @@ export function InvoiceImportSheet({
       });
       toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e));
     }
+    finally { busyRef.current = false; }
   });
 
   const handlePreview = form.handleSubmit(async (values) => {
+    if (busyRef.current) return;
     const file = importFile;
     if (!file) {
       toast.error('Anexe o TXT da operadora para pré-visualizar.');
@@ -286,6 +293,7 @@ export function InvoiceImportSheet({
       toast.error('Defina VITE_STORAGE_BUCKET_NAME no ambiente para enviar o arquivo.');
       return;
     }
+    busyRef.current = true;
     setPreviewing(true);
     try {
       const storageObjectKey =
@@ -313,6 +321,7 @@ export function InvoiceImportSheet({
       toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e));
     } finally {
       setPreviewing(false);
+      busyRef.current = false;
     }
   });
 
@@ -325,7 +334,7 @@ export function InvoiceImportSheet({
   };
 
   const handleImportFile = (file: File | undefined) => {
-    if (!file) return;
+    if (!file || busyRef.current) return;
     if (!validInvoiceFile(file)) {
       toast.error('Envie um arquivo TXT (fatura VIVO) ou PDF (recebido, parse ainda não disponível).', {
         position: 'bottom-right',
@@ -333,6 +342,7 @@ export function InvoiceImportSheet({
       });
       return;
     }
+    if (file.size === 0) { toast.error("O arquivo está vazio."); return; }
     if (file.size > MAX_IMPORT_FILE_BYTES) {
       toast.error('O arquivo excede 256 MB.', { position: 'bottom-right', duration: 3000 });
       return;
@@ -353,6 +363,7 @@ export function InvoiceImportSheet({
   };
 
   const resetImportFile = () => {
+    if (busyRef.current) return;
     setImportFile(null);
     setPreview(null);
     setUploadedKey(null);
@@ -381,6 +392,7 @@ export function InvoiceImportSheet({
     <Sheet
       open={open}
       onOpenChange={(next) => {
+        if (busyRef.current) return;
         if (!next) {
           setImportFile(null);
           setPreview(null);
@@ -398,12 +410,8 @@ export function InvoiceImportSheet({
           </a>
           <SheetTitle>Importar fatura</SheetTitle>
           <SheetDescription>
-            Selecione o mês de processamento da importação, a operadora e,
-            opcionalmente, o arquivo. Com arquivo anexado, o envio usa URL
-            pré-assinada da API e depois registra a solicitação. A empresa
-            contratante segue o conteúdo do arquivo (011D) no processamento.
-            Configure <code className="text-xs">VITE_STORAGE_BUCKET_NAME</code>{' '}
-            com o nome do bucket no R2.
+            Selecione a operadora, o mês de processamento e o arquivo TXT da fatura.
+            Confira a prévia antes de confirmar a importação.
           </SheetDescription>
         </SheetHeader>
 
@@ -417,8 +425,8 @@ export function InvoiceImportSheet({
                   <FieldLabel htmlFor="invoice-import-month">Mês de processamento</FieldLabel>
                   <Select
                     value={field.value || ''}
-                    onValueChange={field.onChange}
-                    disabled={processingMonthsQuery.isPending}
+                    onValueChange={(value) => { field.onChange(value); setPreview(null); }}
+                    disabled={processingMonthsQuery.isPending || previewing || form.formState.isSubmitting}
                   >
                     <SelectTrigger
                       id="invoice-import-month"
@@ -459,8 +467,13 @@ export function InvoiceImportSheet({
                   <FieldLabel htmlFor="invoice-import-provider">Operadora</FieldLabel>
                   <Select
                     value={field.value || ''}
-                    onValueChange={field.onChange}
-                    disabled={providersQuery.isPending}
+                    onValueChange={(value) => {
+                      field.onChange(value);
+                      form.setValue('processingMonthId', '');
+                      setPreview(null);
+                      setUploadedKey(null);
+                    }}
+                    disabled={providersQuery.isPending || previewing || form.formState.isSubmitting}
                   >
                     <SelectTrigger
                       id="invoice-import-provider"
@@ -494,7 +507,7 @@ export function InvoiceImportSheet({
 
             <div className="w-full">
               <FieldLabel htmlFor="invoice-import-file-input">
-                Arquivo (opcional p/ nome e chave)
+                Arquivo da fatura
               </FieldLabel>
 
               <div
@@ -584,7 +597,8 @@ export function InvoiceImportSheet({
                       type="checkbox"
                       className="mt-1 size-4 accent-primary"
                       checked={field.value}
-                      onChange={(e) => field.onChange(e.target.checked)}
+                      disabled={previewing || form.formState.isSubmitting}
+                      onChange={(e) => { field.onChange(e.target.checked); setPreview(null); }}
                     />
                     <span>
                       <span className="font-medium">Fatura substituta</span>
@@ -632,7 +646,7 @@ export function InvoiceImportSheet({
                 ))}
                 {!preview.is_valid ? (
                   <p className="text-destructive mt-2 text-xs">
-                    Prévia inválida — ajuste o arquivo ou marque fatura substituta se for duplicata.
+                    Prévia inválida — corrija os problemas indicados antes de importar.
                   </p>
                 ) : null}
               </div>
@@ -644,11 +658,11 @@ export function InvoiceImportSheet({
               Cancelar
             </SheetClose>
             {importFile ? (
-              <Button type="button" variant="secondary" disabled={previewing} onClick={() => void handlePreview()}>
+              <Button type="button" variant="secondary" disabled={previewing || form.formState.isSubmitting} onClick={() => void handlePreview()}>
                 {previewing ? 'Pré-visualizando…' : 'Pré-visualizar'}
               </Button>
             ) : null}
-            <Button type="submit" disabled={Boolean(preview && !preview.is_valid)}>
+            <Button type="submit" disabled={!importFile || previewing || form.formState.isSubmitting || importMutation.isPending || Boolean(preview && !preview.is_valid)}>
               {preview ? 'Confirmar importação' : 'Enviar'}
             </Button>
           </SheetFooter>

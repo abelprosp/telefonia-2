@@ -88,7 +88,7 @@ function loadPersistedImport(): { state: ImportProgressState; importId: string |
         fileName: data.fileName,
         errorMessage: data.errorMessage
       },
-      importId: data.importId
+      importId: data.stage === 'processing' || data.stage === 'registering' ? data.importId : null
     };
   } catch {
     return { state: IDLE_PROGRESS, importId: null };
@@ -200,8 +200,7 @@ export function InvoicesList() {
         }
         return false;
       } catch (err: unknown) {
-        // If the status endpoint returns 404 (e.g. backend container without the new route),
-        // stop polling immediately, mark as completed and refresh the invoices list.
+        // A missing status is not evidence that the import completed.
         const is404 =
           (typeof err === 'object' &&
             err !== null &&
@@ -216,13 +215,12 @@ export function InvoicesList() {
           stopPolling();
           setPollingImportId(null);
           clearPersistedImport();
-          invalidateInvoicesList();
-          const nextState: ImportProgressState = {
-            stage: 'done',
-            progress: 100,
-            fileName
-          };
-          setImportProgress(nextState);
+          setImportProgress({
+            stage: 'error',
+            progress: 0,
+            fileName,
+            errorMessage: 'Não foi possível localizar a solicitação de importação. Confira a lista de faturas antes de tentar novamente.'
+          });
           return true;
         }
         return false;

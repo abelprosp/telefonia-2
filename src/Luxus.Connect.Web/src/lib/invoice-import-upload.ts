@@ -61,6 +61,9 @@ export async function uploadFileFromPresignedUrl(
       reject(new Error('Falha de rede ao enviar o arquivo.'));
     });
 
+    xhr.timeout = 5 * 60 * 1000;
+    xhr.addEventListener('timeout', () => reject(new Error('O envio demorou demais. Tente novamente.')));
+
     xhr.addEventListener('abort', () => {
       reject(new Error('Upload cancelado.'));
     });

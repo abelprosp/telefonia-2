@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/luxus-connect/telefonia/api/internal/httputil"
 	"github.com/luxus-connect/telefonia/api/internal/models"
 	"github.com/luxus-connect/telefonia/api/internal/notifications"
@@ -21,7 +22,6 @@ import (
 	"github.com/luxus-connect/telefonia/api/internal/statemachine"
 	"github.com/luxus-connect/telefonia/api/internal/store"
 	"github.com/luxus-connect/telefonia/api/internal/vivo"
-	"github.com/jackc/pgx/v5"
 )
 
 type ObjectGetter interface {
@@ -37,49 +37,82 @@ type Processor struct {
 
 func (p *Processor) engine() *statemachine.Engine {
 	if p.SM == nil {
-		p.SM = statemachine.NewEngine(p.Store)
+		return statemachine.NewEngine(p.Store)
 	}
 	return p.SM
 }
 
 func (p *Processor) ProcessImport(ctx context.Context, importRequestID string) error {
 	start := time.Now()
-	req, err := p.Store.GetImportRequest(ctx, importRequestID)
+	var processErr error
+	err := p.Store.WithTx(ctx, func(ctx context.Context, tx pgx.Tx) error {
+		ctx = store.CtxWithTx(ctx, tx)
+		// Lock the request until both invoice data and terminal status are committed.
+		// A redelivery waits for this transaction and never processes the same request twice.
+		req, err := p.Store.GetImportRequestForUpdate(ctx, importRequestID)
+		if err != nil {
+			return err
+		}
+		if req == nil {
+			return httputil.BusinessError(notifications.ImportRequestNotFound)
+		}
+		if req.Status == 2 {
+			return nil
+		}
+		if req.Status != 0 {
+			return httputil.BusinessError(notifications.ImportRequestNotPending)
+		}
+		// Serialize account creation and replacement checks for this provider.
+		if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtext($1))", "invoice-import:"+req.ProviderID); err != nil {
+			return err
+		}
+		work, err := tx.Begin(ctx)
+		if err != nil {
+			return err
+		}
+		processErr = p.processInner(store.CtxWithTx(ctx, work), req)
+		if processErr != nil {
+			if err := work.Rollback(ctx); err != nil {
+				return err
+			}
+		} else if err := work.Commit(ctx); err != nil {
+			return err
+		}
+		now := time.Now().UTC()
+		status := 2
+		var message *string
+		if processErr != nil {
+			status = 3
+			if isPDFUnparsed(processErr) {
+				status = 4
+			}
+			msg := importErrorMessage(processErr)
+			message = &msg
+			if p.Log != nil {
+				p.Log.Error("invoice import failed", "request_id", importRequestID, "error", processErr)
+			}
+		}
+		return p.Store.UpdateImportRequestStatus(ctx, importRequestID, status, message, &now)
+	})
+	observability.Observe("import.process", time.Since(start), err == nil && processErr == nil)
 	if err != nil {
 		return err
 	}
-	if req == nil {
-		return httputil.BusinessError(notifications.ImportRequestNotFound)
-	}
-	if req.Status != 0 {
-		return httputil.BusinessError(notifications.ImportRequestNotPending)
-	}
-	now := time.Now().UTC()
-	_ = p.Store.UpdateImportRequestStatus(ctx, importRequestID, 1, nil, nil)
-
-	processErr := p.process(ctx, req)
-	observability.Observe("import.process", time.Since(start), processErr == nil)
-	if processErr != nil {
-		msg := processErr.Error()
-		status := 3
-		if isPDFUnparsed(processErr) {
-			status = 4
-		}
-		_ = p.Store.UpdateImportRequestStatus(ctx, importRequestID, status, &msg, &now)
-		return processErr
-	}
-	_ = p.Store.UpdateImportRequestStatus(ctx, importRequestID, 2, nil, &now)
-	return nil
+	return processErr
 }
 
-func (p *Processor) process(ctx context.Context, req *store.ImportRequestRow) error {
-	return p.Store.WithTx(ctx, func(ctx context.Context, tx pgx.Tx) error {
-		ctx = store.CtxWithTx(ctx, tx)
-		return p.processInner(ctx, req)
-	})
+func importErrorMessage(err error) string {
+	var app *httputil.AppError
+	if errors.As(err, &app) && app.Kind != httputil.ErrorInternal {
+		return app.Error()
+	}
+	return "Não foi possível processar a fatura. Tente novamente ou contate o suporte."
 }
 
 func (p *Processor) processInner(ctx context.Context, req *store.ImportRequestRow) error {
+	if p.Storage == nil {
+		return httputil.BusinessError(notifications.ObjectStorageUnavailable)
+	}
 	raw, err := p.Storage.GetObject(ctx, req.StorageBucket, req.StorageObjectKey)
 	if err != nil {
 		return fmt.Errorf("storage get: %w", err)
@@ -114,6 +147,9 @@ func (p *Processor) processInner(ctx context.Context, req *store.ImportRequestRo
 		return err
 	}
 
+	if orgID != req.OrganizationID {
+		return httputil.BusinessError(notifications.ProviderNotFound)
+	}
 	company, account, month, cycle, err := p.resolveContext(ctx, orgID, req, parsed, header, taxID, customer011)
 	if err != nil {
 		return err
@@ -148,7 +184,7 @@ func (p *Processor) processInner(ctx context.Context, req *store.ImportRequestRo
 	if err != nil {
 		return err
 	}
-	if otherMonth && !req.AllowSubstitute {
+	if otherMonth {
 		return httputil.BusinessError(notifications.InvoiceDuplicateOtherProcessingMonth)
 	}
 
@@ -184,7 +220,9 @@ func (p *Processor) processInner(ctx context.Context, req *store.ImportRequestRo
 		return err
 	}
 
-	_ = p.applyAutomaticExceedances(ctx, orgID, invoiceID, parsed)
+	if err := p.applyAutomaticExceedances(ctx, orgID, invoiceID, parsed); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -306,7 +344,10 @@ func (p *Processor) resolveCustomer(ctx context.Context, orgID, providerID strin
 		}
 	}
 	if len(matches) == 1 {
-		cnpj, _ := p.Store.GetCustomerCNPJ(ctx, matches[0])
+		cnpj, err := p.Store.GetCustomerCNPJ(ctx, matches[0])
+		if err != nil {
+			return "", err
+		}
 		if cnpj != "" && httputil.NormalizeDigits(cnpj) != company.TaxID {
 			return "", httputil.BusinessError(notifications.CustomerContractingCompanyMismatch)
 		}
@@ -333,8 +374,11 @@ func (p *Processor) processInvoiceServices(ctx context.Context, providerID, invo
 			continue
 		}
 		plan, err := p.resolvePlan(ctx, providerID, planCode)
-		if err != nil || plan == nil {
-			continue
+		if err != nil {
+			return err
+		}
+		if plan == nil {
+			return httputil.BusinessError(notifications.N("IMPORT_PLAN_MISSING", "Há serviços ou linhas sem plano no arquivo. Revise o TXT da operadora."))
 		}
 		qtyF := float64(qty)
 		if qtyF <= 0 {
@@ -385,7 +429,9 @@ func (p *Processor) changeLineStatus(ctx context.Context, orgID, lineID, from, t
 	if err := p.Store.UpdatePhoneLineStatus(ctx, lineID, to); err != nil {
 		return err
 	}
-	_ = p.engine().RecordTransition(ctx, orgID, statemachine.EntityPhoneLine, lineID, from, to, trigger, nil, nil, nil)
+	if err := p.engine().RecordTransition(ctx, orgID, statemachine.EntityPhoneLine, lineID, from, to, trigger, nil, nil, nil); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -410,8 +456,11 @@ func (p *Processor) processLines(ctx context.Context, orgID, providerID, account
 		seen[numberKey] = struct{}{}
 
 		plan, err := p.resolvePlan(ctx, providerID, line.PlanName)
-		if err != nil || plan == nil {
-			continue
+		if err != nil {
+			return err
+		}
+		if plan == nil {
+			return httputil.BusinessError(notifications.N("IMPORT_PLAN_MISSING", "Há serviços ou linhas sem plano no arquivo. Revise o TXT da operadora."))
 		}
 
 		pl, err := p.Store.GetPhoneLineByNumber(ctx, numberKey)
@@ -429,21 +478,32 @@ func (p *Processor) processLines(ctx context.Context, orgID, providerID, account
 			}
 			pl = &store.PhoneLineRow{ID: id, Number: numberKey, ProviderAccountID: accountID, ProviderPlanID: plan.ID, Status: "in_stock"}
 			created = true
-			p.auditImport(ctx, "Create", pl.ID, map[string]any{
+			if err := p.auditImport(ctx, "Create", pl.ID, map[string]any{
 				"message": fmt.Sprintf("Linha criada em estoque automaticamente a partir da fatura %s / %s.", header.ReferenceMonth, header.DueDate.Format("02/01/2006")),
 				"number":  numberKey,
-			})
+			}); err != nil {
+				return err
+			}
 		}
 
 		if pl.Status == "cancelled" || pl.Status == "suspended" {
 			return httputil.BusinessError(notifications.InvoiceImportedLineOrphanDestination)
 		}
 
-		_, activeCustomer, _ := p.Store.GetActivePhoneLineCustomerLink(ctx, pl.ID)
+		_, activeCustomer, err := p.Store.GetActivePhoneLineCustomerLink(ctx, pl.ID)
+		if err != nil {
+			return err
+		}
 		if customerID != "" && activeCustomer == "" {
-			_ = p.Store.AssignPhoneLineCustomer(ctx, pl.ID, customerID, header.IssueDate, nil)
-			_ = p.Store.AddCustomerProviderLink(ctx, customerID, providerID, header.IssueDate)
-			_ = p.Store.ReactivateCustomer(ctx, customerID)
+			if err := p.Store.AssignPhoneLineCustomer(ctx, pl.ID, customerID, header.IssueDate, nil); err != nil {
+				return err
+			}
+			if err := p.Store.AddCustomerProviderLink(ctx, customerID, providerID, header.IssueDate); err != nil {
+				return err
+			}
+			if err := p.Store.ReactivateCustomer(ctx, customerID); err != nil {
+				return err
+			}
 			activeCustomer = customerID
 		}
 
@@ -468,27 +528,37 @@ func (p *Processor) processLines(ctx context.Context, orgID, providerID, account
 			if err := p.Store.ActivatePhoneLineFromInvoice(ctx, pl.ID, activation); err != nil {
 				return err
 			}
-			_ = p.engine().RecordTransition(ctx, orgID, statemachine.EntityPhoneLine, pl.ID, prevStatus, "active", "import_invoice", nil, nil, nil)
+			if err := p.engine().RecordTransition(ctx, orgID, statemachine.EntityPhoneLine, pl.ID, prevStatus, "active", "import_invoice", nil, nil, nil); err != nil {
+				return err
+			}
 			if prevStatus == "in_transition" || prevStatus == "awaiting_invoice" {
-				p.auditImport(ctx, "Reconcile", pl.ID, map[string]any{
+				if err := p.auditImport(ctx, "Reconcile", pl.ID, map[string]any{
 					"message":         fmt.Sprintf("Linha %s conciliada automaticamente. Status: Ativa desde %s.", numberKey, activation.Format("02/01/2006")),
 					"previous_status": prevStatus,
 					"activation_date": activation.Format("2006-01-02"),
-				})
+				}); err != nil {
+					return err
+				}
 			}
 		} else if target != prevStatus {
 			if err := p.changeLineStatus(ctx, orgID, pl.ID, prevStatus, target, "import_invoice"); err != nil {
 				return err
 			}
 			if target == "in_stock" && prevStatus == "inactive" {
-				p.auditImport(ctx, "ReactivateStock", pl.ID, map[string]any{
+				if err := p.auditImport(ctx, "ReactivateStock", pl.ID, map[string]any{
 					"message": fmt.Sprintf("Linha %s retornou ao estoque após reaparecer na fatura.", numberKey),
-				})
+				}); err != nil {
+					return err
+				}
 			}
 		}
 
-		_ = p.Store.UpdatePhoneLineCosts(ctx, pl.ID, line.LineTotal, line.LineTotal, invoiceID)
-		_ = p.Store.LinkInvoicePhoneLine(ctx, invoiceID, pl.ID)
+		if err := p.Store.UpdatePhoneLineCosts(ctx, pl.ID, line.LineTotal, line.LineTotal, invoiceID); err != nil {
+			return err
+		}
+		if err := p.Store.LinkInvoicePhoneLine(ctx, invoiceID, pl.ID); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -506,43 +576,53 @@ func (p *Processor) applyAbsentLines(ctx context.Context, orgID, accountID, invo
 		if _, present := numbersInFile[key]; present {
 			continue
 		}
-		_, activeCustomer, _ := p.Store.GetActivePhoneLineCustomerLink(ctx, line.ID)
+		_, activeCustomer, err := p.Store.GetActivePhoneLineCustomerLink(ctx, line.ID)
+		if err != nil {
+			return err
+		}
 		if activeCustomer == "" {
 			if line.Status == "in_stock" || line.Status == "active" {
 				if err := p.changeLineStatus(ctx, orgID, line.ID, line.Status, "inactive", "import_absent"); err != nil {
 					return err
 				}
-				p.auditImport(ctx, "InactivateStock", line.ID, map[string]any{
+				if err := p.auditImport(ctx, "InactivateStock", line.ID, map[string]any{
 					"message":         fmt.Sprintf("Linha %s inativada no estoque por ausência na fatura. Última fatura preservada.", line.Number),
 					"last_invoice_id": invoiceID,
 					"previous_status": line.Status,
-				})
+				}); err != nil {
+					return err
+				}
 			}
 		} else {
 			if err := p.changeLineStatus(ctx, orgID, line.ID, line.Status, "awaiting_invoice", "import_absent"); err != nil {
 				return err
 			}
-			p.auditImport(ctx, "AwaitingInvoice", line.ID, map[string]any{
+			if err := p.auditImport(ctx, "AwaitingInvoice", line.ID, map[string]any{
 				"message":         fmt.Sprintf("Linha %s ausente na fatura. Status: Aguardando fatura.", line.Number),
 				"previous_status": line.Status,
 				"customer_id":     activeCustomer,
-			})
+			}); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
 }
 
-func (p *Processor) auditImport(ctx context.Context, changeType, phoneLineID string, payload map[string]any) {
+func (p *Processor) auditImport(ctx context.Context, changeType, phoneLineID string, payload map[string]any) error {
 	var newStr *string
 	if b, err := json.Marshal(payload); err == nil {
 		s := string(b)
 		newStr = &s
 	}
 	system := "import"
-	_ = p.Store.InsertAuditLog(ctx, uuid.New().String(), changeType, "PhoneLine", phoneLineID, &system, nil, newStr, time.Now().UTC(), "")
+	if err := p.Store.InsertAuditLog(ctx, uuid.New().String(), changeType, "PhoneLine", phoneLineID, &system, nil, newStr, time.Now().UTC(), ""); err != nil {
+		return err
+	}
 	if p.Log != nil {
 		p.Log.Info("import matrix", "change", changeType, "phone_line_id", phoneLineID, "payload", payload)
 	}
+	return nil
 }
 
 func (p *Processor) resolvePlan(ctx context.Context, providerID, planCode string) (*store.ProviderPlanRow, error) {
@@ -654,12 +734,18 @@ func (p *Processor) applyAutomaticExceedances(ctx context.Context, orgID, invoic
 		var phoneLineID *string
 		if n := httputil.NormalizeDigits(hit.phoneNumber); n != "" {
 			pl, err := p.Store.GetPhoneLineByNumber(ctx, n)
-			if err != nil || pl == nil {
+			if err != nil {
+				return err
+			}
+			if pl == nil {
 				continue
 			}
 			phoneLineID = &pl.ID
 			settings, err := p.Store.GetPhoneLineExceedanceSettings(ctx, pl.ID)
-			if err != nil || settings == nil || !settings.ChargeExceedances {
+			if err != nil {
+				return err
+			}
+			if settings == nil || !settings.ChargeExceedances {
 				continue
 			}
 			charged, chargeType := services.ChargedExceedanceAmount(hit.amount, settings.ExceedanceChargeType, term)
@@ -668,35 +754,49 @@ func (p *Processor) applyAutomaticExceedances(ctx context.Context, orgID, invoic
 				Term: term.Term, Description: hit.description, InvoiceAmount: hit.amount, ChargedAmount: charged,
 				ChargeType: chargeType, Applied: charged > 0, CreatedAt: now,
 			})
-			if err != nil || !inserted || charged <= 0 {
+			if err != nil {
+				return err
+			}
+			if !inserted || charged <= 0 {
 				continue
 			}
 			procID, err := p.Store.GetPrimaryProcessingIDForLine(ctx, pl.ID)
-			if err != nil || procID == "" {
+			if err != nil {
+				return err
+			}
+			if procID == "" {
 				continue
 			}
 			item := store.BillingCompositionItemRow{
 				ID: uuid.New().String(), ProcessingID: procID, ItemType: "exceedance",
 				Description: term.Term + " — " + strings.TrimSpace(hit.description),
-				Amount: charged, Quantity: 1, Active: true, CreatedAt: now, UpdatedAt: now, Proportional: false,
+				Amount:      charged, Quantity: 1, Active: true, CreatedAt: now, UpdatedAt: now, Proportional: false,
 			}
 			if err := p.Store.CreateBillingCompositionItem(ctx, item); err != nil {
-				continue
+				return err
 			}
-			if secondary, err := p.Store.GetMirroredSecondaryProcessingID(ctx, pl.ID); err == nil && secondary != "" {
+			secondary, err := p.Store.GetMirroredSecondaryProcessingID(ctx, pl.ID)
+			if err != nil {
+				return err
+			}
+			if secondary != "" {
 				copy := item
 				copy.ID = uuid.New().String()
 				copy.ProcessingID = secondary
-				_ = p.Store.CreateBillingCompositionItem(ctx, copy)
+				if err := p.Store.CreateBillingCompositionItem(ctx, copy); err != nil {
+					return err
+				}
 			}
 			continue
 		}
-		_, _ = p.Store.InsertDetectedExceedance(ctx, store.DetectedExceedanceRow{
+		_, err := p.Store.InsertDetectedExceedance(ctx, store.DetectedExceedanceRow{
 			ID: uuid.New().String(), InvoiceID: invoiceID, TermID: &term.ID,
 			Term: term.Term, Description: hit.description, InvoiceAmount: hit.amount, ChargedAmount: 0,
 			ChargeType: term.ChargeType, Applied: false, CreatedAt: now,
 		})
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
-

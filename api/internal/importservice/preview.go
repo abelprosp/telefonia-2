@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"sort"
 
 	"github.com/luxus-connect/telefonia/api/internal/httputil"
 	"github.com/luxus-connect/telefonia/api/internal/models"
@@ -16,7 +17,10 @@ func (p *Processor) PreviewImport(ctx context.Context, orgID string, input model
 		return nil, httputil.BusinessError(notifications.ObjectStorageUnavailable)
 	}
 	gotOrg, _, err := p.Store.GetProviderByID(ctx, input.ProviderID)
-	if err != nil || gotOrg != orgID {
+	if err != nil {
+		return nil, err
+	}
+	if gotOrg != orgID {
 		return nil, httputil.NotFoundError(notifications.ProviderNotFound)
 	}
 	raw, err := p.Storage.GetObject(ctx, input.StorageBucket, input.StorageObjectKey)
@@ -50,7 +54,11 @@ func (p *Processor) PreviewImport(ctx context.Context, orgID string, input model
 	known, unknown := 0, 0
 	for n := range numbersMap {
 		lineItems = append(lineItems, n)
-		if pl, err := p.Store.GetPhoneLineByNumber(ctx, n); err == nil && pl != nil {
+		pl, err := p.Store.GetPhoneLineByNumber(ctx, n)
+		if err != nil {
+			return nil, err
+		}
+		if pl != nil {
 			known++
 		} else {
 			unknown++
@@ -59,15 +67,27 @@ func (p *Processor) PreviewImport(ctx context.Context, orgID string, input model
 
 	var warnings []string
 	duplicate := false
-	if existingHash, err := p.Store.FindActiveInvoiceByContentSHA256(ctx, fileHash); err == nil && existingHash != nil {
+	existingHash, err := p.Store.FindActiveInvoiceByContentSHA256(ctx, fileHash)
+	if err != nil {
+		return nil, err
+	}
+	if existingHash != nil {
 		duplicate = true
-		warnings = append(warnings, "Arquivo duplicado (SHA-256 idêntico a uma fatura ativa). Marque substituição explícita para continuar.")
+		warnings = append(warnings, "Este arquivo já foi importado. Para substituir uma fatura, envie um arquivo corrigido.")
 	}
 	if getCustomer011(parsed) == nil {
 		warnings = append(warnings, "Registro 011D (cliente) ausente — a importação falhará.")
 	}
 
-	valid := getCustomer011(parsed) != nil && (!duplicate || input.AllowSubstitute)
+	valid := getCustomer011(parsed) != nil && !duplicate
+	if customer := getCustomer011(parsed); customer != nil {
+		doc := httputil.NormalizeDigits(customer.Document)
+		if len(doc) != 11 && len(doc) != 14 {
+			valid = false
+			warnings = append(warnings, notifications.ImportCustomerDocumentInvalid.Message)
+		}
+	}
+	sort.Strings(lineItems)
 
 	return &models.ImportPreviewResponse{
 		Summary: models.ImportPreviewInvoiceSummary{

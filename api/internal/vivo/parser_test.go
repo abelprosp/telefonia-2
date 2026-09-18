@@ -125,3 +125,18 @@ func TestParseDateFormat(t *testing.T) {
 		t.Errorf("date = %v, want %v", d, want)
 	}
 }
+
+func TestLatin1CustomerKeepsFixedWidthOffsets(t *testing.T) {
+	raw := []byte(stringsRepeat(' ', 1900))
+	copy(raw[110:], "011D")
+	copy(raw[199:], []byte{'J', 'o', 0xe3, 'o'})
+	copy(raw[1846:], "12345678000190")
+	records, err := ParseLatin1(raw)
+	if err != nil || len(records) != 1 {
+		t.Fatalf("records %d, error %v", len(records), err)
+	}
+	customer := records[0].(*Line011DCustomer)
+	if customer.LegalName != "João" || customer.Document != "12345678000190" {
+		t.Fatalf("offsets shifted: %+v", customer)
+	}
+}
