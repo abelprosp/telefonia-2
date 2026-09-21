@@ -9,7 +9,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
@@ -89,9 +91,17 @@ func (s *Service) CreateWebhook(ctx context.Context, input models.CreateWebhookS
 	if err != nil {
 		return nil, err
 	}
+<<<<<<< HEAD
 	url := strings.TrimSpace(input.URL)
 	if err := httputil.ValidatePublicHTTPSWebhookURL(url); err != nil {
 		return nil, httputil.ValidationError(notifications.N("INVALID_WEBHOOK_URL", err.Error()))
+=======
+	webhookURL := strings.TrimSpace(input.URL)
+	parsedURL, parseErr := url.Parse(webhookURL)
+	if parseErr != nil || (parsedURL.Scheme != "https" && parsedURL.Scheme != "http") ||
+		parsedURL.Hostname() == "" || blockedWebhookHost(parsedURL.Hostname()) {
+		return nil, httputil.ValidationError(notifications.N("INVALID_WEBHOOK_URL", "URL do webhook deve ser HTTP/HTTPS válida."))
+>>>>>>> 6b82d54 (fix tenant isolation and invoice processing reliability)
 	}
 	events := make([]string, 0, len(input.Events))
 	for _, e := range input.Events {
@@ -107,17 +117,26 @@ func (s *Service) CreateWebhook(ctx context.Context, input models.CreateWebhookS
 
 	now := time.Now().UTC()
 	row := store.WebhookSubscriptionRow{
-		ID: uuid.New().String(), OrganizationID: orgID, URL: url, Events: events,
+		ID: uuid.New().String(), OrganizationID: orgID, URL: webhookURL, Events: events,
 		Secret: generateWebhookSecret(), IsActive: true, CreatedAt: now, UpdatedAt: now,
 	}
 	if err := s.Store.InsertWebhookSubscription(ctx, row); err != nil {
 		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
 	s.auditLog(ctx, "CreateWebhook", "WebhookSubscription", row.ID, nil, map[string]any{
-		"url": url, "events": events,
+		"url": webhookURL, "events": events,
 	})
 	dto := webhookToDTO(row, true)
 	return &dto, nil
+}
+
+func blockedWebhookHost(host string) bool {
+	h := strings.ToLower(strings.TrimSpace(host))
+	if h == "localhost" || strings.HasSuffix(h, ".localhost") || h == "metadata.google.internal" {
+		return true
+	}
+	ip := net.ParseIP(h)
+	return ip != nil && (ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsUnspecified())
 }
 
 func (s *Service) DeleteWebhook(ctx context.Context, id string) error {

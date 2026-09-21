@@ -6,8 +6,11 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+<<<<<<< HEAD
 	"os"
 	"path/filepath"
+=======
+>>>>>>> 6b82d54 (fix tenant isolation and invoice processing reliability)
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -47,6 +50,7 @@ type Client struct {
 	client    *s3.Client
 }
 
+<<<<<<< HEAD
 type ObjectStream struct {
 	Body          io.ReadCloser
 	ContentLength *int64
@@ -57,6 +61,9 @@ type MaterializedObject struct {
 	SHA256 string
 	Size   int64
 }
+=======
+const maxObjectBytes = 50 * 1024 * 1024
+>>>>>>> 6b82d54 (fix tenant isolation and invoice processing reliability)
 
 func NewClient(cfg config.Config) (*Client, error) {
 	if cfg.ObjectStorageServiceURL == "" {
@@ -188,6 +195,7 @@ func (c *Client) GetObject(ctx context.Context, bucket, key string) ([]byte, err
 		return nil, err
 	}
 	defer out.Body.Close()
+<<<<<<< HEAD
 	if out.ContentLength != nil && *out.ContentLength > MaxObjectBytes {
 		return nil, fmt.Errorf("object exceeds maximum size of %d bytes", MaxObjectBytes)
 	}
@@ -198,6 +206,22 @@ func (c *Client) GetObject(ctx context.Context, bucket, key string) ([]byte, err
 	}
 	if int64(len(buf)) > MaxObjectBytes {
 		return nil, fmt.Errorf("object exceeds maximum size of %d bytes", MaxObjectBytes)
+=======
+	buf := make([]byte, 0, 1024*1024)
+	reader := io.LimitReader(out.Body, maxObjectBytes+1)
+	for {
+		chunk := make([]byte, 32*1024)
+		n, readErr := reader.Read(chunk)
+		if n > 0 {
+			buf = append(buf, chunk[:n]...)
+		}
+		if readErr != nil {
+			break
+		}
+>>>>>>> 6b82d54 (fix tenant isolation and invoice processing reliability)
+	}
+	if int64(len(buf)) > maxObjectBytes {
+		return nil, fmt.Errorf("object exceeds maximum size of %d bytes", maxObjectBytes)
 	}
 	return buf, nil
 }

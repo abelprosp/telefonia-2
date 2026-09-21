@@ -462,6 +462,7 @@ func DefaultOrganizationAttribute(orgID, orgName string) map[string][]string {
 		"organization":    {string(raw)},
 		"organization_id": {orgID},
 	}
+<<<<<<< HEAD
 }
 
 // organizationAlias builds a stable claim key. Never use a raw UUID as the only
@@ -504,4 +505,12 @@ func slugifyOrgName(name string) string {
 		out = strings.Trim(out, "-")
 	}
 	return out
+=======
+	payload := map[string]map[string]any{
+		alias: {"id": strings.TrimSpace(orgID), "name": []string{strings.TrimSpace(orgName)}},
+	}
+	rawBytes, _ := json.Marshal(payload)
+	raw := string(rawBytes)
+	return map[string][]string{"organization": {raw}}
+>>>>>>> 6b82d54 (fix tenant isolation and invoice processing reliability)
 }

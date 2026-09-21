@@ -114,10 +114,22 @@ func (s *Service) ListOrganizationUsers(ctx context.Context, search string) ([]m
 		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
 
+<<<<<<< HEAD
 	items := make([]models.ListOrganizationUserResponse, 0, len(users))
 	for _, u := range users {
 		item := toListUser(u)
 		if item.OrganizationID != callerOrg.ID {
+=======
+	currentOrg := auth.OrganizationFromContext(ctx)
+	if currentOrg == nil || strings.TrimSpace(currentOrg.ID) == "" {
+		return nil, httputil.BusinessError(notifications.SharedOrganizationRequired)
+	}
+
+	items := make([]models.ListOrganizationUserResponse, 0, len(users))
+	for _, u := range users {
+		item := toListUser(u)
+		if item.OrganizationID != currentOrg.ID {
+>>>>>>> 6b82d54 (fix tenant isolation and invoice processing reliability)
 			continue
 		}
 		items = append(items, item)
@@ -293,7 +305,6 @@ func truncateErr(prefix string, err error) string {
 	return prefix + ": " + msg
 }
 
-
 func (s *Service) UpdateOrganizationUser(ctx context.Context, userID string, input models.UpdateOrganizationUserInput) (*models.ListOrganizationUserResponse, error) {
 	if s.Keycloak == nil || !s.Keycloak.Enabled() {
 		return nil, httputil.UnavailableError(notifications.N("KEYCLOAK_ADMIN_UNAVAILABLE", "User management is not configured."))
@@ -301,6 +312,14 @@ func (s *Service) UpdateOrganizationUser(ctx context.Context, userID string, inp
 	userID = strings.TrimSpace(userID)
 	if userID == "" {
 		return nil, httputil.ValidationError(notifications.N("USER_NOT_FOUND", "User was not found."))
+	}
+	currentOrg := auth.OrganizationFromContext(ctx)
+	if currentOrg == nil || strings.TrimSpace(currentOrg.ID) == "" {
+		return nil, httputil.BusinessError(notifications.SharedOrganizationRequired)
+	}
+	owner, err := s.Keycloak.GetUserByID(ctx, userID)
+	if err != nil || owner == nil || toListUser(*owner).OrganizationID != currentOrg.ID {
+		return nil, httputil.NotFoundError(notifications.N("USER_NOT_FOUND", "User was not found."))
 	}
 
 	callerOrg, err := requireCallerOrganization(ctx)
@@ -421,4 +440,3 @@ func requireCallerOrganization(ctx context.Context) (*auth.Organization, error) 
 	}
 	return org, nil
 }
-

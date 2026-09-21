@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -45,6 +46,7 @@ func (h *Handler) createAccountPayable(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) createAccountPayableFromInvoice(w http.ResponseWriter, r *http.Request) {
 	item, err := h.Svc.CreateAccountPayableFromInvoice(r.Context(), chi.URLParam(r, "invoiceId"))
 	if err != nil {
+		slog.ErrorContext(r.Context(), "create accounts payable from provider invoice failed", "invoice_id", chi.URLParam(r, "invoiceId"), "error", err)
 		httputil.HandleServiceError(w, err)
 		return
 	}

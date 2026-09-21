@@ -1,5 +1,8 @@
+<<<<<<< HEAD
 -- Credenciais Sicredi por organização (multi-tenant).
 
+=======
+>>>>>>> 6b82d54 (fix tenant isolation and invoice processing reliability)
 ALTER TABLE "OrganizationSettings"
     ADD COLUMN IF NOT EXISTS "SicrediEnabled" boolean NOT NULL DEFAULT FALSE,
     ADD COLUMN IF NOT EXISTS "SicrediSandbox" boolean NOT NULL DEFAULT TRUE,
