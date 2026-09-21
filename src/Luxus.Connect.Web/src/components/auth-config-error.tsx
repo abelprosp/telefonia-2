@@ -16,11 +16,17 @@ export const AuthConfigError = ({
 }: AuthConfigErrorProps) => {
   const { signinRedirect, removeUser } = useAuth();
 
-  const isStateError = message.toLowerCase().includes('state') || message.toLowerCase().includes('matching');
+  const isStateError =
+    message.toLowerCase().includes('no matching state') ||
+    message.toLowerCase().includes('state does not match') ||
+    message.toLowerCase().includes('stale state');
+  const isScopeError =
+    message.toLowerCase().includes('invalid_scope') ||
+    message.toLowerCase().includes('invalid scopes');
 
   const handleRetry = async () => {
     try {
-      // Limpa os parâmetros de código e estado da URL para não reenviar state corrompido/antigo
+      // Drop OIDC error/code/state query params so retry does not re-parse a failed callback.
       window.history.replaceState({}, document.title, window.location.pathname);
       sessionStorage.clear();
       localStorage.removeItem('luxus_last_auth_redirect');
@@ -45,7 +51,9 @@ export const AuthConfigError = ({
       <p className="max-w-md text-sm">
         {isStateError
           ? 'A sessão de login anterior expirou ou o redirecionamento foi interrompido.'
-          : message}
+          : isScopeError
+            ? 'O Keycloak rejeitou os scopes do cliente (realm desatualizado). Veja o detalhe abaixo.'
+            : message}
       </p>
       {hint && (
         <p className="max-w-lg rounded-lg border bg-muted/50 p-3 text-xs whitespace-pre-wrap">

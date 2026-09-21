@@ -23,7 +23,7 @@ const RouteComponent = () => {
         {error ? (
           <AuthConfigError
             message={error.message}
-            hint={getAuthConfigHint()}
+            hint={getAuthConfigHint(error.message)}
           />
         ) : isLoading ? (
           <PageLoader label="Carregando..." />

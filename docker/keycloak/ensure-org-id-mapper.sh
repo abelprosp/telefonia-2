@@ -100,12 +100,29 @@ CID=$(kcadm get clients -r "$REALM" -q "clientId=${CLIENT_ID}" --fields id,clien
   | head -1)
 
 if [ -n "$CID" ]; then
-  # Ignore errors if already assigned.
-  kcadm update "clients/${CID}/default-client-scopes/${SCOPE_ID}" -r "$REALM" 2>/dev/null || \
-  kcadm create "clients/${CID}/default-client-scopes/${SCOPE_ID}" -r "$REALM" 2>/dev/null || true
+  # Keycloak Admin API: PUT/POST default-client-scopes/{scopeId}
+  if kcadm create "clients/${CID}/default-client-scopes/${SCOPE_ID}" -r "$REALM" 2>/dev/null; then
+    echo "Attached ${SCOPE_NAME} as default scope"
+  else
+    echo "Scope already attached (or update needed) — verifying..."
+    kcadm get "clients/${CID}/default-client-scopes" -r "$REALM" --fields id,name 2>/dev/null | grep -q "${SCOPE_NAME}" \
+      && echo "OK: ${SCOPE_NAME} is default on ${CLIENT_ID}" \
+      || echo "WARN: could not confirm attachment — check Keycloak admin → Clients → ${CLIENT_ID} → Client scopes"
+  fi
+
+  # luxus-roles (realm roles claim)
+  ROLES_SCOPE_ID=$(kcadm get client-scopes -r "$REALM" --fields id,name 2>/dev/null \
+    | tr -d '\n' \
+    | sed -n 's/.*"name"[[:space:]]*:[[:space:]]*"luxus-roles"[[:space:]]*,[[:space:]]*"id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
+    | head -1)
+  if [ -n "$ROLES_SCOPE_ID" ]; then
+    kcadm create "clients/${CID}/default-client-scopes/${ROLES_SCOPE_ID}" -r "$REALM" 2>/dev/null || true
+  fi
+
   echo "Client ${CLIENT_ID} linked to ${SCOPE_NAME}"
 else
   echo "WARN: client ${CLIENT_ID} not found — attach scope manually in Keycloak admin"
 fi
 
 echo "Done. Users must log out/in to refresh tokens."
+echo "Tip: if login still fails with invalid_scope, rebuild connect-web (scope is now only 'openid')."

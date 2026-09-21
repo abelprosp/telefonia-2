@@ -20,4 +20,9 @@ systemctl reload nginx
 echo "=== Testando Keycloak (path /auth, porta 8083) ==="
 curl -sI "http://127.0.0.1:8083/auth/realms/luxus/.well-known/openid-configuration" | head -n 15 || echo "Keycloak ainda iniciando na 8083..."
 
+if [ -f "docker/keycloak/ensure-org-id-mapper.sh" ]; then
+  echo "=== Garantindo client scopes (tenant-organization) no connect-cli ==="
+  bash docker/keycloak/ensure-org-id-mapper.sh || echo "WARN: ensure-org-id-mapper falhou — rode manualmente com KC_ADMIN_PWD"
+fi
+
 echo "=== Concluído. Confirme Content-Type: application/json no endpoint OIDC. ==="

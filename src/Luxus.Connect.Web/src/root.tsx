@@ -38,7 +38,10 @@ const oidcStateStore = new WebStorageStateStore({ store: window.sessionStorage }
 const oidcConfig: AuthProviderProps = {
   authority: `${env.VITE_AUTH_URL.replace(/\/+$/, '')}/realms/luxus`,
   client_id: env.VITE_CLIENT_ID,
-  scope: 'openid tenant-organization',
+  // Request only openid; Keycloak attaches default client scopes (tenant-organization,
+  // luxus-roles, profile, email). Explicitly asking for an unassigned scope returns
+  // invalid_scope on older imported realms.
+  scope: 'openid',
   redirect_uri: window.location.origin,
   userStore: oidcUserStore,
   stateStore: oidcStateStore,
