@@ -34,8 +34,6 @@ type Processor struct {
 	SM      *statemachine.Engine
 }
 
-const maxImportFileBytes = 50 * 1024 * 1024
-
 func (p *Processor) engine() *statemachine.Engine {
 	if p.SM == nil {
 		return statemachine.NewEngine(p.Store)
@@ -114,24 +112,7 @@ func (p *Processor) processInner(ctx context.Context, req *store.ImportRequestRo
 	if p.Storage == nil {
 		return httputil.BusinessError(notifications.ObjectStorageUnavailable)
 	}
-<<<<<<< HEAD
 	loaded, err := p.loadInvoiceForProcessing(ctx, req.StorageBucket, req.StorageObjectKey)
-=======
-	raw, err := p.Storage.GetObject(ctx, req.StorageBucket, req.StorageObjectKey)
-	if err != nil {
-		return fmt.Errorf("storage get: %w", err)
-	}
-	if len(raw) > maxImportFileBytes {
-		return httputil.ValidationError(notifications.N("IMPORT_FILE_TOO_LARGE", "O arquivo da fatura excede o limite de 50 MB."))
-	}
-	if isPDFBytes(raw) {
-		return httputil.BusinessError(notifications.ImportPDFNotParsed)
-	}
-	sum := sha256.Sum256(raw)
-	fileHash := hex.EncodeToString(sum[:])
-
-	parsed, err := vivo.ParseLatin1(raw)
->>>>>>> 6b82d54 (fix tenant isolation and invoice processing reliability)
 	if err != nil {
 		return err
 	}

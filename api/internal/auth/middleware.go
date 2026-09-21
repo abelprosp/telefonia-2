@@ -71,26 +71,10 @@ func (m *Middleware) authenticateRequest(r *http.Request, required bool) (*http.
 	}
 	tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
 
-<<<<<<< HEAD
 	token, err := jwt.Parse(tokenStr, m.jwks.Keyfunc,
 		jwt.WithValidMethods([]string{"RS256"}),
 		jwt.WithExpirationRequired(),
 	)
-=======
-	parseOptions := []jwt.ParserOption{}
-	if strings.TrimSpace(m.cfg.KeycloakRealm) != "" {
-		issuerBase := m.cfg.KeycloakPublicAuthServerURL
-		if strings.TrimSpace(issuerBase) == "" {
-			issuerBase = m.cfg.KeycloakAuthServerURL
-		}
-		issuer := strings.TrimRight(issuerBase, "/") + "/realms/" + m.cfg.KeycloakRealm
-		parseOptions = append(parseOptions, jwt.WithIssuer(issuer))
-	}
-	if strings.TrimSpace(m.cfg.KeycloakResource) != "" {
-		parseOptions = append(parseOptions, jwt.WithAudience(m.cfg.KeycloakResource))
-	}
-	token, err := jwt.Parse(tokenStr, m.jwks.Keyfunc, parseOptions...)
->>>>>>> 6b82d54 (fix tenant isolation and invoice processing reliability)
 	if err != nil || !token.Valid {
 		return nil, fmt.Errorf("Invalid token")
 	}
@@ -138,11 +122,6 @@ func (m *Middleware) authenticateRequest(r *http.Request, required bool) (*http.
 	if org != nil {
 		org = normalizeOrganization(org)
 	}
-<<<<<<< HEAD
-=======
-	// Never invent a tenant. Missing organization must surface as
-	// ORGANIZATION_ID_REQUIRED in services — do not fall back to Luxus.
->>>>>>> 6b82d54 (fix tenant isolation and invoice processing reliability)
 	if org != nil && strings.TrimSpace(org.ID) != "" {
 		ctx = WithOrganization(ctx, org)
 	}
