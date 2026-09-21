@@ -19,6 +19,11 @@ export type GetV1PhoneLinesQueryParams = {
    * @type string | undefined
    */
   status?: string;
+  /**
+   * Free-text server search (number, account, provider).
+   * @type string | undefined
+   */
+  q?: string;
 };
 
 /**

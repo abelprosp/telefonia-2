@@ -28,7 +28,12 @@ export const Route = createFileRoute('/__app/invoices/')({
       typeof rawPm === 'string' && rawPm.trim() !== ''
         ? rawPm.trim()
         : undefined;
-    return { page, pageSize, processingMonthId };
+    return {
+      page,
+      pageSize,
+      processingMonthId,
+      ...(typeof search.q === 'string' && search.q ? { q: search.q } : {})
+    };
   },
   component: RouteComponent
 });

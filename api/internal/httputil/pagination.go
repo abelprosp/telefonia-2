@@ -3,11 +3,14 @@ package httputil
 import (
 	"net/http"
 	"strconv"
+	"strings"
 )
 
 type PageSearch struct {
 	PageIndex int
 	PageSize  int
+	// Search is a free-text filter applied server-side when supported by the list endpoint.
+	Search string
 }
 
 const (
@@ -27,7 +30,11 @@ func ParsePagination(r *http.Request) PageSearch {
 	if size > maxPageSize {
 		size = maxPageSize
 	}
-	return PageSearch{PageIndex: idx, PageSize: size}
+	q := r.URL.Query().Get("q")
+	if q == "" {
+		q = r.URL.Query().Get("search")
+	}
+	return PageSearch{PageIndex: idx, PageSize: size, Search: strings.TrimSpace(q)}
 }
 
 func (p PageSearch) Offset() int {

@@ -5,6 +5,7 @@ import { Phone } from 'lucide-react';
 
 import { useGetV1PhoneLines } from '@/api';
 import { DataTable, DataTablePagination } from '@/components/data-table';
+import { DynamicSearchInput } from '@/components/dynamic-search-input';
 import { ListPageHeader, ListPageSkeleton } from '@/components/list-page';
 import {
   Empty,
@@ -32,14 +33,15 @@ const PHONE_LINES_SKELETON_COLUMNS = [
 ];
 
 export function PhoneLinesList() {
-  const { page, pageSize } = routeApi.useSearch();
+  const { page, pageSize, q } = routeApi.useSearch();
   const navigate = routeApi.useNavigate();
 
   const pageIndex = page - 1;
 
   const { data, isPending, isError, error } = useGetV1PhoneLines({
     page_index: pageIndex,
-    page_size: pageSize
+    page_size: pageSize,
+    ...(q ? { q } : {})
   });
 
   const total = data?.total_count ?? 0;
@@ -97,6 +99,16 @@ export function PhoneLinesList() {
       <ListPageHeader
         title="Linhas telefônicas"
         description="Consulte e abra o detalhe das linhas cadastradas no sistema"
+      />
+
+      <DynamicSearchInput
+        value={q ?? ''}
+        placeholder="Buscar por número, conta ou operadora…"
+        onChange={(next) =>
+          navigate({
+            search: (prev) => ({ ...prev, page: 1, q: next })
+          })
+        }
       />
 
       <DataTable

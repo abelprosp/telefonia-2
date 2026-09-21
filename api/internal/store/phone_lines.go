@@ -26,6 +26,23 @@ func (s *Store) ListPhoneLines(ctx context.Context, orgID string, status *string
 		base += ` AND pl."Status" = $2::phone_line_status`
 		args = append(args, *status)
 	}
+	if page.Search != "" {
+		digits := httputil.NormalizeDigits(page.Search)
+		args = append(args, "%"+page.Search+"%")
+		idx := len(args)
+		base += ` AND (
+			pl."Number" ILIKE $` + itoa(idx) + `
+			OR COALESCE(pl."NumberOriginal", '') ILIKE $` + itoa(idx) + `
+			OR COALESCE(pl."NormalizedNumber", '') LIKE $` + itoa(idx) + `
+			OR pa."AccountNumber" ILIKE $` + itoa(idx) + `
+			OR p."Name" ILIKE $` + itoa(idx) + `
+			OR pp."Name" ILIKE $` + itoa(idx)
+		if digits != "" {
+			args = append(args, "%"+digits+"%")
+			base += ` OR COALESCE(pl."NormalizedNumber", pl."Number") LIKE $` + itoa(len(args))
+		}
+		base += `)`
+	}
 
 	var total int64
 	if err := s.q(ctx).QueryRow(ctx, `SELECT COUNT(*) `+base, args...).Scan(&total); err != nil {
@@ -263,9 +280,22 @@ func (s *Store) UpdateActivePhoneLineCustomerLinkAmount(ctx context.Context, pho
 }
 
 func (s *Store) UnassignPhoneLineCustomer(ctx context.Context, phoneLineID string, end time.Time) error {
+	return s.UnassignPhoneLineCustomerWithReason(ctx, phoneLineID, end, nil, nil)
+}
+
+func (s *Store) UnassignPhoneLineCustomerWithReason(ctx context.Context, phoneLineID string, end time.Time, reason, changedBy *string) error {
 	tag, err := s.q(ctx).Exec(ctx, `
-		UPDATE "PhoneLineCustomerLinks" SET "EndDate" = $2
-		WHERE "PhoneLineId" = $1 AND "EndDate" IS NULL`, phoneLineID, end)
+		UPDATE "PhoneLineCustomerLinks"
+		SET "EndDate" = $2,
+			"EndReason" = COALESCE($3, "EndReason"),
+			"ChangedByUserId" = COALESCE($4, "ChangedByUserId"),
+			"Status" = 'ended'
+		WHERE "PhoneLineId" = $1 AND "EndDate" IS NULL`, phoneLineID, end, reason, changedBy)
+	if err != nil && isUndefinedColumn(err) {
+		tag, err = s.q(ctx).Exec(ctx, `
+			UPDATE "PhoneLineCustomerLinks" SET "EndDate" = $2
+			WHERE "PhoneLineId" = $1 AND "EndDate" IS NULL`, phoneLineID, end)
+	}
 	if err != nil {
 		return err
 	}
@@ -307,11 +337,22 @@ type PhoneLineRow struct {
 }
 
 func (s *Store) GetPhoneLineByNumber(ctx context.Context, number string) (*PhoneLineRow, error) {
+	normalized := httputil.NormalizeDigits(number)
 	var pl PhoneLineRow
 	err := s.q(ctx).QueryRow(ctx, `
 		SELECT "Id", "Number", "ProviderAccountId", "ProviderPlanId", "Status"::text
-		FROM "PhoneLines" WHERE "Number" = $1`, number).
+		FROM "PhoneLines"
+		WHERE "Number" = $1
+			OR ("NormalizedNumber" IS NOT NULL AND "NormalizedNumber" = $2)
+			OR regexp_replace("Number", '[^0-9]', '', 'g') = $2`, number, normalized).
 		Scan(&pl.ID, &pl.Number, &pl.ProviderAccountID, &pl.ProviderPlanID, &pl.Status)
+	if err != nil && isUndefinedColumn(err) {
+		err = s.q(ctx).QueryRow(ctx, `
+			SELECT "Id", "Number", "ProviderAccountId", "ProviderPlanId", "Status"::text
+			FROM "PhoneLines" WHERE "Number" = $1 OR regexp_replace("Number", '[^0-9]', '', 'g') = $2`,
+			number, normalized).
+			Scan(&pl.ID, &pl.Number, &pl.ProviderAccountID, &pl.ProviderPlanID, &pl.Status)
+	}
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -319,11 +360,28 @@ func (s *Store) GetPhoneLineByNumber(ctx context.Context, number string) (*Phone
 }
 
 func (s *Store) CreatePhoneLine(ctx context.Context, id, planID, accountID, number string) error {
+	return s.CreatePhoneLineWithIdentity(ctx, id, planID, accountID, number, number, httputil.NormalizeDigits(number))
+}
+
+func (s *Store) CreatePhoneLineWithIdentity(ctx context.Context, id, planID, accountID, number, original, normalized string) error {
+	if normalized == "" {
+		normalized = httputil.NormalizeDigits(number)
+	}
+	if original == "" {
+		original = number
+	}
 	_, err := s.q(ctx).Exec(ctx, `
-		INSERT INTO "PhoneLines" ("Id", "Number", "ProviderAccountId", "ProviderPlanId",
-			"LineClassification", "Status")
-		VALUES ($1, $2, $3, $4, 'normal'::line_classification, 'in_stock'::phone_line_status)`,
-		id, number, accountID, planID)
+		INSERT INTO "PhoneLines" ("Id", "Number", "NumberOriginal", "NormalizedNumber",
+			"ProviderAccountId", "ProviderPlanId", "LineClassification", "Status")
+		VALUES ($1, $2, $3, $4, $5, $6, 'normal'::line_classification, 'in_stock'::phone_line_status)`,
+		id, number, original, normalized, accountID, planID)
+	if err != nil && isUndefinedColumn(err) {
+		_, err = s.q(ctx).Exec(ctx, `
+			INSERT INTO "PhoneLines" ("Id", "Number", "ProviderAccountId", "ProviderPlanId",
+				"LineClassification", "Status")
+			VALUES ($1, $2, $3, $4, 'normal'::line_classification, 'in_stock'::phone_line_status)`,
+			id, number, accountID, planID)
+	}
 	return err
 }
 

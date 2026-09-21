@@ -6,6 +6,7 @@ import { FileText, Upload } from 'lucide-react';
 
 import { useGetV1ProcessingMonths, useGetV1ProviderInvoices } from '@/api';
 import { DataTable, DataTablePagination } from '@/components/data-table';
+import { DynamicSearchInput } from '@/components/dynamic-search-input';
 import { ListPageHeader, ListPageSkeleton } from '@/components/list-page';
 import { Button } from '@/components/ui/button';
 import {
@@ -124,7 +125,7 @@ function clearPersistedImport() {
 }
 
 export function InvoicesList() {
-  const { page, pageSize, processingMonthId } = routeApi.useSearch();
+  const { page, pageSize, processingMonthId, q } = routeApi.useSearch();
   const navigate = routeApi.useNavigate();
   const [importOpen, setImportOpen] = useState(false);
 
@@ -311,8 +312,9 @@ export function InvoicesList() {
   const listQuery = useGetV1ProviderInvoices({
     page_index: pageIndex,
     page_size: pageSize,
-    processing_month_id: processingMonthId
-  });
+    processing_month_id: processingMonthId,
+    ...(q ? { q } : {})
+  } as Parameters<typeof useGetV1ProviderInvoices>[0]);
 
   const total = parseTotalCount(listQuery.data?.total_count);
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -404,7 +406,16 @@ export function InvoicesList() {
         />
       )}
 
-      <div className="flex max-w-md flex-col gap-2 sm:flex-row sm:items-end sm:gap-4">
+      <div className="flex max-w-3xl flex-col gap-2 sm:flex-row sm:items-end sm:gap-4">
+        <DynamicSearchInput
+          value={q ?? ''}
+          placeholder="Buscar fatura, conta, operadora ou hash…"
+          onChange={(next) =>
+            navigate({
+              search: (prev) => ({ ...prev, page: 1, q: next })
+            })
+          }
+        />
         <Field className="min-w-[220px] flex-1">
           <FieldLabel htmlFor="invoices-filter-pm">
             Mês de processamento

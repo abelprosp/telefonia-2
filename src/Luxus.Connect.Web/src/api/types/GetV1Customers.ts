@@ -19,6 +19,11 @@ export type GetV1CustomersQueryParams = {
    * @type string | undefined
    */
   provider_id?: string;
+  /**
+   * Free-text server search (name, document, email).
+   * @type string | undefined
+   */
+  q?: string;
 };
 
 /**

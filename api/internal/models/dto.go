@@ -300,6 +300,36 @@ type CreateStockPhoneLineInput struct {
 	ProviderPlanID        string `json:"provider_plan_id"`
 }
 
+type BulkCreateStockPhoneLineItemInput struct {
+	Number                string  `json:"number"`
+	ProviderID            *string `json:"provider_id,omitempty"`
+	ProviderAccountNumber *string `json:"provider_account_number,omitempty"`
+	ProviderPlanID        *string `json:"provider_plan_id,omitempty"`
+}
+
+type BulkCreateStockPhoneLinesInput struct {
+	// Shared attributes applied when item-level fields are omitted.
+	ProviderID            string                             `json:"provider_id"`
+	ProviderAccountNumber string                             `json:"provider_account_number"`
+	ProviderPlanID        string                             `json:"provider_plan_id"`
+	Lines                 []BulkCreateStockPhoneLineItemInput `json:"lines"`
+}
+
+type BulkCreateStockPhoneLineItemResult struct {
+	Index   int                       `json:"index"`
+	Number  string                    `json:"number"`
+	Status  string                    `json:"status"` // created | ignored | rejected
+	Reason  string                    `json:"reason,omitempty"`
+	Line    *GetPhoneLineResponse     `json:"line,omitempty"`
+}
+
+type BulkCreateStockPhoneLinesResponse struct {
+	Created  int                                  `json:"created"`
+	Ignored  int                                  `json:"ignored"`
+	Rejected int                                  `json:"rejected"`
+	Items    []BulkCreateStockPhoneLineItemResult `json:"items"`
+}
+
 type GetPhoneLineServiceResponse struct {
 	ID                    string     `json:"id"`
 	PhoneLineID           string     `json:"phone_line_id"`
@@ -2269,6 +2299,86 @@ type AssignDivergenceInput struct {
 
 type CommentDivergenceInput struct {
 	Body string `json:"body"`
+}
+
+type LineConsumptionReportItem struct {
+	PhoneLineID          string   `json:"phone_line_id"`
+	PhoneNumber          string   `json:"phone_number"`
+	ProviderID           string   `json:"provider_id"`
+	ProviderName         string   `json:"provider_name"`
+	CustomerID           *string  `json:"customer_id,omitempty"`
+	CustomerName         *string  `json:"customer_name,omitempty"`
+	ProcessingMonthID    string   `json:"processing_month_id"`
+	ProcessingMonthName  string   `json:"processing_month_name"`
+	Year                 int      `json:"year"`
+	Month                int      `json:"month"`
+	Status               string   `json:"status"`
+	BaseCost             *float64 `json:"base_cost,omitempty"`
+	CostWithConsumption  *float64 `json:"cost_with_consumption,omitempty"`
+	InvoiceID            string   `json:"invoice_id"`
+	InvoiceNumber        *string  `json:"invoice_number,omitempty"`
+	InvoiceTotal         float64  `json:"invoice_total"`
+}
+
+type LineConsumptionReportResponse struct {
+	Items       []LineConsumptionReportItem `json:"items"`
+	TotalCount  int64                       `json:"total_count"`
+	TotalAmount float64                     `json:"total_amount"`
+}
+
+type ReconciliationFindingResponse struct {
+	ID                string  `json:"id,omitempty"`
+	FindingType       string  `json:"finding_type"`
+	PhoneLineID       *string `json:"phone_line_id,omitempty"`
+	NormalizedNumber  string  `json:"normalized_number"`
+	InternalStatus    *string `json:"internal_status,omitempty"`
+	ExternalStatus    *string `json:"external_status,omitempty"`
+	CustomerID        *string `json:"customer_id,omitempty"`
+	CustomerName      *string `json:"customer_name,omitempty"`
+	ProviderName      *string `json:"provider_name,omitempty"`
+	ImportJobID       *string `json:"import_job_id,omitempty"`
+	IsInconclusive    bool    `json:"is_inconclusive"`
+	Evidence          string  `json:"evidence,omitempty"`
+}
+
+type DomainAuditEventResponse struct {
+	ID            string    `json:"id"`
+	EntityType    string    `json:"entity_type"`
+	EntityID      string    `json:"entity_id"`
+	Action        string    `json:"action"`
+	ActorUserID   *string   `json:"actor_user_id,omitempty"`
+	ActorKind     string    `json:"actor_kind"`
+	Source        string    `json:"source"`
+	CorrelationID *string   `json:"correlation_id,omitempty"`
+	BeforeJSON    *string   `json:"before_json,omitempty"`
+	AfterJSON     *string   `json:"after_json,omitempty"`
+	MetadataJSON  *string   `json:"metadata_json,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
+}
+
+type ExternalLineImportJobInput struct {
+	Source            string  `json:"source"`
+	ProviderID        *string `json:"provider_id,omitempty"`
+	StorageBucket     string  `json:"storage_bucket"`
+	StorageObjectKey  string  `json:"storage_object_key"`
+	FileName          *string `json:"file_name,omitempty"`
+	LayoutCode        string  `json:"layout_code"`
+	ReferencePeriod   *string `json:"reference_period,omitempty"`
+	IsPartialSource   bool    `json:"is_partial_source"`
+}
+
+type ExternalLineImportJobResponse struct {
+	ID              string     `json:"id"`
+	Source          string     `json:"source"`
+	Status          string     `json:"status"`
+	LayoutCode      string     `json:"layout_code"`
+	IsPartialSource bool       `json:"is_partial_source"`
+	TotalRows       int        `json:"total_rows"`
+	AcceptedRows    int        `json:"accepted_rows"`
+	RejectedRows    int        `json:"rejected_rows"`
+	ErrorMessage    *string    `json:"error_message,omitempty"`
+	CreatedAt       time.Time  `json:"created_at"`
+	CompletedAt     *time.Time `json:"completed_at,omitempty"`
 }
 
 type ProcessingMonthRunStepResponse struct {

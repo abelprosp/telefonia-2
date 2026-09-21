@@ -33,6 +33,20 @@ func (h *Handler) createStockPhoneLine(w http.ResponseWriter, r *http.Request) {
 	httputil.WriteJSON(w, http.StatusCreated, item)
 }
 
+func (h *Handler) bulkCreateStockPhoneLines(w http.ResponseWriter, r *http.Request) {
+	var input models.BulkCreateStockPhoneLinesInput
+	if err := decodeJSON(r, &input); err != nil {
+		httputil.WriteFail(w, http.StatusBadRequest, notifications.N("REQUEST_VALIDATION", "Invalid request body"))
+		return
+	}
+	item, err := h.Svc.BulkCreateStockPhoneLines(r.Context(), input)
+	if err != nil {
+		httputil.HandleServiceError(w, err)
+		return
+	}
+	httputil.WriteJSON(w, http.StatusOK, item)
+}
+
 func (h *Handler) getPhoneLine(w http.ResponseWriter, r *http.Request) {
 	item, err := h.Svc.GetPhoneLine(r.Context(), chi.URLParam(r, "id"))
 	if err != nil {

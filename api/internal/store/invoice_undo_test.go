@@ -2,8 +2,9 @@ package store_test
 
 import (
 	"context"
+	"fmt"
+	"hash/fnv"
 	"os"
-	"strings"
 	"testing"
 	"time"
 
@@ -11,6 +12,14 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/luxus-connect/telefonia/api/internal/store"
 )
+
+// uniqueTestPhone returns a digits-only MSISDN derived from id so NormalizedNumber
+// stays unique across parallel fixtures (UUID hex is not digit-safe).
+func uniqueTestPhone(id string) string {
+	h := fnv.New64a()
+	_, _ = h.Write([]byte(id))
+	return fmt.Sprintf("55%011d", h.Sum64()%100_000_000_000)
+}
 
 // Set INVOICE_UNDO_TEST_DATABASE_URL to a disposable, migrated PostgreSQL database.
 // Each fixture uses its own organization; never point this at production.
@@ -46,7 +55,7 @@ func newUndoFixture(t *testing.T) *undoFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = st.CreatePhoneLine(ctx, f.existing, f.plan, f.account, strings.ReplaceAll(f.existing, "-", "")[:20]); err != nil {
+	if err = st.CreatePhoneLine(ctx, f.existing, f.plan, f.account, uniqueTestPhone(f.existing)); err != nil {
 		t.Fatal(err)
 	}
 	f.exec(t, `UPDATE "PhoneLines" SET "BaseCost"=9, "CostWithConsumption"=9 WHERE "Id"=$1`, f.existing)
@@ -55,7 +64,7 @@ func newUndoFixture(t *testing.T) *undoFixture {
 		if err := st.BeginInvoiceUndoTracking(ctx, f.invoice); err != nil {
 			return err
 		}
-		if err := st.CreatePhoneLine(ctx, f.line, f.plan, f.account, strings.ReplaceAll(f.line, "-", "")[:20]); err != nil {
+		if err := st.CreatePhoneLine(ctx, f.line, f.plan, f.account, uniqueTestPhone(f.line)); err != nil {
 			return err
 		}
 		if err := st.UpdatePhoneLineCosts(ctx, f.line, 13.99, 13.99, f.invoice); err != nil {
@@ -210,7 +219,7 @@ func TestInvoiceUndo_RestoresAbsentLine(t *testing.T) {
 	f := newUndoFixture(t)
 	ctx := context.Background()
 	absent := uuid.NewString()
-	if err := f.st.CreatePhoneLine(ctx, absent, f.plan, f.account, strings.ReplaceAll(absent, "-", "")[:20]); err != nil {
+	if err := f.st.CreatePhoneLine(ctx, absent, f.plan, f.account, uniqueTestPhone(absent)); err != nil {
 		t.Fatal(err)
 	}
 	if err := f.st.WithTx(ctx, func(ctx context.Context, tx pgx.Tx) error {

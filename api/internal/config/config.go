@@ -19,7 +19,9 @@ type Config struct {
 	ObjectStoragePublicURL      string
 	ObjectStorageAccessKeyID    string
 	ObjectStorageSecretKey      string
-	CORSOrigins                 []string
+	ObjectStorageMaxObjectBytes     int64
+	ObjectStorageMaxDiskObjectBytes int64
+	CORSOrigins                     []string
 	Port                        string
 	Environment                 string
 	KeycloakAdminUsername       string
@@ -110,7 +112,9 @@ func Load() Config {
 		ObjectStoragePublicURL:      objectStoragePublicURL,
 		ObjectStorageAccessKeyID:    os.Getenv("OBJECT_STORAGE_ACCESS_KEY_ID"),
 		ObjectStorageSecretKey:      os.Getenv("OBJECT_STORAGE_SECRET_ACCESS_KEY"),
-		CORSOrigins:                 origins,
+		ObjectStorageMaxObjectBytes:     GetEnvInt64("OBJECT_STORAGE_MAX_OBJECT_BYTES", 512*1024*1024),
+		ObjectStorageMaxDiskObjectBytes: GetEnvInt64("OBJECT_STORAGE_MAX_DISK_OBJECT_BYTES", 2*1024*1024*1024),
+		CORSOrigins:                     origins,
 		Port:                        port,
 		Environment:                 env,
 		KeycloakAdminUsername:       firstNonEmpty(os.Getenv("KEYCLOAK_ADMIN_USERNAME"), "admin"),
@@ -227,6 +231,18 @@ func GetEnvInt(key string, def int) int {
 		return def
 	}
 	n, err := strconv.Atoi(v)
+	if err != nil {
+		return def
+	}
+	return n
+}
+
+func GetEnvInt64(key string, def int64) int64 {
+	v := os.Getenv(key)
+	if v == "" {
+		return def
+	}
+	n, err := strconv.ParseInt(v, 10, 64)
 	if err != nil {
 		return def
 	}

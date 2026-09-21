@@ -27,7 +27,12 @@ export const Route = createFileRoute('/__app/customers/')({
       typeof search.providerId === 'string' && search.providerId.length > 0
         ? search.providerId
         : undefined;
-    return { page, pageSize, providerId };
+    return {
+      page,
+      pageSize,
+      providerId,
+      ...(typeof search.q === 'string' && search.q ? { q: search.q } : {})
+    };
   },
   component: RouteComponent
 });

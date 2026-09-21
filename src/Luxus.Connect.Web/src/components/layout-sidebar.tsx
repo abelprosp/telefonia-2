@@ -98,6 +98,10 @@ const operationalMenuItems: MenuItem[] = [
     icon: <TrendingUp />,
     items: [
       { title: 'Movimentação de linhas', url: '/reports/transition-pending' },
+      { title: 'Consumo de linhas', url: '/reports/line-consumption' },
+      { title: 'Conciliação', url: '/reports/reconciliation' },
+      { title: 'Histórico de auditoria', url: '/audit/events' },
+      { title: 'Divergências', url: '/divergences' },
       { title: 'Solicitações de parceiros', url: '/line-requests' },
       { title: 'Resumo financeiro', url: '/finance' },
       { title: 'Rentabilidade', url: '/finance' }

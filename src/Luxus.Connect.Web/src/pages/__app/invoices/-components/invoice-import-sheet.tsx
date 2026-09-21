@@ -49,7 +49,7 @@ import { previewProviderInvoiceImport, type ImportPreview } from '@/lib/ops-api'
 
 import type { ImportProgressState } from './invoice-import-progress-banner';
 
-const MAX_IMPORT_FILE_BYTES = 256 * 1024 * 1024;
+const MAX_IMPORT_FILE_BYTES = 2 * 1024 * 1024 * 1024; // 2 GiB — streamed to disk on the API
 
 const INVOICE_IMPORT_ACCEPT = '.txt,.pdf,application/pdf,text/plain';
 
@@ -343,7 +343,7 @@ export function InvoiceImportSheet({
     }
     if (file.size === 0) { toast.error("O arquivo está vazio."); return; }
     if (file.size > MAX_IMPORT_FILE_BYTES) {
-      toast.error('O arquivo excede 256 MB.', { position: 'bottom-right', duration: 3000 });
+      toast.error('O arquivo excede 2 GiB.', { position: 'bottom-right', duration: 3000 });
       return;
     }
     setImportFile(file);

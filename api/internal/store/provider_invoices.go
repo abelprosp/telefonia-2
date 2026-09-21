@@ -24,6 +24,17 @@ func (s *Store) ListProviderInvoices(ctx context.Context, orgID string, processi
 		base += ` AND i."ProcessingMonthId" = $2`
 		args = append(args, *processingMonthID)
 	}
+	if page.Search != "" {
+		args = append(args, "%"+page.Search+"%")
+		idx := len(args)
+		base += ` AND (
+			COALESCE(i."Number", '') ILIKE $` + itoa(idx) + `
+			OR pa."AccountNumber" ILIKE $` + itoa(idx) + `
+			OR cc."LegalName" ILIKE $` + itoa(idx) + `
+			OR p."Name" ILIKE $` + itoa(idx) + `
+			OR COALESCE(i."ContentSHA256", '') ILIKE $` + itoa(idx) + `
+		)`
+	}
 
 	var total int64
 	if err := s.q(ctx).QueryRow(ctx, `SELECT COUNT(*) `+base, args...).Scan(&total); err != nil {

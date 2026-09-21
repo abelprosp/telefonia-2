@@ -19,6 +19,11 @@ export type GetV1ProviderInvoicesQueryParams = {
    * @type string | undefined
    */
   processing_month_id?: string;
+  /**
+   * Free-text server search.
+   * @type string | undefined
+   */
+  q?: string;
 };
 
 /**

@@ -23,7 +23,7 @@ export const Route = createFileRoute('/__app/phone-lines/')({
     const page = Math.max(1, Number(search.page) || 1);
     const rawSize = Number(search.pageSize) || 10;
     const pageSize = [10, 25, 50].includes(rawSize) ? rawSize : 10;
-    return { page, pageSize };
+    return { page, pageSize, ...(typeof search.q === 'string' && search.q ? { q: search.q } : {}) };
   },
   component: RouteComponent
 });

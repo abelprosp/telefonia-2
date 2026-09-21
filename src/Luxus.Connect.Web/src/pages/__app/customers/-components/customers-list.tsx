@@ -13,6 +13,8 @@ import {
   useProvidersControllerGetById
 } from '@/api';
 import { DataTable, DataTablePagination } from '@/components/data-table';
+import { ConfirmDialog } from '@/components/confirm-dialog';
+import { DynamicSearchInput } from '@/components/dynamic-search-input';
 import { ListPageHeader, ListPageSkeleton } from '@/components/list-page';
 import { Button } from '@/components/ui/button';
 import {
@@ -23,15 +25,6 @@ import {
   EmptyMedia,
   EmptyTitle
 } from '@/components/ui/empty';
-import {
-  Sheet,
-  SheetClose,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle
-} from '@/components/ui/sheet';
 import { getErrorMessage, isApiHttpError } from '@/lib/api-error';
 import { invalidateDashboardCaches, parseTotalCount } from '@/lib/query-utils';
 
@@ -54,9 +47,10 @@ const CUSTOMERS_SKELETON_COLUMNS = [
 ];
 
 export function CustomersList() {
-  const { page, pageSize, providerId } = routeApi.useSearch();
+  const { page, pageSize, providerId, q } = routeApi.useSearch();
   const navigate = routeApi.useNavigate();
   const queryClient = useQueryClient();
+  const [createOpen, setCreateOpen] = useState(false);
 
   const pageIndex = page - 1;
 
@@ -67,7 +61,8 @@ export function CustomersList() {
   const listQuery = useGetV1Customers({
     page_index: pageIndex,
     page_size: pageSize,
-    ...(providerId ? { provider_id: providerId } : {})
+    ...(providerId ? { provider_id: providerId } : {}),
+    ...(q ? { q } : {})
   });
 
   const deleteMutation = useDeleteV1CustomersId({
@@ -87,7 +82,6 @@ export function CustomersList() {
 
   const total = parseTotalCount(listQuery.data?.total_count);
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const [createOpen, setCreateOpen] = useState(false);
 
   const setPage = (next: number) => {
     navigate({
@@ -149,6 +143,16 @@ export function CustomersList() {
         }
       />
 
+      <DynamicSearchInput
+        value={q ?? ''}
+        placeholder="Buscar por nome, documento ou e-mail…"
+        onChange={(next) =>
+          navigate({
+            search: (prev) => ({ ...prev, page: 1, q: next })
+          })
+        }
+      />
+
       <CustomersTable
         rows={items}
         page={page}
@@ -191,13 +195,14 @@ function CustomersTable({
   deletePending: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const [pendingId, setPendingId] = useState<string | null>(null);
+  const [pending, setPending] = useState<ListCustomerResponse | null>(null);
 
   const columns = useMemo(
     () =>
       createCustomersColumns({
         onDeleteClick: (id) => {
-          setPendingId(id);
+          const row = rows.find((r) => r.id === id) ?? null;
+          setPending(row);
           setOpen(true);
         },
         deletePending,
@@ -207,7 +212,7 @@ function CustomersTable({
           providerId: providerId ?? undefined
         }
       }),
-    [deletePending, page, pageSize, providerId]
+    [deletePending, page, pageSize, providerId, rows]
   );
 
   return (
@@ -240,34 +245,29 @@ function CustomersTable({
         getRowId={(row) => row.id}
       />
 
-      <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent side="right" className="sm:max-w-md">
-          <SheetHeader>
-            <SheetTitle>Excluir cliente</SheetTitle>
-            <SheetDescription>
-              Esta ação não pode ser desfeita. Confirma a exclusão?
-            </SheetDescription>
-          </SheetHeader>
-          <SheetFooter className="gap-2 sm:justify-end">
-            <SheetClose render={<Button variant="outline" />}>
-              Cancelar
-            </SheetClose>
-            <Button
-              variant="destructive"
-              disabled={deletePending || !pendingId}
-              onClick={() => {
-                if (pendingId) {
-                  onDelete(pendingId);
-                  setOpen(false);
-                  setPendingId(null);
-                }
-              }}
-            >
-              Excluir
-            </Button>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
+      <ConfirmDialog
+        open={open}
+        title="Excluir cliente"
+        description={
+          pending
+            ? `Confirma a exclusão de "${pending.name}" (${pending.cpf_cnpj || 'sem documento'})? Ação sensível e de difícil reversão.`
+            : 'Confirma a exclusão deste cliente?'
+        }
+        confirmLabel="Excluir"
+        destructive
+        loading={deletePending}
+        onCancel={() => {
+          setOpen(false);
+          setPending(null);
+        }}
+        onConfirm={() => {
+          if (pending) {
+            onDelete(pending.id);
+            setOpen(false);
+            setPending(null);
+          }
+        }}
+      />
     </>
   );
 }

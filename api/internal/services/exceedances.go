@@ -2,10 +2,12 @@ package services
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/luxus-connect/telefonia/api/internal/httputil"
 	"github.com/luxus-connect/telefonia/api/internal/models"
 	"github.com/luxus-connect/telefonia/api/internal/notifications"
@@ -101,6 +103,9 @@ func (s *Service) UpdatePhoneLineExceedanceSettings(ctx context.Context, phoneLi
 		chargeType = &n
 	}
 	if err := s.Store.UpdatePhoneLineExceedanceSettings(ctx, phoneLineID, input.ChargeExceedances, chargeType); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, httputil.NotFoundError(notifications.PhoneLineNotFound)
+		}
 		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
 	return s.GetPhoneLine(ctx, phoneLineID)

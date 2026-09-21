@@ -16,7 +16,7 @@ func testStore(t *testing.T) *store.Store {
 	t.Helper()
 	raw := os.Getenv("DATABASE_URL")
 	if raw == "" {
-		raw = "postgres://postgres:postgres@127.0.0.1:5432/luxus_connect_dev?sslmode=disable"
+		raw = "postgres://postgres:postgres@127.0.0.1:5433/luxus_connect_dev?sslmode=disable"
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()

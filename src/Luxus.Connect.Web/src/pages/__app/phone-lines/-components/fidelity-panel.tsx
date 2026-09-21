@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 
 import { toast } from 'sonner';
 
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
@@ -43,6 +44,7 @@ export function FidelityPanel({ phoneLineId }: FidelityPanelProps) {
   const [months, setMonths] = useState('12');
   const [autoRenew, setAutoRenew] = useState(false);
   const [renewalMonths, setRenewalMonths] = useState('12');
+  const [renewConfirmOpen, setRenewConfirmOpen] = useState(false);
 
   useEffect(() => {
     if (!query.data) return;
@@ -147,31 +149,53 @@ export function FidelityPanel({ phoneLineId }: FidelityPanelProps) {
             size="sm"
             variant="outline"
             disabled={decision.isPending}
-            onClick={() => {
-              const ok = window.confirm(
-                'Esta alteração pode gerar renovação contratual. Deseja renovar a fidelidade pelo prazo inicial?'
-              );
-              decision.mutate(
-                {
-                  renew: ok,
-                  trigger: 'plan',
-                  notes: ok
-                    ? 'Renovação por alteração contratual.'
-                    : 'Operador optou por não renovar.'
-                },
-                {
-                  onSuccess: () =>
-                    toast.success(ok ? 'Fidelidade renovada.' : 'Decisão registrada.'),
-                  onError: (e) =>
-                    toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
-                }
-              );
-            }}
+            onClick={() => setRenewConfirmOpen(true)}
           >
             Renovar por alteração
           </Button>
         ) : null}
       </div>
+
+      <ConfirmDialog
+        open={renewConfirmOpen}
+        title="Renovação de fidelidade"
+        description="Esta alteração pode gerar renovação contratual. Confirma renovar a fidelidade pelo prazo inicial?"
+        confirmLabel="Renovar"
+        cancelLabel="Não renovar"
+        loading={decision.isPending}
+        onCancel={() => {
+          setRenewConfirmOpen(false);
+          decision.mutate(
+            {
+              renew: false,
+              trigger: 'plan',
+              notes: 'Operador optou por não renovar.'
+            },
+            {
+              onSuccess: () => toast.success('Decisão registrada.'),
+              onError: (e) =>
+                toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+            }
+          );
+        }}
+        onConfirm={() => {
+          decision.mutate(
+            {
+              renew: true,
+              trigger: 'plan',
+              notes: 'Renovação por alteração contratual.'
+            },
+            {
+              onSuccess: () => {
+                toast.success('Fidelidade renovada.');
+                setRenewConfirmOpen(false);
+              },
+              onError: (e) =>
+                toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+            }
+          );
+        }}
+      />
 
       {query.data && query.data.history.length > 0 ? (
         <div>

@@ -4,6 +4,7 @@ import { createFileRoute, Link } from '@tanstack/react-router';
 import { Loader2, QrCode, Send, FileDown, Ban, CalendarClock } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { PageWrapper } from '@/components/page-wrapper';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -59,6 +60,7 @@ function CustomerInvoiceDetailPage() {
   const [newDueDate, setNewDueDate] = useState('');
   const [pdfLoading, setPdfLoading] = useState(false);
   const [invoiceDownloadLoading, setInvoiceDownloadLoading] = useState(false);
+  const [cancelBoletoConfirmOpen, setCancelBoletoConfirmOpen] = useState(false);
 
   useEffect(() => {
     const d = docQuery.data;
@@ -163,15 +165,8 @@ function CustomerInvoiceDetailPage() {
     }
   };
 
-  const handleCancelBoleto = async () => {
-    if (!window.confirm('Baixar/cancelar este boleto no Sicredi?')) return;
-    try {
-      const result = await cancelBoletoMutation.mutateAsync(id);
-      toast.success(result.message);
-      await docQuery.refetch();
-    } catch (e) {
-      toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e));
-    }
+  const handleCancelBoleto = () => {
+    setCancelBoletoConfirmOpen(true);
   };
 
   const handleAlterDueDate = async () => {
@@ -472,6 +467,26 @@ function CustomerInvoiceDetailPage() {
           Voltar à lista
         </Link>
       </div>
+
+      <ConfirmDialog
+        open={cancelBoletoConfirmOpen}
+        title="Cancelar boleto Sicredi"
+        description="Baixar/cancelar este boleto no Sicredi? Esta ação não pode ser desfeita pelo sistema."
+        confirmLabel="Cancelar boleto"
+        destructive
+        loading={cancelBoletoMutation.isPending}
+        onCancel={() => setCancelBoletoConfirmOpen(false)}
+        onConfirm={async () => {
+          try {
+            const result = await cancelBoletoMutation.mutateAsync(id);
+            toast.success(result.message);
+            setCancelBoletoConfirmOpen(false);
+            await docQuery.refetch();
+          } catch (e) {
+            toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e));
+          }
+        }}
+      />
     </PageWrapper>
   );
 }

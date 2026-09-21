@@ -2,8 +2,12 @@ package storage
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -13,12 +17,45 @@ import (
 	"github.com/luxus-connect/telefonia/api/internal/models"
 )
 
-// MaxObjectBytes is the hard ceiling for objects loaded into memory (invoice import).
-const MaxObjectBytes int64 = 256 * 1024 * 1024
+// MaxObjectBytes is the hard ceiling for objects loaded *into memory*.
+// Safe default for incidental GetObject callers: 512 MiB.
+// Invoice import uses OpenObject + disk materialization up to MaxDiskObjectBytes.
+const DefaultMaxObjectBytes int64 = 512 * 1024 * 1024
+
+// DefaultMaxDiskObjectBytes is the ceiling for streamed invoice imports written to
+// a temporary file (not held fully in RAM). Based on typical VPS disk headroom for
+// MinIO-backed TXT invoices; override with OBJECT_STORAGE_MAX_DISK_OBJECT_BYTES.
+const DefaultMaxDiskObjectBytes int64 = 2 * 1024 * 1024 * 1024 // 2 GiB
+
+var MaxObjectBytes int64 = DefaultMaxObjectBytes
+var MaxDiskObjectBytes int64 = DefaultMaxDiskObjectBytes
+
+func ConfigureMaxObjectBytes(n int64) {
+	if n > 0 {
+		MaxObjectBytes = n
+	}
+}
+
+func ConfigureMaxDiskObjectBytes(n int64) {
+	if n > 0 {
+		MaxDiskObjectBytes = n
+	}
+}
 
 type Client struct {
 	presigner *s3.PresignClient
 	client    *s3.Client
+}
+
+type ObjectStream struct {
+	Body          io.ReadCloser
+	ContentLength *int64
+}
+
+type MaterializedObject struct {
+	Path   string
+	SHA256 string
+	Size   int64
 }
 
 func NewClient(cfg config.Config) (*Client, error) {
@@ -78,6 +115,67 @@ func (c *Client) CreatePresignedDownloadURL(ctx context.Context, bucket, key str
 	}
 	return &models.PresignedURLModel{
 		URL: req.URL, HTTPMethod: req.Method, ExpiresAtUTC: time.Now().UTC().Add(expires),
+	}, nil
+}
+
+func (c *Client) OpenObject(ctx context.Context, bucket, key string) (*ObjectStream, error) {
+	out, err := c.client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return nil, err
+	}
+	if out.ContentLength != nil && *out.ContentLength > MaxDiskObjectBytes {
+		_ = out.Body.Close()
+		return nil, fmt.Errorf("object exceeds maximum disk size of %d bytes", MaxDiskObjectBytes)
+	}
+	return &ObjectStream{Body: out.Body, ContentLength: out.ContentLength}, nil
+}
+
+// MaterializeObject streams the object to a temp file while computing SHA-256.
+// Caller must remove Path when done (os.Remove).
+func (c *Client) MaterializeObject(ctx context.Context, bucket, key string) (*MaterializedObject, error) {
+	stream, err := c.OpenObject(ctx, bucket, key)
+	if err != nil {
+		return nil, err
+	}
+	defer stream.Body.Close()
+
+	dir := filepath.Join(os.TempDir(), "luxus-invoice-import")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return nil, err
+	}
+	f, err := os.CreateTemp(dir, "invoice-*.bin")
+	if err != nil {
+		return nil, err
+	}
+	path := f.Name()
+	cleanup := true
+	defer func() {
+		_ = f.Close()
+		if cleanup {
+			_ = os.Remove(path)
+		}
+	}()
+
+	h := sha256.New()
+	limited := io.LimitReader(stream.Body, MaxDiskObjectBytes+1)
+	n, err := io.Copy(io.MultiWriter(f, h), limited)
+	if err != nil {
+		return nil, err
+	}
+	if n > MaxDiskObjectBytes {
+		return nil, fmt.Errorf("object exceeds maximum disk size of %d bytes", MaxDiskObjectBytes)
+	}
+	if err := f.Sync(); err != nil {
+		return nil, err
+	}
+	cleanup = false
+	return &MaterializedObject{
+		Path:   path,
+		SHA256: hex.EncodeToString(h.Sum(nil)),
+		Size:   n,
 	}, nil
 }
 

@@ -2,14 +2,11 @@ package importservice
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"sort"
 
 	"github.com/luxus-connect/telefonia/api/internal/httputil"
 	"github.com/luxus-connect/telefonia/api/internal/models"
 	"github.com/luxus-connect/telefonia/api/internal/notifications"
-	"github.com/luxus-connect/telefonia/api/internal/vivo"
 )
 
 func (p *Processor) PreviewImport(ctx context.Context, orgID string, input models.ProviderInvoiceImportRequestInput) (*models.ImportPreviewResponse, error) {
@@ -23,23 +20,21 @@ func (p *Processor) PreviewImport(ctx context.Context, orgID string, input model
 	if gotOrg != orgID {
 		return nil, httputil.NotFoundError(notifications.ProviderNotFound)
 	}
-	raw, err := p.Storage.GetObject(ctx, input.StorageBucket, input.StorageObjectKey)
+
+	loaded, err := p.loadInvoiceForProcessing(ctx, input.StorageBucket, input.StorageObjectKey)
 	if err != nil {
-		return nil, httputil.InternalError(notifications.SharedUnexpectedError("storage get: " + err.Error()))
+		return nil, err
 	}
-	if isPDFBytes(raw) {
+	defer loaded.Cleanup()
+	if loaded.IsPDF {
 		return &models.ImportPreviewResponse{
 			Warnings: []string{notifications.ImportPDFNotParsed.Message},
 			IsValid:  false,
 		}, nil
 	}
 
-	sum := sha256.Sum256(raw)
-	fileHash := hex.EncodeToString(sum[:])
-	parsed, err := vivo.ParseLatin1(raw)
-	if err != nil {
-		return nil, httputil.BusinessError(notifications.N("IMPORT_PARSE_FAILED", "Não foi possível interpretar o TXT VIVO."))
-	}
+	fileHash := loaded.SHA256
+	parsed := loaded.Parsed
 
 	header := getHeader(parsed)
 	if header == nil {
@@ -87,6 +82,33 @@ func (p *Processor) PreviewImport(ctx context.Context, orgID string, input model
 			warnings = append(warnings, notifications.ImportCustomerDocumentInvalid.Message)
 		}
 	}
+
+	if input.ProcessingMonthID != "" {
+		month, err := p.Store.GetProcessingMonth(ctx, orgID, input.ProcessingMonthID)
+		if err != nil {
+			return nil, err
+		}
+		if month == nil {
+			valid = false
+			warnings = append(warnings, notifications.ProcessingMonthNotFound.Message)
+		} else if err := validateInvoiceCompetence(header, month); err != nil {
+			valid = false
+			warnings = append(warnings, err.Error())
+		} else if account, aerr := p.Store.GetProviderAccountByProviderAndNumber(ctx, orgID, input.ProviderID, header.AccountNumber); aerr == nil && account != nil {
+			if existingKey, kerr := p.Store.FindActiveInvoiceByBusinessKey(ctx, account.ID, month.ID, header.DueDate); kerr != nil {
+				return nil, kerr
+			} else if existingKey != nil {
+				if input.AllowSubstitute {
+					warnings = append(warnings, "Já existe fatura ativa com a mesma chave lógica. A importação substituirá o registro anterior (allow_substitute=true).")
+				} else {
+					duplicate = true
+					valid = false
+					warnings = append(warnings, notifications.InvoiceDuplicateSameProcessingMonth.Message)
+				}
+			}
+		}
+	}
+
 	sort.Strings(lineItems)
 
 	return &models.ImportPreviewResponse{

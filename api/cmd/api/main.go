@@ -34,6 +34,8 @@ func main() {
 	slog.SetDefault(logger)
 
 	cfg := config.Load()
+	storage.ConfigureMaxObjectBytes(cfg.ObjectStorageMaxObjectBytes)
+	storage.ConfigureMaxDiskObjectBytes(cfg.ObjectStorageMaxDiskObjectBytes)
 
 	if cfg.MonitoringTestEnabled {
 		logger.Error("MONITORING_TEST_ENABLED=true — API encerrada de propósito (crash loop para teste de monitoramento)")

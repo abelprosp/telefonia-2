@@ -229,6 +229,7 @@ func (h *Handler) RegisterRoutes(
 				r.Get("/", h.listPhoneLines)
 
 				r.Post("/stock", h.createStockPhoneLine)
+				r.Post("/stock/bulk", h.bulkCreateStockPhoneLines)
 
 				r.Route("/{id}", func(r chi.Router) {
 
@@ -341,6 +342,13 @@ func (h *Handler) RegisterRoutes(
 			r.Get("/reports/line-movements", h.getMovementReports)
 			r.Get("/reports/financial-summary", h.getFinancialSummaryReport)
 			r.Get("/reports/customer-profitability", h.getCustomerProfitabilityReport)
+			r.Get("/reports/line-consumption", h.listLineConsumptionReport)
+			r.Get("/reports/line-consumption/export", h.exportLineConsumptionReport)
+			r.Get("/audit/events", h.listDomainAuditEvents)
+			r.Get("/reconciliation/missing-in-operator", h.listReconciliationMissing)
+			r.Get("/reconciliation/cancelled-externally-active", h.listReconciliationCancelledExternal)
+			r.Post("/reconciliation/cancelled-externally-active/apply", h.applyCancelledExternallyActive)
+			r.Post("/external-line-imports", h.createExternalLineImportJob)
 
 			r.Route("/exceedance-terms", func(r chi.Router) {
 				r.Get("/", h.listExceedanceTerms)

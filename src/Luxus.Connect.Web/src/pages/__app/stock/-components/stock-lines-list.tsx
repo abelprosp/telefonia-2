@@ -5,6 +5,7 @@ import { Filter, PackageX, Plus } from 'lucide-react';
 
 import { useGetV1PhoneLines, type ListPhoneLineResponse } from '@/api';
 import { DataTable, DataTablePagination } from '@/components/data-table';
+import { DynamicSearchInput } from '@/components/dynamic-search-input';
 import { LinkCustomerLineSheet } from '@/components/link-customer-line-sheet';
 import { ListPageHeader, ListPageSkeleton } from '@/components/list-page';
 import { Button } from '@/components/ui/button';
@@ -26,6 +27,7 @@ import { getErrorMessage, isApiHttpError } from '@/lib/api-error';
 import { parseTotalCount } from '@/lib/query-utils';
 
 import { createStockLinesColumns } from './columns';
+import { StockLineBulkCreateSheet } from './stock-line-bulk-create-sheet';
 import { StockLineCreateSheet } from './stock-line-create-sheet';
 
 const routeApi = getRouteApi('/__app/stock/');
@@ -48,9 +50,10 @@ const STOCK_LINES_SKELETON_COLUMNS = [
 ];
 
 export function StockLinesList() {
-  const { page, pageSize } = routeApi.useSearch();
+  const { page, pageSize, q } = routeApi.useSearch();
   const navigate = routeApi.useNavigate();
   const [createOpen, setCreateOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [linkLine, setLinkLine] = useState<ListPhoneLineResponse | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('in_stock');
 
@@ -59,7 +62,8 @@ export function StockLinesList() {
   const listQuery = useGetV1PhoneLines({
     page_index: pageIndex,
     page_size: pageSize,
-    status: statusFilter === 'all' ? undefined : (statusFilter as any)
+    status: statusFilter === 'all' ? undefined : (statusFilter as any),
+    ...(q ? { q } : {})
   });
 
   const total = parseTotalCount(listQuery.data?.total_count);
@@ -119,15 +123,29 @@ export function StockLinesList() {
         title="Estoque de linhas"
         description="Linhas sob controle sem vínculo ativo com cliente. Entram automaticamente em estoque ao importar faturas da operadora (§3.2 e §4.1)."
         action={
-          <Button onClick={() => setCreateOpen(true)}>
-            <Plus />
-            Cadastrar linha
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => setBulkOpen(true)}>
+              Cadastro em lote
+            </Button>
+            <Button onClick={() => setCreateOpen(true)}>
+              <Plus />
+              Cadastrar linha
+            </Button>
+          </div>
         }
       />
 
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <DynamicSearchInput
+            value={q ?? ''}
+            placeholder="Buscar número, conta ou operadora…"
+            onChange={(next) =>
+              navigate({
+                search: (prev) => ({ ...prev, page: 1, q: next })
+              })
+            }
+          />
           <Filter className="text-muted-foreground size-4" />
           <span className="text-sm font-medium">Filtrar status:</span>
           <Select
@@ -157,6 +175,11 @@ export function StockLinesList() {
         onSuccess={() => void listQuery.refetch()}
       />
 
+      <StockLineBulkCreateSheet
+        open={bulkOpen}
+        onOpenChange={setBulkOpen}
+        onSuccess={() => void listQuery.refetch()}
+      />
       {linkLine ? (
         <LinkCustomerLineSheet
           mode="line-to-customer"

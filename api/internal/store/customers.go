@@ -26,6 +26,26 @@ func (s *Store) ListCustomers(ctx context.Context, orgID string, providerID *str
 		base += ` AND c."ResponsibleSalespersonUserId" = $` + itoa(len(args)+1)
 		args = append(args, *salespersonUserID)
 	}
+	if page.Search != "" {
+		digits := httputil.NormalizeDigits(page.Search)
+		args = append(args, "%"+page.Search+"%")
+		idx := len(args)
+		base += ` AND (
+			c."Name" ILIKE $` + itoa(idx) + `
+			OR COALESCE(c."LegalName", '') ILIKE $` + itoa(idx) + `
+			OR COALESCE(c."BillingEmail", '') ILIKE $` + itoa(idx) + `
+			OR EXISTS (
+				SELECT 1 FROM "CustomerDocuments" cd
+				WHERE cd."CustomerId" = c."Id"
+					AND (cd."Number" ILIKE $` + itoa(idx)
+		if digits != "" {
+			args = append(args, "%"+digits+"%")
+			base += ` OR regexp_replace(cd."Number", '[^0-9]', '', 'g') LIKE $` + itoa(len(args))
+		}
+		base += `)
+			)`
+		base += `)`
+	}
 
 	var total int64
 	countQuery := `SELECT COUNT(*) ` + base

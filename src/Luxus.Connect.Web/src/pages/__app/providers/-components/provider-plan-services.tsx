@@ -4,6 +4,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import type { GetProviderPlanServiceResponse } from '@/api';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Field, FieldLabel } from '@/components/ui/field';
@@ -97,6 +98,7 @@ export function ProviderPlanServices({ providerId, planId, services }: Props) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [name, setName] = useState('');
   const [invoiceName, setInvoiceName] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [serviceType, setServiceType] = useState('subscription');
   const [price, setPrice] = useState('');
   const [recurring, setRecurring] = useState(true);
@@ -159,19 +161,7 @@ export function ProviderPlanServices({ providerId, planId, services }: Props) {
   };
 
   const handleDelete = (serviceId: string, svcName: string) => {
-    if (!confirm(`Deseja desativar o serviço "${svcName}" deste plano?`)) {
-      return;
-    }
-    deleteMutation.mutate(serviceId, {
-      onSuccess: () => {
-        toast.success('Serviço desativado.');
-      },
-      onError: (err) => {
-        toast.error(
-          isApiHttpError(err) ? err.message : getErrorMessage(err)
-        );
-      }
-    });
+    setDeleteTarget({ id: serviceId, name: svcName });
   };
 
   return (
@@ -370,6 +360,32 @@ export function ProviderPlanServices({ providerId, planId, services }: Props) {
           </SheetFooter>
         </SheetContent>
       </Sheet>
+
+      <ConfirmDialog
+        open={deleteTarget != null}
+        title="Desativar serviço do plano"
+        description={
+          deleteTarget
+            ? `Deseja desativar o serviço "${deleteTarget.name}" deste plano?`
+            : ''
+        }
+        confirmLabel="Desativar"
+        destructive
+        loading={deleteMutation.isPending}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => {
+          if (!deleteTarget) return;
+          deleteMutation.mutate(deleteTarget.id, {
+            onSuccess: () => {
+              toast.success('Serviço desativado.');
+              setDeleteTarget(null);
+            },
+            onError: (err) => {
+              toast.error(isApiHttpError(err) ? err.message : getErrorMessage(err));
+            }
+          });
+        }}
+      />
     </div>
   );
 }

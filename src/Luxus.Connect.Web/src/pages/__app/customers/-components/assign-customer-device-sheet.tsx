@@ -1,10 +1,11 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
@@ -73,6 +74,9 @@ export function AssignCustomerDeviceSheet({
 }: AssignCustomerDeviceSheetProps) {
   const assignMutation = useAssignCustomerDevice(customerId);
   const stockQuery = useDeviceStockList({ page_index: 0, page_size: 200, status: 'in_stock' });
+  const [pendingValues, setPendingValues] = useState<FormValues | null>(null);
+  const [pendingAmount, setPendingAmount] = useState<number | null>(null);
+  const [renewConfirmOpen, setRenewConfirmOpen] = useState(false);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -84,7 +88,12 @@ export function AssignCustomerDeviceSheet({
   const stockItems = stockQuery.data?.items ?? [];
 
   useEffect(() => {
-    if (!open) form.reset(defaultValues);
+    if (!open) {
+      form.reset(defaultValues);
+      setPendingValues(null);
+      setPendingAmount(null);
+      setRenewConfirmOpen(false);
+    }
   }, [open, form]);
 
   useEffect(() => {
@@ -96,6 +105,30 @@ export function AssignCustomerDeviceSheet({
     }
     form.setValue('description', `Aparelho ${device.brand} ${device.model}${device.storage_capacity ? ` ${device.storage_capacity}` : ''}`);
   }, [deviceStockItemId, form, source, stockItems]);
+
+  const submitAssign = (values: FormValues, monthlyAmount: number, renewFidelity: boolean) => {
+    assignMutation.mutate(
+      {
+        device_stock_item_id: values.source === 'stock' ? values.deviceStockItemId : null,
+        brand: values.source === 'manual' ? values.brand?.trim() : null,
+        model: values.source === 'manual' ? values.model?.trim() : null,
+        description: values.description?.trim() || null,
+        monthly_amount: monthlyAmount,
+        renew_fidelity: renewFidelity
+      },
+      {
+        onSuccess: () => {
+          toast.success('Aparelho vinculado ao cliente.');
+          setRenewConfirmOpen(false);
+          setPendingValues(null);
+          setPendingAmount(null);
+          onOpenChange(false);
+          onSuccess?.();
+        },
+        onError: (e) => toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+      }
+    );
+  };
 
   const onSubmit = form.handleSubmit((values) => {
     const monthlyAmount = parseMoney(values.monthly_amount);
@@ -113,28 +146,9 @@ export function AssignCustomerDeviceSheet({
       return;
     }
 
-    const renewFidelity = window.confirm(
-      'Aquisição de aparelho pode renovar a fidelidade das linhas deste cliente. Deseja renovar?'
-    );
-
-    assignMutation.mutate(
-      {
-        device_stock_item_id: values.source === 'stock' ? values.deviceStockItemId : null,
-        brand: values.source === 'manual' ? values.brand?.trim() : null,
-        model: values.source === 'manual' ? values.model?.trim() : null,
-        description: values.description?.trim() || null,
-        monthly_amount: monthlyAmount,
-        renew_fidelity: renewFidelity
-      },
-      {
-        onSuccess: () => {
-          toast.success('Aparelho vinculado ao cliente.');
-          onOpenChange(false);
-          onSuccess?.();
-        },
-        onError: (e) => toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
-      }
-    );
+    setPendingValues(values);
+    setPendingAmount(monthlyAmount);
+    setRenewConfirmOpen(true);
   });
 
   return (
@@ -246,6 +260,26 @@ export function AssignCustomerDeviceSheet({
           </SheetFooter>
         </form>
       </SheetContent>
+
+      <ConfirmDialog
+        open={renewConfirmOpen}
+        title="Renovação de fidelidade"
+        description="Aquisição de aparelho pode renovar a fidelidade das linhas deste cliente. Deseja renovar?"
+        confirmLabel="Renovar"
+        cancelLabel="Não renovar"
+        loading={assignMutation.isPending}
+        onCancel={() => {
+          if (pendingValues == null || pendingAmount == null) {
+            setRenewConfirmOpen(false);
+            return;
+          }
+          submitAssign(pendingValues, pendingAmount, false);
+        }}
+        onConfirm={() => {
+          if (pendingValues == null || pendingAmount == null) return;
+          submitAssign(pendingValues, pendingAmount, true);
+        }}
+      />
     </Sheet>
   );
 }

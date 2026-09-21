@@ -9,9 +9,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -19,6 +19,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/luxus-connect/telefonia/api/internal/auth"
 	"github.com/luxus-connect/telefonia/api/internal/config"
 	"github.com/luxus-connect/telefonia/api/internal/observability"
@@ -60,6 +61,7 @@ func openTestStore(t *testing.T) *store.Store {
 	if raw == "" {
 		raw = "postgres://postgres:postgres@127.0.0.1:5433/luxus_connect_dev?sslmode=disable"
 	}
+	applyBaseMigrationsIfNeeded(t, raw)
 	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
 	defer cancel()
 	st, err := store.New(ctx, config.NormalizeDatabaseURL(raw))
@@ -67,37 +69,45 @@ func openTestStore(t *testing.T) *store.Store {
 		t.Skipf("postgres indisponível: %v", err)
 	}
 	t.Cleanup(st.Close)
-	ensureSchema(t, st)
 	return st
 }
 
-func ensureSchema(t *testing.T, st *store.Store) {
+func applyBaseMigrationsIfNeeded(t *testing.T, databaseURL string) {
 	t.Helper()
-	var exists bool
-	err := st.Pool().QueryRow(context.Background(), `SELECT EXISTS (
-		SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='Providers')`).Scan(&exists)
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+	pool, err := pgxpool.New(ctx, config.NormalizeDatabaseURL(databaseURL))
 	if err != nil {
-		t.Fatalf("schema probe: %v", err)
+		return // store.New will Skip with the same connectivity issue
 	}
-	if exists {
+	defer pool.Close()
+
+	var exists bool
+	err = pool.QueryRow(ctx, `SELECT EXISTS (
+		SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='Providers')`).Scan(&exists)
+	if err != nil || exists {
 		return
 	}
+
 	root := repoRoot(t)
 	files, err := filepath.Glob(filepath.Join(root, "db", "migrations", "[0-9][0-9][0-9]_*.sql"))
 	if err != nil || len(files) == 0 {
 		t.Skip("schema ausente e migrações não encontradas")
 	}
+	sort.Strings(files)
 	for _, f := range files {
-		cmd := exec.Command("docker", "exec", "-i", "postgres.connect.luxus", "psql", "-U", "postgres", "-d", "luxus_connect_dev", "-v", "ON_ERROR_STOP=1")
-		in, err := os.Open(f)
+		body, err := os.ReadFile(f)
 		if err != nil {
 			t.Fatalf("open %s: %v", f, err)
 		}
-		cmd.Stdin = in
-		out, err := cmd.CombinedOutput()
-		_ = in.Close()
+		conn, err := pool.Acquire(ctx)
 		if err != nil {
-			t.Fatalf("migração %s falhou: %v\n%s", filepath.Base(f), err, out)
+			t.Fatalf("acquire: %v", err)
+		}
+		_, err = conn.Conn().PgConn().Exec(ctx, string(body)).ReadAll()
+		conn.Release()
+		if err != nil {
+			t.Fatalf("migração %s falhou: %v", filepath.Base(f), err)
 		}
 	}
 }
@@ -195,6 +205,10 @@ func TestListEndpointsOK(t *testing.T) {
 		"/v1/reports/line-movements",
 		"/v1/reports/financial-summary",
 		"/v1/reports/customer-profitability",
+		"/v1/reports/line-consumption",
+		"/v1/audit/events",
+		"/v1/reconciliation/missing-in-operator",
+		"/v1/reconciliation/cancelled-externally-active",
 		"/v1/exceedance-terms",
 		"/v1/fidelity-renewal-triggers",
 		"/v1/divergences",

@@ -18,6 +18,7 @@ import {
   usePatchV1CustomersId,
   type ListCustomerResponse
 } from '@/api';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { LinkCustomerLineSheet } from '@/components/link-customer-line-sheet';
 import { Button } from '@/components/ui/button';
 import {
@@ -160,6 +161,7 @@ export function CustomerDetailView({
   const [linkLineOpen, setLinkLineOpen] = useState(false);
   const [linkDeviceOpen, setLinkDeviceOpen] = useState(false);
   const [generateInvoiceOpen, setGenerateInvoiceOpen] = useState(false);
+  const [anonymizeConfirmOpen, setAnonymizeConfirmOpen] = useState(false);
   const [isReseller, setIsReseller] = useState(
     Boolean((customer as ListCustomerResponse & { is_reseller?: boolean }).is_reseller)
   );
@@ -522,19 +524,33 @@ export function CustomerDetailView({
                 size="sm"
                 variant="ghost"
                 disabled={anonymizeCustomer.isPending}
-                onClick={() => {
-                  if (!window.confirm('Anonimizar este cliente? Ação irreversível.')) return;
-                  anonymizeCustomer.mutate(undefined, {
-                    onSuccess: () => toast.success('Cliente anonimizado.'),
-                    onError: (e) => toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
-                  });
-                }}
+                onClick={() => setAnonymizeConfirmOpen(true)}
               >
                 Anonimizar
               </Button>
             </div>
           ) : null}
         </DetailSection>
+
+        <ConfirmDialog
+          open={anonymizeConfirmOpen}
+          title="Anonimizar cliente"
+          description="Anonimizar este cliente? Ação irreversível: dados pessoais serão removidos ou mascarados conforme LGPD."
+          confirmLabel="Anonimizar"
+          destructive
+          requirePhrase="ANONIMIZAR"
+          loading={anonymizeCustomer.isPending}
+          onCancel={() => setAnonymizeConfirmOpen(false)}
+          onConfirm={() => {
+            anonymizeCustomer.mutate(undefined, {
+              onSuccess: () => {
+                toast.success('Cliente anonimizado.');
+                setAnonymizeConfirmOpen(false);
+              },
+              onError: (e) => toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+            });
+          }}
+        />
 
         <Separator />
 

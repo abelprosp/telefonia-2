@@ -3,12 +3,11 @@ package importservice
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 	"time"
 
@@ -113,20 +112,16 @@ func (p *Processor) processInner(ctx context.Context, req *store.ImportRequestRo
 	if p.Storage == nil {
 		return httputil.BusinessError(notifications.ObjectStorageUnavailable)
 	}
-	raw, err := p.Storage.GetObject(ctx, req.StorageBucket, req.StorageObjectKey)
-	if err != nil {
-		return fmt.Errorf("storage get: %w", err)
-	}
-	if isPDFBytes(raw) {
-		return httputil.BusinessError(notifications.ImportPDFNotParsed)
-	}
-	sum := sha256.Sum256(raw)
-	fileHash := hex.EncodeToString(sum[:])
-
-	parsed, err := vivo.ParseLatin1(raw)
+	loaded, err := p.loadInvoiceForProcessing(ctx, req.StorageBucket, req.StorageObjectKey)
 	if err != nil {
 		return err
 	}
+	defer loaded.Cleanup()
+	if loaded.IsPDF {
+		return httputil.BusinessError(notifications.ImportPDFNotParsed)
+	}
+	fileHash := loaded.SHA256
+	parsed := loaded.Parsed
 
 	header := getHeader(parsed)
 	if header == nil {
@@ -334,8 +329,58 @@ func (p *Processor) resolveContext(ctx context.Context, orgID string, req *store
 	if month.Status != "open" {
 		return nil, nil, nil, nil, httputil.BusinessError(notifications.ProcessingMonthNotOpen)
 	}
+	if err := validateInvoiceCompetence(header, month); err != nil {
+		return nil, nil, nil, nil, err
+	}
 
 	return company, account, month, cycle, nil
+}
+
+// validateInvoiceCompetence compares the competence identified in the VIVO header
+// (ReferenceMonth YYYYMM and/or billing period end) with the user-selected ProcessingMonth.
+// Issue/due dates are not used as competence.
+func validateInvoiceCompetence(header *vivo.Line010DHeader, month *store.ProcessingMonthRow) error {
+	if header == nil || month == nil {
+		return httputil.BusinessError(notifications.ImportCompetenceUndetermined)
+	}
+	refYear, refMonth, ok := parseReferenceMonthYM(header.ReferenceMonth)
+	if !ok {
+		// Fallback: billing end date is the competence month for VIVO cycles when ReferenceMonth is unusable.
+		if header.BillingEndDate.IsZero() {
+			return httputil.BusinessError(notifications.ImportCompetenceUndetermined)
+		}
+		refYear = header.BillingEndDate.Year()
+		refMonth = int(header.BillingEndDate.Month())
+	}
+	if refYear != month.Year || refMonth != month.Month {
+		return httputil.BusinessError(notifications.N(
+			"IMPORT_COMPETENCE_MISMATCH",
+			fmt.Sprintf(
+				"Competência da fatura (%02d/%04d) diverge da competência selecionada (%02d/%04d). Importação bloqueada.",
+				refMonth, refYear, month.Month, month.Year,
+			),
+		))
+	}
+	return nil
+}
+
+func parseReferenceMonthYM(ref string) (year, month int, ok bool) {
+	ref = strings.TrimSpace(ref)
+	if len(ref) == 6 {
+		y, err1 := strconv.Atoi(ref[0:4])
+		m, err2 := strconv.Atoi(ref[4:6])
+		if err1 == nil && err2 == nil && m >= 1 && m <= 12 && y >= 2000 {
+			return y, m, true
+		}
+	}
+	if len(ref) == 7 && (ref[2] == '/' || ref[2] == '-') {
+		m, err1 := strconv.Atoi(ref[0:2])
+		y, err2 := strconv.Atoi(ref[3:7])
+		if err1 == nil && err2 == nil && m >= 1 && m <= 12 && y >= 2000 {
+			return y, m, true
+		}
+	}
+	return 0, 0, false
 }
 
 func (p *Processor) resolveCustomer(ctx context.Context, orgID, providerID string, company *store.ContractingCompanyRow, taxID string, parsed []any) (string, error) {

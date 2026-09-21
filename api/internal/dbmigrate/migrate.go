@@ -14,7 +14,8 @@ import (
 var sqlFS embed.FS
 
 // Apply runs bundled SQL in order, committing each file before the next one.
-// A failed migration prevents startup with an incompatible schema.
+// Already-applied files are skipped (tracked in schema_migrations) so parallel
+// test/API processes do not re-run DDL and deadlock.
 func Apply(ctx context.Context, pool *pgxpool.Pool) error {
 	entries, err := fs.Glob(sqlFS, "sql/*.sql")
 	if err != nil {
@@ -36,13 +37,31 @@ func Apply(ctx context.Context, pool *pgxpool.Pool) error {
 		_, _ = conn.Exec(context.Background(), `SELECT pg_advisory_unlock(hashtext('luxus-connect-schema'))`)
 	}()
 
+	if _, err := conn.Exec(ctx, `
+		CREATE TABLE IF NOT EXISTS schema_migrations (
+			filename text PRIMARY KEY,
+			applied_at timestamptz NOT NULL DEFAULT now()
+		)`); err != nil {
+		return fmt.Errorf("schema_migrations: %w", err)
+	}
+
 	for _, name := range entries {
+		var done bool
+		if err := conn.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM schema_migrations WHERE filename = $1)`, name).Scan(&done); err != nil {
+			return err
+		}
+		if done {
+			continue
+		}
 		body, err := sqlFS.ReadFile(name)
 		if err != nil {
 			return err
 		}
 		if err := execMulti(ctx, conn, string(body)); err != nil {
 			return fmt.Errorf("%s: %w", name, err)
+		}
+		if _, err := conn.Exec(ctx, `INSERT INTO schema_migrations (filename) VALUES ($1) ON CONFLICT DO NOTHING`, name); err != nil {
+			return fmt.Errorf("%s record: %w", name, err)
 		}
 	}
 	return nil

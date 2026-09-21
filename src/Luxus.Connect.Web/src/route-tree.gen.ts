@@ -42,6 +42,8 @@ import { Route as _appBillingCyclesCycleIdRouteImport } from './pages/__app/bill
 import { Route as _appStockDevicesIndexRouteImport } from './pages/__app/stock/devices/index'
 import { Route as _appSalesNewIndexRouteImport } from './pages/__app/sales/new/index'
 import { Route as _appReportsTransitionPendingIndexRouteImport } from './pages/__app/reports/transition-pending/index'
+import { Route as _appReportsReconciliationIndexRouteImport } from './pages/__app/reports/reconciliation/index'
+import { Route as _appReportsLineConsumptionIndexRouteImport } from './pages/__app/reports/line-consumption/index'
 import { Route as _appPartnerRequestsIndexRouteImport } from './pages/__app/partner/requests/index'
 import { Route as _appPartnerPhoneLinesIndexRouteImport } from './pages/__app/partner/phone-lines/index'
 import { Route as _appPartnerFinancialIndexRouteImport } from './pages/__app/partner/financial/index'
@@ -55,6 +57,7 @@ import { Route as _appFinanceInvoiceEmailTemplatesIndexRouteImport } from './pag
 import { Route as _appFinanceFinancialAgentIndexRouteImport } from './pages/__app/finance/financial-agent/index'
 import { Route as _appFinanceCustomerInvoicesIndexRouteImport } from './pages/__app/finance/customer-invoices/index'
 import { Route as _appFinanceCollectionsIndexRouteImport } from './pages/__app/finance/collections/index'
+import { Route as _appAuditEventsIndexRouteImport } from './pages/__app/audit/events/index'
 import { Route as _appPartnerCommercialSalesSaleIdRouteImport } from './pages/__app/partner/commercial-sales/$saleId'
 import { Route as _appFinanceInvoiceLayoutTemplatesIdRouteImport } from './pages/__app/finance/invoice-layout-templates/$id'
 import { Route as _appFinanceCustomerInvoicesBulkGenerateRouteImport } from './pages/__app/finance/customer-invoices/bulk-generate'
@@ -232,6 +235,18 @@ const _appReportsTransitionPendingIndexRoute =
     path: '/reports/transition-pending/',
     getParentRoute: () => _appLayoutRoute,
   } as any)
+const _appReportsReconciliationIndexRoute =
+  _appReportsReconciliationIndexRouteImport.update({
+    id: '/reports/reconciliation/',
+    path: '/reports/reconciliation/',
+    getParentRoute: () => _appLayoutRoute,
+  } as any)
+const _appReportsLineConsumptionIndexRoute =
+  _appReportsLineConsumptionIndexRouteImport.update({
+    id: '/reports/line-consumption/',
+    path: '/reports/line-consumption/',
+    getParentRoute: () => _appLayoutRoute,
+  } as any)
 const _appPartnerRequestsIndexRoute =
   _appPartnerRequestsIndexRouteImport.update({
     id: '/partner/requests/',
@@ -310,6 +325,11 @@ const _appFinanceCollectionsIndexRoute =
     path: '/finance/collections/',
     getParentRoute: () => _appLayoutRoute,
   } as any)
+const _appAuditEventsIndexRoute = _appAuditEventsIndexRouteImport.update({
+  id: '/audit/events/',
+  path: '/audit/events/',
+  getParentRoute: () => _appLayoutRoute,
+} as any)
 const _appPartnerCommercialSalesSaleIdRoute =
   _appPartnerCommercialSalesSaleIdRouteImport.update({
     id: '/partner/commercial-sales/$saleId',
@@ -375,6 +395,7 @@ export interface FileRoutesByFullPath {
   '/finance/customer-invoices/bulk-generate': typeof _appFinanceCustomerInvoicesBulkGenerateRoute
   '/finance/invoice-layout-templates/$id': typeof _appFinanceInvoiceLayoutTemplatesIdRoute
   '/partner/commercial-sales/$saleId': typeof _appPartnerCommercialSalesSaleIdRoute
+  '/audit/events/': typeof _appAuditEventsIndexRoute
   '/finance/collections/': typeof _appFinanceCollectionsIndexRoute
   '/finance/customer-invoices/': typeof _appFinanceCustomerInvoicesIndexRoute
   '/finance/financial-agent/': typeof _appFinanceFinancialAgentIndexRoute
@@ -388,6 +409,8 @@ export interface FileRoutesByFullPath {
   '/partner/financial/': typeof _appPartnerFinancialIndexRoute
   '/partner/phone-lines/': typeof _appPartnerPhoneLinesIndexRoute
   '/partner/requests/': typeof _appPartnerRequestsIndexRoute
+  '/reports/line-consumption/': typeof _appReportsLineConsumptionIndexRoute
+  '/reports/reconciliation/': typeof _appReportsReconciliationIndexRoute
   '/reports/transition-pending/': typeof _appReportsTransitionPendingIndexRoute
   '/sales/new/': typeof _appSalesNewIndexRoute
   '/stock/devices/': typeof _appStockDevicesIndexRoute
@@ -427,6 +450,7 @@ export interface FileRoutesByTo {
   '/finance/customer-invoices/bulk-generate': typeof _appFinanceCustomerInvoicesBulkGenerateRoute
   '/finance/invoice-layout-templates/$id': typeof _appFinanceInvoiceLayoutTemplatesIdRoute
   '/partner/commercial-sales/$saleId': typeof _appPartnerCommercialSalesSaleIdRoute
+  '/audit/events': typeof _appAuditEventsIndexRoute
   '/finance/collections': typeof _appFinanceCollectionsIndexRoute
   '/finance/customer-invoices': typeof _appFinanceCustomerInvoicesIndexRoute
   '/finance/financial-agent': typeof _appFinanceFinancialAgentIndexRoute
@@ -440,6 +464,8 @@ export interface FileRoutesByTo {
   '/partner/financial': typeof _appPartnerFinancialIndexRoute
   '/partner/phone-lines': typeof _appPartnerPhoneLinesIndexRoute
   '/partner/requests': typeof _appPartnerRequestsIndexRoute
+  '/reports/line-consumption': typeof _appReportsLineConsumptionIndexRoute
+  '/reports/reconciliation': typeof _appReportsReconciliationIndexRoute
   '/reports/transition-pending': typeof _appReportsTransitionPendingIndexRoute
   '/sales/new': typeof _appSalesNewIndexRoute
   '/stock/devices': typeof _appStockDevicesIndexRoute
@@ -481,6 +507,7 @@ export interface FileRoutesById {
   '/__app/finance/customer-invoices/bulk-generate': typeof _appFinanceCustomerInvoicesBulkGenerateRoute
   '/__app/finance/invoice-layout-templates/$id': typeof _appFinanceInvoiceLayoutTemplatesIdRoute
   '/__app/partner/commercial-sales/$saleId': typeof _appPartnerCommercialSalesSaleIdRoute
+  '/__app/audit/events/': typeof _appAuditEventsIndexRoute
   '/__app/finance/collections/': typeof _appFinanceCollectionsIndexRoute
   '/__app/finance/customer-invoices/': typeof _appFinanceCustomerInvoicesIndexRoute
   '/__app/finance/financial-agent/': typeof _appFinanceFinancialAgentIndexRoute
@@ -494,6 +521,8 @@ export interface FileRoutesById {
   '/__app/partner/financial/': typeof _appPartnerFinancialIndexRoute
   '/__app/partner/phone-lines/': typeof _appPartnerPhoneLinesIndexRoute
   '/__app/partner/requests/': typeof _appPartnerRequestsIndexRoute
+  '/__app/reports/line-consumption/': typeof _appReportsLineConsumptionIndexRoute
+  '/__app/reports/reconciliation/': typeof _appReportsReconciliationIndexRoute
   '/__app/reports/transition-pending/': typeof _appReportsTransitionPendingIndexRoute
   '/__app/sales/new/': typeof _appSalesNewIndexRoute
   '/__app/stock/devices/': typeof _appStockDevicesIndexRoute
@@ -535,6 +564,7 @@ export interface FileRouteTypes {
     | '/finance/customer-invoices/bulk-generate'
     | '/finance/invoice-layout-templates/$id'
     | '/partner/commercial-sales/$saleId'
+    | '/audit/events/'
     | '/finance/collections/'
     | '/finance/customer-invoices/'
     | '/finance/financial-agent/'
@@ -548,6 +578,8 @@ export interface FileRouteTypes {
     | '/partner/financial/'
     | '/partner/phone-lines/'
     | '/partner/requests/'
+    | '/reports/line-consumption/'
+    | '/reports/reconciliation/'
     | '/reports/transition-pending/'
     | '/sales/new/'
     | '/stock/devices/'
@@ -587,6 +619,7 @@ export interface FileRouteTypes {
     | '/finance/customer-invoices/bulk-generate'
     | '/finance/invoice-layout-templates/$id'
     | '/partner/commercial-sales/$saleId'
+    | '/audit/events'
     | '/finance/collections'
     | '/finance/customer-invoices'
     | '/finance/financial-agent'
@@ -600,6 +633,8 @@ export interface FileRouteTypes {
     | '/partner/financial'
     | '/partner/phone-lines'
     | '/partner/requests'
+    | '/reports/line-consumption'
+    | '/reports/reconciliation'
     | '/reports/transition-pending'
     | '/sales/new'
     | '/stock/devices'
@@ -640,6 +675,7 @@ export interface FileRouteTypes {
     | '/__app/finance/customer-invoices/bulk-generate'
     | '/__app/finance/invoice-layout-templates/$id'
     | '/__app/partner/commercial-sales/$saleId'
+    | '/__app/audit/events/'
     | '/__app/finance/collections/'
     | '/__app/finance/customer-invoices/'
     | '/__app/finance/financial-agent/'
@@ -653,6 +689,8 @@ export interface FileRouteTypes {
     | '/__app/partner/financial/'
     | '/__app/partner/phone-lines/'
     | '/__app/partner/requests/'
+    | '/__app/reports/line-consumption/'
+    | '/__app/reports/reconciliation/'
     | '/__app/reports/transition-pending/'
     | '/__app/sales/new/'
     | '/__app/stock/devices/'
@@ -896,6 +934,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof _appReportsTransitionPendingIndexRouteImport
       parentRoute: typeof _appLayoutRoute
     }
+    '/__app/reports/reconciliation/': {
+      id: '/__app/reports/reconciliation/'
+      path: '/reports/reconciliation'
+      fullPath: '/reports/reconciliation/'
+      preLoaderRoute: typeof _appReportsReconciliationIndexRouteImport
+      parentRoute: typeof _appLayoutRoute
+    }
+    '/__app/reports/line-consumption/': {
+      id: '/__app/reports/line-consumption/'
+      path: '/reports/line-consumption'
+      fullPath: '/reports/line-consumption/'
+      preLoaderRoute: typeof _appReportsLineConsumptionIndexRouteImport
+      parentRoute: typeof _appLayoutRoute
+    }
     '/__app/partner/requests/': {
       id: '/__app/partner/requests/'
       path: '/partner/requests'
@@ -987,6 +1039,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof _appFinanceCollectionsIndexRouteImport
       parentRoute: typeof _appLayoutRoute
     }
+    '/__app/audit/events/': {
+      id: '/__app/audit/events/'
+      path: '/audit/events'
+      fullPath: '/audit/events/'
+      preLoaderRoute: typeof _appAuditEventsIndexRouteImport
+      parentRoute: typeof _appLayoutRoute
+    }
     '/__app/partner/commercial-sales/$saleId': {
       id: '/__app/partner/commercial-sales/$saleId'
       path: '/partner/commercial-sales/$saleId'
@@ -1059,6 +1118,7 @@ interface _appLayoutRouteChildren {
   _appFinanceCustomerInvoicesBulkGenerateRoute: typeof _appFinanceCustomerInvoicesBulkGenerateRoute
   _appFinanceInvoiceLayoutTemplatesIdRoute: typeof _appFinanceInvoiceLayoutTemplatesIdRoute
   _appPartnerCommercialSalesSaleIdRoute: typeof _appPartnerCommercialSalesSaleIdRoute
+  _appAuditEventsIndexRoute: typeof _appAuditEventsIndexRoute
   _appFinanceCollectionsIndexRoute: typeof _appFinanceCollectionsIndexRoute
   _appFinanceCustomerInvoicesIndexRoute: typeof _appFinanceCustomerInvoicesIndexRoute
   _appFinanceFinancialAgentIndexRoute: typeof _appFinanceFinancialAgentIndexRoute
@@ -1072,6 +1132,8 @@ interface _appLayoutRouteChildren {
   _appPartnerFinancialIndexRoute: typeof _appPartnerFinancialIndexRoute
   _appPartnerPhoneLinesIndexRoute: typeof _appPartnerPhoneLinesIndexRoute
   _appPartnerRequestsIndexRoute: typeof _appPartnerRequestsIndexRoute
+  _appReportsLineConsumptionIndexRoute: typeof _appReportsLineConsumptionIndexRoute
+  _appReportsReconciliationIndexRoute: typeof _appReportsReconciliationIndexRoute
   _appReportsTransitionPendingIndexRoute: typeof _appReportsTransitionPendingIndexRoute
   _appSalesNewIndexRoute: typeof _appSalesNewIndexRoute
   _appStockDevicesIndexRoute: typeof _appStockDevicesIndexRoute
@@ -1115,6 +1177,7 @@ const _appLayoutRouteChildren: _appLayoutRouteChildren = {
   _appFinanceInvoiceLayoutTemplatesIdRoute:
     _appFinanceInvoiceLayoutTemplatesIdRoute,
   _appPartnerCommercialSalesSaleIdRoute: _appPartnerCommercialSalesSaleIdRoute,
+  _appAuditEventsIndexRoute: _appAuditEventsIndexRoute,
   _appFinanceCollectionsIndexRoute: _appFinanceCollectionsIndexRoute,
   _appFinanceCustomerInvoicesIndexRoute: _appFinanceCustomerInvoicesIndexRoute,
   _appFinanceFinancialAgentIndexRoute: _appFinanceFinancialAgentIndexRoute,
@@ -1130,6 +1193,8 @@ const _appLayoutRouteChildren: _appLayoutRouteChildren = {
   _appPartnerFinancialIndexRoute: _appPartnerFinancialIndexRoute,
   _appPartnerPhoneLinesIndexRoute: _appPartnerPhoneLinesIndexRoute,
   _appPartnerRequestsIndexRoute: _appPartnerRequestsIndexRoute,
+  _appReportsLineConsumptionIndexRoute: _appReportsLineConsumptionIndexRoute,
+  _appReportsReconciliationIndexRoute: _appReportsReconciliationIndexRoute,
   _appReportsTransitionPendingIndexRoute:
     _appReportsTransitionPendingIndexRoute,
   _appSalesNewIndexRoute: _appSalesNewIndexRoute,

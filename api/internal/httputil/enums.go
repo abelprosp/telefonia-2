@@ -19,6 +19,8 @@ func ImportRequestStatusString(status int) string {
 	}
 }
 
+// NormalizeDigits strips non-digit characters. Prefer phone.Normalize for
+// telephone numbers when original+normalized pair is needed for audit.
 func NormalizeDigits(s string) string {
 	var b strings.Builder
 	for _, r := range s {

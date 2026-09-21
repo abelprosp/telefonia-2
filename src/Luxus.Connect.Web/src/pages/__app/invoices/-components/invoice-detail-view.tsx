@@ -1,8 +1,11 @@
+import { useState } from 'react';
+
 import { Link } from '@tanstack/react-router';
 import { ChevronLeft } from 'lucide-react';
 import { toast } from 'sonner';
 
 import type { GetProviderInvoiceResponse } from '@/api';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
@@ -101,6 +104,7 @@ export function InvoiceDetailView({
 }: InvoiceDetailViewProps) {
   const { canAccessFinance } = useAuthRoles();
   const undoInvoice = useUndoProviderInvoice();
+  const [undoConfirmOpen, setUndoConfirmOpen] = useState(false);
   const undone = Boolean((invoice as GetProviderInvoiceResponse & { undone_at?: string }).undone_at);
   const backLink = {
     to: '/invoices' as const,
@@ -131,18 +135,39 @@ export function InvoiceDetailView({
             </p>
           </div>
           {canAccessFinance && !undone && invoice.status !== 'substituted' && (
-            <Button variant="destructive" disabled={undoInvoice.isPending} onClick={() => {
-              if (window.confirm('Desfazer toda a importação? As linhas criadas serão removidas, as alterações registradas serão revertidas e as contas a pagar, a receber e cobranças vinculadas serão canceladas. Se houver pagamentos, boletos ativos ou vínculos posteriores, nada será alterado e a pendência será informada.')) {
-                undoInvoice.mutate(invoice.id!, {
-                  onSuccess: () => toast.success('Importação desfeita: linhas removidas, alterações revertidas e lançamentos vinculados cancelados.'),
-                  onError: (error) => toast.error(getErrorMessage(error))
-                });
-              }
-            }}>{undoInvoice.isPending ? 'Desfazendo…' : 'Desfazer toda a importação'}</Button>
+            <Button
+              variant="destructive"
+              disabled={undoInvoice.isPending}
+              onClick={() => setUndoConfirmOpen(true)}
+            >
+              {undoInvoice.isPending ? 'Desfazendo…' : 'Desfazer toda a importação'}
+            </Button>
           )}
           {undone && <p className="text-muted-foreground text-sm" role="status">Importação desfeita.</p>}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={undoConfirmOpen}
+        title="Desfazer importação da fatura"
+        description={`Fatura ${invoice.number ?? invoice.id}: as linhas criadas serão removidas, as alterações registradas serão revertidas e as contas a pagar, a receber e cobranças vinculadas serão canceladas. Se houver pagamentos, boletos ativos ou vínculos posteriores, nada será alterado.`}
+        confirmLabel="Desfazer importação"
+        destructive
+        requirePhrase="DESFAZER"
+        loading={undoInvoice.isPending}
+        onCancel={() => setUndoConfirmOpen(false)}
+        onConfirm={() => {
+          undoInvoice.mutate(invoice.id!, {
+            onSuccess: () => {
+              toast.success(
+                'Importação desfeita: linhas removidas, alterações revertidas e lançamentos vinculados cancelados.'
+              );
+              setUndoConfirmOpen(false);
+            },
+            onError: (error) => toast.error(getErrorMessage(error))
+          });
+        }}
+      />
 
       <DetailSection
         title="Identificação e valores"

@@ -13,6 +13,7 @@ import (
 	"github.com/luxus-connect/telefonia/api/internal/httputil"
 	"github.com/luxus-connect/telefonia/api/internal/models"
 	"github.com/luxus-connect/telefonia/api/internal/notifications"
+	"github.com/luxus-connect/telefonia/api/internal/phone"
 	"github.com/luxus-connect/telefonia/api/internal/statemachine"
 	"github.com/luxus-connect/telefonia/api/internal/store"
 )
@@ -50,9 +51,13 @@ func (s *Service) CreateStockPhoneLine(ctx context.Context, input models.CreateS
 		return nil, err
 	}
 
-	number := httputil.NormalizeDigits(strings.TrimSpace(input.Number))
+	numberNorm := phone.Normalize(input.Number)
+	number := numberNorm.Normalized
 	if number == "" {
 		return nil, httputil.ValidationError(notifications.PhoneLineNumberRequired)
+	}
+	if !phone.IsValidBasic(number, 8, 15) {
+		return nil, httputil.ValidationError(notifications.N("PHONE_LINE_NUMBER_INVALID", "Número telefônico inválido após normalização."))
 	}
 
 	providerID := strings.TrimSpace(input.ProviderID)
@@ -117,10 +122,139 @@ func (s *Service) CreateStockPhoneLine(ctx context.Context, input models.CreateS
 	}
 
 	id := uuid.New().String()
-	if err := s.Store.CreatePhoneLine(ctx, id, planID, account.ID, number); err != nil {
+	if err := s.Store.CreatePhoneLineWithIdentity(ctx, id, planID, account.ID, number, numberNorm.Original, number); err != nil {
 		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
+	_ = s.recordDomainAudit(ctx, orgID, "phone_line", id, "create", map[string]any{
+		"number": number, "status": "in_stock",
+	}, nil)
 	return s.GetPhoneLine(ctx, id)
+}
+
+func (s *Service) BulkCreateStockPhoneLines(ctx context.Context, input models.BulkCreateStockPhoneLinesInput) (*models.BulkCreateStockPhoneLinesResponse, error) {
+	if len(input.Lines) == 0 {
+		return nil, httputil.ValidationError(notifications.N("BULK_LINES_REQUIRED", "Informe ao menos uma linha no lote."))
+	}
+	if len(input.Lines) > 500 {
+		return nil, httputil.ValidationError(notifications.N("BULK_LINES_LIMIT", "O lote não pode exceder 500 linhas."))
+	}
+
+	seen := map[string]int{}
+	out := &models.BulkCreateStockPhoneLinesResponse{
+		Items: make([]models.BulkCreateStockPhoneLineItemResult, 0, len(input.Lines)),
+	}
+
+	// Pre-validate batch duplicates (no silent writes of invalid rows).
+	type prepared struct {
+		idx    int
+		input  models.CreateStockPhoneLineInput
+		norm   string
+		reject string
+	}
+	prep := make([]prepared, len(input.Lines))
+	for i, line := range input.Lines {
+		p := prepared{idx: i}
+		providerID := input.ProviderID
+		if line.ProviderID != nil && strings.TrimSpace(*line.ProviderID) != "" {
+			providerID = strings.TrimSpace(*line.ProviderID)
+		}
+		account := input.ProviderAccountNumber
+		if line.ProviderAccountNumber != nil && strings.TrimSpace(*line.ProviderAccountNumber) != "" {
+			account = strings.TrimSpace(*line.ProviderAccountNumber)
+		}
+		planID := input.ProviderPlanID
+		if line.ProviderPlanID != nil && strings.TrimSpace(*line.ProviderPlanID) != "" {
+			planID = strings.TrimSpace(*line.ProviderPlanID)
+		}
+		norm := phone.Normalize(line.Number)
+		p.norm = norm.Normalized
+		p.input = models.CreateStockPhoneLineInput{
+			Number:                line.Number,
+			ProviderID:            providerID,
+			ProviderAccountNumber: account,
+			ProviderPlanID:        planID,
+		}
+		if p.norm == "" {
+			p.reject = "Número vazio ou sem dígitos."
+		} else if !phone.IsValidBasic(p.norm, 8, 15) {
+			p.reject = "Número inválido após normalização."
+		} else if prev, dup := seen[p.norm]; dup {
+			p.reject = fmt.Sprintf("Duplicado no lote (mesma linha do índice %d).", prev)
+		} else {
+			seen[p.norm] = i
+		}
+		prep[i] = p
+	}
+
+	// Transactional policy: each valid line is committed independently so a rejection
+	// does not roll back previously created valid lines; invalid rows are never written.
+	for _, p := range prep {
+		item := models.BulkCreateStockPhoneLineItemResult{
+			Index:  p.idx,
+			Number: p.norm,
+		}
+		if p.reject != "" {
+			item.Status = "rejected"
+			item.Reason = p.reject
+			out.Rejected++
+			out.Items = append(out.Items, item)
+			continue
+		}
+		existing, err := s.Store.GetPhoneLineByNumber(ctx, p.norm)
+		if err != nil {
+			item.Status = "rejected"
+			item.Reason = err.Error()
+			out.Rejected++
+			out.Items = append(out.Items, item)
+			continue
+		}
+		if existing != nil {
+			item.Status = "ignored"
+			item.Reason = "Número já cadastrado no banco de dados."
+			if line, gerr := s.GetPhoneLine(ctx, existing.ID); gerr == nil {
+				item.Line = line
+			}
+			out.Ignored++
+			out.Items = append(out.Items, item)
+			continue
+		}
+		created, err := s.CreateStockPhoneLine(ctx, p.input)
+		if err != nil {
+			if app, ok := err.(*httputil.AppError); ok && app.Kind == httputil.ErrorBusiness {
+				item.Status = "ignored"
+				item.Reason = app.Error()
+				out.Ignored++
+			} else {
+				item.Status = "rejected"
+				item.Reason = err.Error()
+				out.Rejected++
+			}
+			out.Items = append(out.Items, item)
+			continue
+		}
+		item.Status = "created"
+		item.Line = created
+		out.Created++
+		out.Items = append(out.Items, item)
+	}
+	return out, nil
+}
+
+func (s *Service) recordDomainAudit(ctx context.Context, orgID, entityType, entityID, action string, after, before map[string]any) error {
+	var actorPtr *string
+	if u := auth.UserFromContext(ctx); u != nil && u.ID != "" {
+		actorPtr = &u.ID
+	}
+	return s.Store.InsertDomainAuditEvent(ctx, store.DomainAuditEventRow{
+		ID:             uuid.New().String(),
+		OrganizationID: orgID,
+		EntityType:     entityType,
+		EntityID:       entityID,
+		Action:         action,
+		ActorUserID:    actorPtr,
+		BeforeJSON:     store.AuditJSON(before),
+		AfterJSON:      store.AuditJSON(after),
+	})
 }
 
 func (s *Service) ListPhoneLineCustomerLinks(ctx context.Context, phoneLineID string) ([]models.PhoneLineCustomerLinkResponse, error) {
@@ -207,6 +341,9 @@ func (s *Service) AssignPhoneLineCustomer(ctx context.Context, phoneLineID strin
 
 	s.auditLog(ctx, "Assign", "PhoneLineCustomerLink", phoneLineID, map[string]any{"previous_customer_id": prevCustomerID},
 		map[string]any{"customer_id": input.CustomerID, "start_date": start.Format("2006-01-02")})
+	_ = s.recordDomainAudit(ctx, orgID, "phone_line", phoneLineID, "assign_customer", map[string]any{
+		"customer_id": input.CustomerID, "start_date": start.Format("2006-01-02"),
+	}, map[string]any{"previous_customer_id": prevCustomerID})
 	if prevCustomerID != "" && prevCustomerID != input.CustomerID {
 		hasOther, _ := s.Store.CustomerHasOtherActivePhoneLines(ctx, orgID, prevCustomerID, phoneLineID)
 		if !hasOther {
@@ -342,6 +479,9 @@ func (s *Service) UnassignPhoneLineCustomer(ctx context.Context, phoneLineID str
 
 	s.auditLog(ctx, "Unassign", "PhoneLineCustomerLink", phoneLineID,
 		map[string]any{"customer_id": activeCustomerID}, map[string]any{"end_date": end.Format("2006-01-02")})
+	_ = s.recordDomainAudit(ctx, orgID, "phone_line", phoneLineID, "unassign_customer", map[string]any{
+		"end_date": end.Format("2006-01-02"),
+	}, map[string]any{"customer_id": activeCustomerID})
 	hasOther, _ := s.Store.CustomerHasOtherActivePhoneLines(ctx, orgID, activeCustomerID, phoneLineID)
 	if !hasOther {
 		_ = s.Store.InactivateCustomer(ctx, activeCustomerID)

@@ -184,6 +184,14 @@ var (
 	CustomerContractingCompanyMismatch = N("CUSTOMER_CONTRACTING_COMPANY_MISMATCH", "Customer contracting company mismatch.")
 	ImportPDFNotParsed                 = N("IMPORT_PDF_NOT_PARSED", "PDF ainda não parseado. Importe o arquivo TXT equivalente da operadora.")
 	ImportHeaderMissing                = N("IMPORT_HEADER_MISSING", "Registro 010D não encontrado no arquivo.")
+	ImportCompetenceMismatch           = N("IMPORT_COMPETENCE_MISMATCH", "Competência da fatura diverge da competência selecionada. Importação bloqueada.")
+	ImportCompetenceUndetermined       = N("IMPORT_COMPETENCE_UNDETERMINED", "Não foi possível determinar a competência da fatura com segurança. Importação bloqueada.")
+	ImportFileInvalid                  = N("IMPORT_FILE_INVALID", "Arquivo de fatura inválido.")
+	ImportFileReadError                = N("IMPORT_FILE_READ_ERROR", "Erro ao ler o arquivo de fatura.")
+	ImportFormatUnsupported            = N("IMPORT_FORMAT_UNSUPPORTED", "Formato de arquivo não suportado.")
+	ImportDataInconsistent             = N("IMPORT_DATA_INCONSISTENT", "Dados da fatura inconsistentes.")
+	ImportProcessingFailed             = N("IMPORT_PROCESSING_FAILED", "Falha no processamento da importação.")
+	ImportCompletedSuccess             = N("IMPORT_COMPLETED_SUCCESS", "Importação concluída com sucesso.")
 )
 
 // Exceedances & fidelity
