@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"crypto/subtle"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -285,13 +286,14 @@ func (h *Handler) syncZapSignContract(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) zapsignWebhook(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	if h.ZapSignWebhookToken == "" {
 		httputil.WriteFail(w, http.StatusServiceUnavailable, notifications.N("ZAPSIGN_WEBHOOK_NOT_CONFIGURED", "Webhook do ZapSign não configurado."))
 		return
 	}
 	auth := r.Header.Get("Authorization")
 	headerToken := r.Header.Get("X-ZapSign-Token")
-	if auth != "Bearer "+h.ZapSignWebhookToken && auth != h.ZapSignWebhookToken && headerToken != h.ZapSignWebhookToken {
+	if !secureWebhookTokenEqual(auth, "Bearer "+h.ZapSignWebhookToken) && !secureWebhookTokenEqual(auth, h.ZapSignWebhookToken) && !secureWebhookTokenEqual(headerToken, h.ZapSignWebhookToken) {
 		httputil.WriteFail(w, http.StatusUnauthorized, notifications.N("ZAPSIGN_WEBHOOK_UNAUTHORIZED", "Token de webhook inválido."))
 		return
 	}
@@ -313,4 +315,11 @@ func (h *Handler) zapsignWebhook(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	w.WriteHeader(http.StatusOK)
+}
+
+func secureWebhookTokenEqual(got, expected string) bool {
+	if got == "" || expected == "" {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(got), []byte(expected)) == 1
 }
