@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -37,13 +36,16 @@ func New(ctx context.Context, databaseURL string) (*Store, error) {
 		return nil, fmt.Errorf("dbmigrate: %w", err)
 	}
 	if err := s.ensureOrganizationSettingsSchema(ctx); err != nil {
-		fmt.Fprintf(os.Stderr, "ensure OrganizationSettings schema: %v\n", err)
+		pool.Close()
+		return nil, fmt.Errorf("ensure OrganizationSettings schema: %w", err)
 	}
 	if err := s.ensureProcessingMonthSchema(ctx); err != nil {
-		fmt.Fprintf(os.Stderr, "ensure ProcessingMonths schema: %v\n", err)
+		pool.Close()
+		return nil, fmt.Errorf("ensure ProcessingMonths schema: %w", err)
 	}
 	if err := s.ensureFinancialAgentSchema(ctx); err != nil {
-		fmt.Fprintf(os.Stderr, "ensure FinancialAgent schema: %v\n", err)
+		pool.Close()
+		return nil, fmt.Errorf("ensure FinancialAgent schema: %w", err)
 	}
 	return s, nil
 }

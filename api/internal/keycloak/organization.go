@@ -44,6 +44,37 @@ func (c *AdminClient) GetUserOrganizationAttribute(ctx context.Context, userID s
 	return values[0], nil
 }
 
+// GetUserOrganizationIDAttribute returns the plain UUID organization_id attribute.
+func (c *AdminClient) GetUserOrganizationIDAttribute(ctx context.Context, userID string) (string, error) {
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return "", fmt.Errorf("user id is required")
+	}
+
+	path := fmt.Sprintf("/admin/realms/%s/users/%s", c.realm, userID)
+	resp, err := c.do(ctx, http.MethodGet, path, nil)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("get user: %s", string(body))
+	}
+
+	var user userAttributesRecord
+	if err := json.NewDecoder(resp.Body).Decode(&user); err != nil {
+		return "", err
+	}
+
+	values := user.Attributes["organization_id"]
+	if len(values) == 0 || strings.TrimSpace(values[0]) == "" {
+		return "", fmt.Errorf("organization_id attribute not found")
+	}
+	return strings.TrimSpace(values[0]), nil
+}
+
 // SetUserOrganizationAttribute replaces the organization user attribute while
 // preserving every other Keycloak attribute on the user representation.
 func (c *AdminClient) SetUserOrganizationAttribute(ctx context.Context, userID, orgID, orgName string) error {

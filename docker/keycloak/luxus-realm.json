@@ -243,8 +243,8 @@
   ],
   "clientScopes": [
     {
-      "name": "organization",
-      "description": "Claim organization no token",
+      "name": "tenant-organization",
+      "description": "Tenant organization claim from user attribute (avoids Keycloak Organizations scope collision)",
       "protocol": "openid-connect",
       "attributes": {
         "include.in.token.scope": "true",
@@ -343,7 +343,7 @@
       "attributes": {
         "client.use.lightweight.access.token.enabled": "false"
       },
-      "defaultClientScopes": ["openid", "profile", "email", "organization", "luxus-roles"],
+      "defaultClientScopes": ["openid", "profile", "email", "tenant-organization", "luxus-roles"],
       "optionalClientScopes": ["offline_access"],
       "protocolMappers": [
         {

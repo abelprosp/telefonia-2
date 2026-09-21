@@ -18,8 +18,8 @@ func TestDefaultOrganizationAttribute_usesSlugAndID(t *testing.T) {
 	if attrs["organization_id"][0] != orgID {
 		t.Fatalf("expected organization_id attribute, got %v", attrs["organization_id"])
 	}
-	if strings.Contains(raw, `""`) {
-		t.Fatalf("unexpected empty quotes in %s", raw)
+	if !strings.Contains(raw, "Acme Telecom") {
+		t.Fatalf("expected org name in payload, got %s", raw)
 	}
 }
 

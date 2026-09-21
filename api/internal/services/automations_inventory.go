@@ -90,8 +90,8 @@ func (s *Service) CreateWebhook(ctx context.Context, input models.CreateWebhookS
 		return nil, err
 	}
 	url := strings.TrimSpace(input.URL)
-	if !strings.HasPrefix(url, "https://") && !strings.HasPrefix(url, "http://") {
-		return nil, httputil.ValidationError(notifications.N("INVALID_WEBHOOK_URL", "URL do webhook deve ser HTTP/HTTPS válida."))
+	if err := httputil.ValidatePublicHTTPSWebhookURL(url); err != nil {
+		return nil, httputil.ValidationError(notifications.N("INVALID_WEBHOOK_URL", err.Error()))
 	}
 	events := make([]string, 0, len(input.Events))
 	for _, e := range input.Events {
@@ -187,7 +187,10 @@ func (s *Service) DispatchWebhookEvent(orgID, event string, data map[string]any)
 	}()
 }
 
-func postWebhook(ctx context.Context, url, secret string, payload map[string]any) (int, string, error) {
+func postWebhook(ctx context.Context, targetURL, secret string, payload map[string]any) (int, string, error) {
+	if err := httputil.ValidatePublicHTTPSWebhookURL(targetURL); err != nil {
+		return 0, "", err
+	}
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return 0, "", err
@@ -196,7 +199,7 @@ func postWebhook(ctx context.Context, url, secret string, payload map[string]any
 	_, _ = mac.Write(body)
 	sig := hex.EncodeToString(mac.Sum(nil))
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, targetURL, bytes.NewReader(body))
 	if err != nil {
 		return 0, "", err
 	}

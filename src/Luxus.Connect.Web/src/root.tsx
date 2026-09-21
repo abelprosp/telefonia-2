@@ -32,10 +32,10 @@ const router = createRouter({
 const oidcConfig: AuthProviderProps = {
   authority: `${env.VITE_AUTH_URL.replace(/\/+$/, '')}/realms/luxus`,
   client_id: env.VITE_CLIENT_ID,
-  scope: 'openid organization',
+  scope: 'openid tenant-organization',
   redirect_uri: window.location.origin,
-  userStore: new WebStorageStateStore({ store: window.localStorage }),
-  stateStore: new WebStorageStateStore({ store: window.localStorage }),
+  userStore: new WebStorageStateStore({ store: window.sessionStorage }),
+  stateStore: new WebStorageStateStore({ store: window.sessionStorage }),
   onSigninCallback: () => {
     window.history.replaceState({}, document.title, window.location.pathname);
   },

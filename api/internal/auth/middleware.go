@@ -71,7 +71,10 @@ func (m *Middleware) authenticateRequest(r *http.Request, required bool) (*http.
 	}
 	tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
 
-	token, err := jwt.Parse(tokenStr, m.jwks.Keyfunc)
+	token, err := jwt.Parse(tokenStr, m.jwks.Keyfunc,
+		jwt.WithValidMethods([]string{"RS256"}),
+		jwt.WithExpirationRequired(),
+	)
 	if err != nil || !token.Valid {
 		return nil, fmt.Errorf("Invalid token")
 	}
@@ -80,35 +83,40 @@ func (m *Middleware) authenticateRequest(r *http.Request, required bool) (*http.
 	if !ok {
 		return nil, fmt.Errorf("Invalid token claims")
 	}
+	if err := m.validateTokenIssuerAudience(claims); err != nil {
+		return nil, err
+	}
 
 	user := extractUser(claims)
 	user = m.enrichUserIdentity(r.Context(), tokenStr, claims, user)
 	ctx := WithUser(r.Context(), user)
 
 	var org *Organization
-	if claim, ok := claims["organization"]; ok && claim != nil {
-		parsed, err := ParseOrganizationFromClaims(claim)
-		if err != nil {
-			m.logger.Warn("failed to parse organization claim", "error", err)
-		} else {
-			org = parsed
+	// Prefer the Keycloak user attribute written at user-create time. The SPA
+	// historically requested the built-in "organization" scope, which collides
+	// with Keycloak Organizations and often yields a claim without nested id.
+	if user != nil && strings.TrimSpace(user.ID) != "" {
+		if resolved := m.resolveOrganizationFromKeycloak(r.Context(), user.ID); resolved != nil {
+			org = resolved
 		}
 	}
-	// Optional plain claim used by some mappers: organization_id=<uuid>
-	if (org == nil || strings.TrimSpace(org.ID) == "") {
+	if org == nil || strings.TrimSpace(org.ID) == "" {
+		if claim, ok := claims["organization"]; ok && claim != nil {
+			parsed, err := ParseOrganizationFromClaims(claim)
+			if err != nil {
+				m.logger.Warn("failed to parse organization claim", "error", err)
+			} else {
+				org = parsed
+			}
+		}
+	}
+	if org == nil || strings.TrimSpace(org.ID) == "" {
 		if id := strings.TrimSpace(claimString(claims["organization_id"])); id != "" {
 			name := ""
 			if org != nil {
 				name = org.Name
 			}
 			org = &Organization{ID: id, Name: name}
-		}
-	}
-	// Keycloak JWT org claims often omit "id". Fall back to the user attribute
-	// whenever the claim is missing or incomplete.
-	if (org == nil || strings.TrimSpace(org.ID) == "") && user != nil {
-		if resolved := m.resolveOrganizationFromKeycloak(r.Context(), user.ID); resolved != nil {
-			org = resolved
 		}
 	}
 	if org != nil {
@@ -188,6 +196,58 @@ func claimString(raw any) string {
 		return fmt.Sprintf("%.0f", n)
 	}
 	return ""
+}
+
+func (m *Middleware) validateTokenIssuerAudience(claims jwt.MapClaims) error {
+	expectedIssuer := strings.TrimRight(m.cfg.KeycloakPublicAuthServerURL, "/") + "/realms/" + m.cfg.KeycloakRealm
+	if expectedIssuer == "/realms/" || strings.HasSuffix(expectedIssuer, "/realms/") {
+		expectedIssuer = strings.TrimRight(m.cfg.KeycloakAuthServerURL, "/") + "/realms/" + m.cfg.KeycloakRealm
+	}
+	iss := strings.TrimSpace(claimString(claims["iss"]))
+	if expectedIssuer != "" && !strings.HasSuffix(expectedIssuer, "/realms/") {
+		if iss != expectedIssuer {
+			// Accept either public or internal issuer used by Keycloak behind reverse proxy.
+			alt := strings.TrimRight(m.cfg.KeycloakAuthServerURL, "/") + "/realms/" + m.cfg.KeycloakRealm
+			if iss != alt {
+				return fmt.Errorf("Invalid token issuer")
+			}
+		}
+	}
+
+	clientID := strings.TrimSpace(m.cfg.KeycloakResource)
+	if clientID == "" {
+		return nil
+	}
+	if azp := strings.TrimSpace(claimString(claims["azp"])); azp != "" {
+		if azp != clientID {
+			return fmt.Errorf("Invalid token audience")
+		}
+		return nil
+	}
+	if !audienceContains(claims["aud"], clientID) {
+		return fmt.Errorf("Invalid token audience")
+	}
+	return nil
+}
+
+func audienceContains(raw any, clientID string) bool {
+	switch v := raw.(type) {
+	case string:
+		return strings.TrimSpace(v) == clientID
+	case []any:
+		for _, item := range v {
+			if s, ok := item.(string); ok && strings.TrimSpace(s) == clientID {
+				return true
+			}
+		}
+	case []string:
+		for _, s := range v {
+			if strings.TrimSpace(s) == clientID {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func MFAVerifiedFromClaims(acr string, amr []string) bool {

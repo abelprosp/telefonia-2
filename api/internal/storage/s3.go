@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -11,6 +12,9 @@ import (
 	"github.com/luxus-connect/telefonia/api/internal/config"
 	"github.com/luxus-connect/telefonia/api/internal/models"
 )
+
+// MaxObjectBytes is the hard ceiling for objects loaded into memory (invoice import).
+const MaxObjectBytes int64 = 256 * 1024 * 1024
 
 type Client struct {
 	presigner *s3.PresignClient
@@ -86,16 +90,16 @@ func (c *Client) GetObject(ctx context.Context, bucket, key string) ([]byte, err
 		return nil, err
 	}
 	defer out.Body.Close()
-	buf := make([]byte, 0, 1024*1024)
-	for {
-		chunk := make([]byte, 32*1024)
-		n, readErr := out.Body.Read(chunk)
-		if n > 0 {
-			buf = append(buf, chunk[:n]...)
-		}
-		if readErr != nil {
-			break
-		}
+	if out.ContentLength != nil && *out.ContentLength > MaxObjectBytes {
+		return nil, fmt.Errorf("object exceeds maximum size of %d bytes", MaxObjectBytes)
+	}
+	limited := io.LimitReader(out.Body, MaxObjectBytes+1)
+	buf, err := io.ReadAll(limited)
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(buf)) > MaxObjectBytes {
+		return nil, fmt.Errorf("object exceeds maximum size of %d bytes", MaxObjectBytes)
 	}
 	return buf, nil
 }

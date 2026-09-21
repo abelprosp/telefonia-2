@@ -80,6 +80,11 @@ func toListUser(u keycloak.UserRecord) models.ListOrganizationUserResponse {
 				orgName = parsed.Name
 			}
 		}
+		if orgID == "" {
+			if ids, ok := u.Attributes["organization_id"]; ok && len(ids) > 0 {
+				orgID = strings.TrimSpace(ids[0])
+			}
+		}
 	}
 
 	return models.ListOrganizationUserResponse{
@@ -100,26 +105,20 @@ func (s *Service) ListOrganizationUsers(ctx context.Context, search string) ([]m
 	if s.Keycloak == nil || !s.Keycloak.Enabled() {
 		return nil, httputil.UnavailableError(notifications.N("KEYCLOAK_ADMIN_UNAVAILABLE", "User management is not configured."))
 	}
+	callerOrg, err := requireCallerOrganization(ctx)
+	if err != nil {
+		return nil, err
+	}
 	users, err := s.Keycloak.ListUsers(ctx, search, 200)
 	if err != nil {
 		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
 
-	currentOrg := auth.NormalizeOrganization(auth.OrganizationFromContext(ctx))
-	isMaster := auth.IsMaster(ctx)
-	isPlatformAdmin := isMaster && currentOrg != nil && currentOrg.ID == auth.DefaultLuxusOrganizationID
-
 	items := make([]models.ListOrganizationUserResponse, 0, len(users))
 	for _, u := range users {
 		item := toListUser(u)
-		// Platform (Luxus) masters see everyone. Other tenants only see their org.
-		if !isPlatformAdmin {
-			if currentOrg == nil || strings.TrimSpace(currentOrg.ID) == "" {
-				continue
-			}
-			if item.OrganizationID != currentOrg.ID {
-				continue
-			}
+		if item.OrganizationID != callerOrg.ID {
+			continue
 		}
 		items = append(items, item)
 	}
@@ -152,6 +151,17 @@ func (s *Service) CreateOrganizationUser(ctx context.Context, input models.Creat
 	var targetOrgName string
 
 	if isNewUserMaster {
+		callerOrg, err := requireCallerOrganization(ctx)
+		if err != nil {
+			return nil, err
+		}
+		// Somente a org plataforma Luxus pode provisionar novas empresas/masters.
+		if callerOrg.ID != auth.DefaultLuxusOrganizationID {
+			return nil, httputil.ForbiddenError(notifications.N(
+				"FORBIDDEN",
+				"Apenas o administrador da plataforma pode criar usuários Master com nova empresa.",
+			))
+		}
 		// Novo Master = nova organização isolada (UUID próprio no token/atributo).
 		targetOrgID = uuid.NewString()
 		if input.OrganizationName == nil || strings.TrimSpace(*input.OrganizationName) == "" {
@@ -293,14 +303,24 @@ func (s *Service) UpdateOrganizationUser(ctx context.Context, userID string, inp
 		return nil, httputil.ValidationError(notifications.N("USER_NOT_FOUND", "User was not found."))
 	}
 
+	callerOrg, err := requireCallerOrganization(ctx)
+	if err != nil {
+		return nil, err
+	}
+	target, err := s.Keycloak.GetUserByID(ctx, userID)
+	if err != nil {
+		return nil, httputil.NotFoundError(notifications.N("USER_NOT_FOUND", "User was not found."))
+	}
+	targetItem := toListUser(*target)
+	isPlatformAdmin := callerOrg.ID == auth.DefaultLuxusOrganizationID
+	if !isPlatformAdmin && targetItem.OrganizationID != callerOrg.ID {
+		return nil, httputil.ForbiddenError(notifications.N("FORBIDDEN", "Usuário fora da organização autenticada."))
+	}
+
 	if input.FirstName != nil || input.LastName != nil || input.Email != nil {
-		currentUser, err := s.Keycloak.GetUserByID(ctx, userID)
-		if err != nil {
-			return nil, httputil.NotFoundError(notifications.N("USER_NOT_FOUND", "User was not found."))
-		}
-		firstName := currentUser.FirstName
-		lastName := currentUser.LastName
-		email := currentUser.Email
+		firstName := target.FirstName
+		lastName := target.LastName
+		email := target.Email
 		if input.FirstName != nil {
 			firstName = strings.TrimSpace(*input.FirstName)
 		}
@@ -349,18 +369,11 @@ func (s *Service) UpdateOrganizationUser(ctx context.Context, userID string, inp
 				"Informe o nome da empresa.",
 			))
 		}
-		callerOrg := auth.NormalizeOrganization(auth.OrganizationFromContext(ctx))
-		isPlatformAdmin := auth.IsMaster(ctx) && callerOrg != nil && callerOrg.ID == auth.DefaultLuxusOrganizationID
 		if !isPlatformAdmin {
 			return nil, httputil.ForbiddenError(notifications.N("FORBIDDEN", "Only the platform admin can reassign organizations."))
 		}
 
-		currentUser, err := s.Keycloak.GetUserByID(ctx, userID)
-		if err != nil {
-			return nil, httputil.NotFoundError(notifications.N("USER_NOT_FOUND", "User was not found."))
-		}
-		item := toListUser(*currentUser)
-		orgID := strings.TrimSpace(item.OrganizationID)
+		orgID := strings.TrimSpace(targetItem.OrganizationID)
 		if orgID == "" || orgID == "luxus" || orgID == "default" {
 			// Usuário sem tenant próprio: provisiona organização nova.
 			orgID = uuid.NewString()
@@ -399,5 +412,13 @@ func (s *Service) UpdateOrganizationUser(ctx context.Context, userID string, inp
 	}
 	item := toListUser(*created)
 	return &item, nil
+}
+
+func requireCallerOrganization(ctx context.Context) (*auth.Organization, error) {
+	org := auth.NormalizeOrganization(auth.OrganizationFromContext(ctx))
+	if org == nil || strings.TrimSpace(org.ID) == "" {
+		return nil, httputil.BusinessError(notifications.SharedOrganizationRequired)
+	}
+	return org, nil
 }
 

@@ -160,7 +160,9 @@ func (c *AdminClient) ListUsers(ctx context.Context, search string, max int) ([]
 	if max <= 0 {
 		max = 100
 	}
-	path := fmt.Sprintf("/admin/realms/%s/users?max=%d", c.realm, max)
+	// briefRepresentation=false is required so Keycloak returns user attributes
+	// (organization / organization_id) used for tenant isolation in the UI.
+	path := fmt.Sprintf("/admin/realms/%s/users?max=%d&briefRepresentation=false", c.realm, max)
 	if strings.TrimSpace(search) != "" {
 		path += "&search=" + url.QueryEscape(strings.TrimSpace(search))
 	}
@@ -443,11 +445,21 @@ func (c *AdminClient) ResetPassword(ctx context.Context, userID, password string
 
 func DefaultOrganizationAttribute(orgID, orgName string) map[string][]string {
 	orgID = strings.TrimSpace(orgID)
-	safeName := strings.ReplaceAll(strings.TrimSpace(orgName), `"`, "")
-	alias := organizationAlias(orgID, safeName)
-	raw := fmt.Sprintf(`{"%s":{"id":"%s","name":["%s"]}}`, alias, orgID, safeName)
+	orgName = strings.TrimSpace(orgName)
+	alias := organizationAlias(orgID, orgName)
+	payload := map[string]any{
+		alias: map[string]any{
+			"id":   orgID,
+			"name": []string{orgName},
+		},
+	}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		// Extremely unlikely; keep a minimal fallback without string interpolation risks.
+		raw = []byte(`{"org":{"id":"` + orgID + `","name":[""]}}`)
+	}
 	return map[string][]string{
-		"organization":    {raw},
+		"organization":    {string(raw)},
 		"organization_id": {orgID},
 	}
 }
