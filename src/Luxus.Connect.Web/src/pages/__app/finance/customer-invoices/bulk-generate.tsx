@@ -28,8 +28,8 @@ import {
   useManualBillingPreview,
   useManualGenerateBillingDocuments
 } from '@/lib/billing-api';
-import { formatMoney, todayISO } from '@/lib/financial-api';
 import { downloadFinancialExport } from '@/lib/fidelity-api';
+import { formatMoney, todayISO } from '@/lib/financial-api';
 
 const EMPTY_PREVIEW_ITEMS: BulkBillingPreviewItem[] = [];
 
@@ -204,7 +204,7 @@ function BulkGenerateInvoicesPage() {
           )
       }
     ],
-    [mode, previewItems, selectedIds]
+    [mode, previewItems, selectedIds, toggleAllEligible, toggleCustomer]
   );
 
   const handleGenerate = () => {

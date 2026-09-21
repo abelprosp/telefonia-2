@@ -5,6 +5,7 @@ import { Filter, PackageX, Plus } from 'lucide-react';
 
 import { useGetV1PhoneLines, type ListPhoneLineResponse } from '@/api';
 import { DataTable, DataTablePagination } from '@/components/data-table';
+import { LinkCustomerLineSheet } from '@/components/link-customer-line-sheet';
 import { ListPageHeader, ListPageSkeleton } from '@/components/list-page';
 import { Button } from '@/components/ui/button';
 import {
@@ -22,7 +23,6 @@ import {
   SelectValue
 } from '@/components/ui/select';
 import { getErrorMessage, isApiHttpError } from '@/lib/api-error';
-import { LinkCustomerLineSheet } from '@/components/link-customer-line-sheet';
 import { parseTotalCount } from '@/lib/query-utils';
 
 import { createStockLinesColumns } from './columns';

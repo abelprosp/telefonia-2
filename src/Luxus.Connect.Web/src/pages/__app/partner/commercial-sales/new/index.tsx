@@ -1,9 +1,13 @@
 import { useState } from 'react';
 
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
+import { Layers } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { BatchSalePhoneLineDialog } from '@/components/batch-sale-phone-line-dialog';
 import { PageWrapper } from '@/components/page-wrapper';
+import { SaleDevicePicker, buildDeviceSaleDescription } from '@/components/sale-device-picker';
+import { SalePhoneLinePicker, buildPhoneLineSaleDescription } from '@/components/sale-phone-line-picker';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -16,10 +20,6 @@ import {
   SelectValue
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Layers } from 'lucide-react';
-import { SalePhoneLinePicker, buildPhoneLineSaleDescription } from '@/components/sale-phone-line-picker';
-import { BatchSalePhoneLineDialog } from '@/components/batch-sale-phone-line-dialog';
-import { SaleDevicePicker, buildDeviceSaleDescription } from '@/components/sale-device-picker';
 import { getErrorMessage, isApiHttpError } from '@/lib/api-error';
 import { usePartnerCustomers } from '@/lib/partner-api';
 import {

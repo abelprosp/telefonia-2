@@ -2,12 +2,13 @@ import '@/index.css';
 import '@/polyfills';
 
 import { RouterProvider, createRouter } from '@tanstack/react-router';
-import { createRoot } from 'react-dom/client';
 import { WebStorageStateStore } from 'oidc-client-ts';
+import { createRoot } from 'react-dom/client';
 import { AuthProvider, type AuthProviderProps } from 'react-oidc-context';
 
 // Import the generated route tree
 import { env } from '@/env';
+import { MemoryStorage } from '@/lib/oidc-memory-storage';
 import { AppProvider } from '@/providers/app';
 // import { AuthProvider } from '@/providers/auth';
 import { routeTree } from '@/route-tree.gen';
@@ -29,13 +30,18 @@ const router = createRouter({
   defaultPreloadStaleTime: 0
 });
 
+// Tokens stay in memory (XSS blast radius). OIDC redirect state still needs
+// sessionStorage so the auth callback survives the Keycloak round-trip.
+const oidcUserStore = new WebStorageStateStore({ store: new MemoryStorage() });
+const oidcStateStore = new WebStorageStateStore({ store: window.sessionStorage });
+
 const oidcConfig: AuthProviderProps = {
   authority: `${env.VITE_AUTH_URL.replace(/\/+$/, '')}/realms/luxus`,
   client_id: env.VITE_CLIENT_ID,
   scope: 'openid tenant-organization',
   redirect_uri: window.location.origin,
-  userStore: new WebStorageStateStore({ store: window.sessionStorage }),
-  stateStore: new WebStorageStateStore({ store: window.sessionStorage }),
+  userStore: oidcUserStore,
+  stateStore: oidcStateStore,
   onSigninCallback: () => {
     window.history.replaceState({}, document.title, window.location.pathname);
   },
@@ -50,4 +56,3 @@ createRoot(document.getElementById('root')!).render(
     </AppProvider>
   </AuthProvider>
 );
-

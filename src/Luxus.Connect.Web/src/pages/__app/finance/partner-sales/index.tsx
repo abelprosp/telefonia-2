@@ -12,7 +12,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { getErrorMessage, isApiHttpError } from '@/lib/api-error';
-import { formatPhoneNumber } from '@/lib/format';
 import {
   type PartnerSale,
   firstDayOfMonthISO,
@@ -24,6 +23,7 @@ import {
   useUpdateCommissionSettings,
   useUpdatePartnerSaleStatus
 } from '@/lib/financial-api';
+import { formatPhoneNumber } from '@/lib/format';
 
 const searchSchema = z.object({
   page: z.number().int().min(1).catch(1),

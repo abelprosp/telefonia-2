@@ -1,4 +1,5 @@
 import { useState } from 'react';
+
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
@@ -29,8 +30,9 @@ import {
   SheetTitle
 } from '@/components/ui/sheet';
 import { getErrorMessage, isApiHttpError } from '@/lib/api-error';
-import { invalidateDashboardCaches } from '@/lib/query-utils';
 import { emptyCustomerAddress, hasCustomerAddress, registrationDraft, registrationPayload } from '@/lib/customer-registration';
+import { invalidateDashboardCaches } from '@/lib/query-utils';
+
 import { CustomerRegistrationFields } from './customer-registration-fields';
 
 const formSchema = z

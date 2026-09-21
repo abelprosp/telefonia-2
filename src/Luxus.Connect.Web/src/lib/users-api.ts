@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import client from '@/lib/client';
 import type { UserProfile } from '@/lib/auth-roles';
+import client from '@/lib/client';
 
 export type OrganizationUser = {
   id: string;

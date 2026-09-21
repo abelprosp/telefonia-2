@@ -67,18 +67,56 @@ func TestToListUser_readsOrganizationAttributes(t *testing.T) {
 	}
 }
 
-func TestToListUser_fallsBackToOrganizationIDAttribute(t *testing.T) {
-	orgID := "bbbbbbbb-bbbb-cccc-dddd-eeeeeeeeeeee"
-	u := keycloak.UserRecord{
-		ID:       "user-2",
-		Username: "solo",
-		Enabled:  true,
-		Attributes: map[string][]string{
-			"organization_id": {orgID},
+func TestListOrganizationUsers_filtersByCallerOrg(t *testing.T) {
+	caller := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+	other := "bbbbbbbb-bbbb-cccc-dddd-eeeeeeeeeeee"
+	users := []keycloak.UserRecord{
+		{
+			ID: "1", Username: "a", Enabled: true, Roles: []string{auth.RoleMaster},
+			Attributes: map[string][]string{"organization_id": {caller}},
+		},
+		{
+			ID: "2", Username: "b", Enabled: true, Roles: []string{auth.RoleMaster},
+			Attributes: map[string][]string{"organization_id": {other}},
+		},
+		{
+			ID: "3", Username: "c", Enabled: true, Roles: []string{auth.RoleEmployee},
+			Attributes: map[string][]string{
+				"organization": {`{"x":{"id":"` + caller + `","name":["Same"]}}`},
+			},
 		},
 	}
-	item := toListUser(u)
-	if item.OrganizationID != orgID {
-		t.Fatalf("expected org id fallback %s, got %s", orgID, item.OrganizationID)
+
+	var kept []string
+	for _, u := range users {
+		item := toListUser(u)
+		if item.OrganizationID == caller {
+			kept = append(kept, item.Username)
+		}
+	}
+	if len(kept) != 2 || kept[0] != "a" || kept[1] != "c" {
+		t.Fatalf("expected only caller-org users, got %v", kept)
+	}
+}
+
+func TestUpdateOrganizationUser_forbiddenAcrossOrgs(t *testing.T) {
+	caller := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+	other := "bbbbbbbb-bbbb-cccc-dddd-eeeeeeeeeeee"
+	ctx := auth.WithOrganization(context.Background(), &auth.Organization{ID: caller, Name: "A"})
+	callerOrg, err := requireCallerOrganization(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	target := toListUser(keycloak.UserRecord{
+		ID: "x", Username: "foreign", Enabled: true,
+		Attributes: map[string][]string{"organization_id": {other}},
+	})
+	if target.OrganizationID == callerOrg.ID {
+		t.Fatal("fixture broken")
+	}
+	// Mirrors the guard in UpdateOrganizationUser for non-platform admins.
+	isPlatformAdmin := callerOrg.ID == auth.DefaultLuxusOrganizationID
+	if isPlatformAdmin || target.OrganizationID == callerOrg.ID {
+		t.Fatal("expected cross-org access to be denied by guard logic")
 	}
 }

@@ -30,8 +30,9 @@ import {
 } from '@/components/ui/sheet';
 import { Textarea } from '@/components/ui/textarea';
 import { getErrorMessage, isApiHttpError } from '@/lib/api-error';
-import { formatProcessingMonthStatus } from '@/lib/format';
 import { downloadFinancialExport } from '@/lib/fidelity-api';
+import { formatMoney } from '@/lib/financial-api';
+import { formatProcessingMonthStatus } from '@/lib/format';
 import {
   useCloseProcessingMonthWithHash,
   useProcessingMonthLineReadiness,
@@ -40,7 +41,6 @@ import {
   useRunProcessingMonthPipeline,
   useSimulateBillingImpact
 } from '@/lib/ops-api';
-import { formatMoney } from '@/lib/financial-api';
 
 export type ProcessingMonthListSearch = {
   page: number;

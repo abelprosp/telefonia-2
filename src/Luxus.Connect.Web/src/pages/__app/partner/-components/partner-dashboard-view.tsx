@@ -1,6 +1,8 @@
 import { Link } from '@tanstack/react-router';
 import { ClipboardList, Phone, Users, Wallet } from 'lucide-react';
 
+import { DashboardMetricCard } from '../../-components/dashboard/dashboard-metric-card';
+
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -24,7 +26,6 @@ import {
 } from '@/lib/partner-api';
 import { parseTotalCount } from '@/lib/query-utils';
 
-import { DashboardMetricCard } from '../../-components/dashboard/dashboard-metric-card';
 
 const formatCount = (value: number) =>
   new Intl.NumberFormat('pt-BR').format(value);

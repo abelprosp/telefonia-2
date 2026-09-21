@@ -5,11 +5,12 @@ import { type ColumnDef } from '@tanstack/react-table';
 import { Handshake, TrendingUp, Wallet } from 'lucide-react';
 import { z } from 'zod';
 
+import { DashboardMetricCard } from '../../-components/dashboard/dashboard-metric-card';
+
 import { DataTable, DataTablePagination } from '@/components/data-table';
 import { ListPageHeader, ListPageSkeleton } from '@/components/list-page';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getErrorMessage, isApiHttpError } from '@/lib/api-error';
-import { formatPhoneNumber } from '@/lib/format';
 import {
   type PartnerSale,
   formatFinancialStatus,
@@ -17,8 +18,8 @@ import {
   usePartnerFinancialSummary,
   usePartnerSales
 } from '@/lib/financial-api';
+import { formatPhoneNumber } from '@/lib/format';
 
-import { DashboardMetricCard } from '../../-components/dashboard/dashboard-metric-card';
 
 const searchSchema = z.object({
   page: z.number().int().min(1).catch(1),

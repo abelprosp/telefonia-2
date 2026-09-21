@@ -1,3 +1,4 @@
+import { useNavigate } from '@tanstack/react-router';
 import {
   ChevronDown,
   HelpCircle,
@@ -5,10 +6,9 @@ import {
   Search,
   UserCircle
 } from 'lucide-react';
-import { useNavigate } from '@tanstack/react-router';
-
 import { useAuth } from 'react-oidc-context';
 
+import { NotificationsDropdown } from '@/components/notifications-dropdown';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -22,10 +22,9 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { SidebarTrigger } from '@/components/ui/sidebar';
-import { roleLabel, useAuthRoles } from '@/lib/auth-roles';
 import { performLogout } from '@/lib/auth-actions';
+import { roleLabel, useAuthRoles } from '@/lib/auth-roles';
 
-import { NotificationsDropdown } from '@/components/notifications-dropdown';
 
 export const AppTopBar = () => {
   const auth = useAuth();

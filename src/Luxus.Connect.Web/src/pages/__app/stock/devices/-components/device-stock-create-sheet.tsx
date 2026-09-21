@@ -8,7 +8,6 @@ import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import {
   Sheet,
   SheetClose,
@@ -18,6 +17,7 @@ import {
   SheetHeader,
   SheetTitle
 } from '@/components/ui/sheet';
+import { Textarea } from '@/components/ui/textarea';
 import { getErrorMessage, isApiHttpError } from '@/lib/api-error';
 import { useCreateDeviceStockItem } from '@/lib/device-stock-api';
 

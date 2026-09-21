@@ -5,6 +5,8 @@ import { type ColumnDef } from '@tanstack/react-table';
 import { Plus, Users } from 'lucide-react';
 import { z } from 'zod';
 
+import { PartnerCustomerCreateSheet } from '../-components/partner-customer-create-sheet';
+
 import { type ListCustomerResponse } from '@/api';
 import { DataTable, DataTablePagination } from '@/components/data-table';
 import { ListPageHeader, ListPageSkeleton } from '@/components/list-page';
@@ -21,7 +23,6 @@ import { getErrorMessage, isApiHttpError } from '@/lib/api-error';
 import { formatCpfCnpj } from '@/lib/format';
 import { usePartnerCustomers } from '@/lib/partner-api';
 
-import { PartnerCustomerCreateSheet } from '../-components/partner-customer-create-sheet';
 
 const searchSchema = z.object({
   page: z.number().int().min(1).catch(1),

@@ -1,5 +1,6 @@
 import { LogIn, RefreshCw } from 'lucide-react';
 import { useAuth } from 'react-oidc-context';
+
 import { Button } from '@/components/ui/button';
 
 interface AuthConfigErrorProps {

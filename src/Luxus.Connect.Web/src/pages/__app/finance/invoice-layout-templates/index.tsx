@@ -6,8 +6,8 @@ import { DataTable } from '@/components/data-table';
 import { ListPageHeader, ListPageSkeleton } from '@/components/list-page';
 import { PageWrapper } from '@/components/page-wrapper';
 import { Button } from '@/components/ui/button';
-import { useInvoiceLayoutTemplates } from '@/lib/invoice-layout-api';
 import type { InvoiceLayoutTemplate } from '@/lib/invoice-layout/types';
+import { useInvoiceLayoutTemplates } from '@/lib/invoice-layout-api';
 
 export const Route = createFileRoute('/__app/finance/invoice-layout-templates/')({
   component: InvoiceLayoutTemplatesPage

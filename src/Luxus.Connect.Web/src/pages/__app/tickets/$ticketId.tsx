@@ -8,8 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { getErrorMessage, isApiHttpError } from '@/lib/api-error';
-import { defaultTicketStorageBucket, downloadTicketAttachment, putTicketAttachmentFile, requestTicketAttachmentUploadUrl } from '@/lib/ticket-attachment-upload';
 import { useAddTicketMessage, useSupportTicket, useUpdateSupportTicket } from '@/lib/ops-api';
+import { defaultTicketStorageBucket, downloadTicketAttachment, putTicketAttachmentFile, requestTicketAttachmentUploadUrl } from '@/lib/ticket-attachment-upload';
 
 export const Route = createFileRoute('/__app/tickets/$ticketId')({
   component: TicketDetailPage

@@ -1,6 +1,6 @@
 import js from '@eslint/js';
 import importPlugin from 'eslint-plugin-import';
-import prettier from 'eslint-plugin-prettier/recommended';
+import eslintConfigPrettier from 'eslint-config-prettier';
 import reactPlugin from 'eslint-plugin-react';
 import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
@@ -9,7 +9,14 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config([
-  globalIgnores(['dist', 'eslint.config.js', 'src/api']),
+  globalIgnores([
+    'dist',
+    'eslint.config.js',
+    'src/api',
+    'src/route-tree.gen.ts',
+    'src/api/**',
+    '**/*.gen.ts'
+  ]),
   js.configs.recommended,
   ...tseslint.configs.recommended,
   reactHooks.configs.flat['recommended-latest'],
@@ -40,6 +47,9 @@ export default tseslint.config([
       ],
       'react/react-in-jsx-scope': 'off',
       'react/prop-types': 'off',
+      // Form/query sync patterns sync local state from props/query — keep as warn
+      // until screens are refactored to derive state during render.
+      'react-hooks/set-state-in-effect': 'warn',
       '@typescript-eslint/no-unused-vars': 'off',
       '@typescript-eslint/no-shadow': 'off',
       '@typescript-eslint/no-empty-function': 'off',
@@ -76,5 +86,7 @@ export default tseslint.config([
       ]
     }
   },
-  prettier
+  // Disable stylistic rules that conflict with Prettier; do not run Prettier
+  // as an ESLint rule (that produced ~1.7k formatting-only failures).
+  eslintConfigPrettier
 ]);

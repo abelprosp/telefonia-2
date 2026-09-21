@@ -23,7 +23,6 @@ import {
   SidebarMenuItem,
   useSidebar
 } from '@/components/ui/sidebar';
-
 import { performLogout } from '@/lib/auth-actions';
 
 export const NavUser = ({

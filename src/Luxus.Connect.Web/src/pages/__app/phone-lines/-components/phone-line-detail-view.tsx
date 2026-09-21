@@ -45,6 +45,7 @@ import {
   TableRow
 } from '@/components/ui/table';
 import { getErrorMessage, isApiHttpError } from '@/lib/api-error';
+import { useUpdatePhoneLineExceedance } from '@/lib/fidelity-api';
 import { formatMoney } from '@/lib/financial-api';
 import {
   formatCpfCnpj,
@@ -52,6 +53,7 @@ import {
   formatPhoneNumber,
   formatTransitionSubStatus
 } from '@/lib/format';
+import { useStateTransitions, usePhoneLine360 } from '@/lib/ops-api';
 import {
   formatMoneyInput,
   parseMoneyInput,
@@ -61,8 +63,6 @@ import {
   usePutPhoneLineTransition,
   useUpdatePhoneLineClassification
 } from '@/lib/phone-line-spec-api';
-import { useUpdatePhoneLineExceedance } from '@/lib/fidelity-api';
-import { useStateTransitions, usePhoneLine360 } from '@/lib/ops-api';
 import { cn } from '@/lib/utils';
 
 import { BillingProcessingPanel } from './billing-processing-panel';

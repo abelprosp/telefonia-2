@@ -10,8 +10,8 @@ import {
   TooltipContent,
   TooltipTrigger
 } from '@/components/ui/tooltip';
-import { formatInvoiceStatus } from '@/lib/format';
 import { formatFinancialStatus } from '@/lib/financial-api';
+import { formatInvoiceStatus } from '@/lib/format';
 
 type InvoicesListSearch = {
   page: number;

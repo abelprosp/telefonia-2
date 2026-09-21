@@ -18,6 +18,7 @@ import {
   usePatchV1CustomersId,
   type ListCustomerResponse
 } from '@/api';
+import { LinkCustomerLineSheet } from '@/components/link-customer-line-sheet';
 import { Button } from '@/components/ui/button';
 import {
   Field,
@@ -44,31 +45,32 @@ import {
   TableHeader,
   TableRow
 } from '@/components/ui/table';
-import { BillingReadinessPanel } from './billing-readiness-panel';
 import { getErrorMessage, isApiHttpError } from '@/lib/api-error';
+import { useAuthRoles } from '@/lib/auth-roles';
+import { client } from '@/lib/client';
 import {
   useCustomerDevices,
   useUnassignCustomerDevice
 } from '@/lib/customer-devices-api';
+import { emptyCustomerAddress, hasCustomerAddress, registrationDraft, registrationPayload, type RegisteredCustomer } from '@/lib/customer-registration';
+import { formatMoney } from '@/lib/financial-api';
 import {
   formatCpfCnpj,
   formatCustomerType,
   formatPhoneLineStatus
 } from '@/lib/format';
-import { formatMoney } from '@/lib/financial-api';
-import { invalidateDashboardCaches } from '@/lib/query-utils';
 import { useCustomer360, useAnonymizeCustomer } from '@/lib/ops-api';
-import { useAuthRoles } from '@/lib/auth-roles';
-import { client } from '@/lib/client';
+import { invalidateDashboardCaches } from '@/lib/query-utils';
 import { cn } from '@/lib/utils';
 
+import { AssignCustomerDeviceSheet } from './assign-customer-device-sheet';
+import { BillingReadinessPanel } from './billing-readiness-panel';
 import { CustomerAttachmentsView } from './customer-attachments-view';
 import { CustomerContractsSection } from './customer-contracts-section';
-import { AssignCustomerDeviceSheet } from './assign-customer-device-sheet';
-import { GenerateCustomerInvoiceSheet } from './generate-customer-invoice-sheet';
-import { LinkCustomerLineSheet } from '@/components/link-customer-line-sheet';
-import { emptyCustomerAddress, hasCustomerAddress, registrationDraft, registrationPayload, type RegisteredCustomer } from '@/lib/customer-registration';
 import { CustomerRegistrationFields } from './customer-registration-fields';
+import { GenerateCustomerInvoiceSheet } from './generate-customer-invoice-sheet';
+
+
 
 type ListSearch = {
   page: number;

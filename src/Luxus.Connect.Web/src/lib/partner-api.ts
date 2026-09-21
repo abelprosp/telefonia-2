@@ -1,9 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import type { ListCustomerResponse } from '@/api';
 import client from '@/lib/client';
 import { parseTotalCount } from '@/lib/query-utils';
 
-import type { ListCustomerResponse } from '@/api';
 
 export type PartnerDashboardStats = {
   customers_count: number;

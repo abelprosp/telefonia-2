@@ -1,6 +1,8 @@
 import { Link } from '@tanstack/react-router';
 import { ArrowDownCircle, ArrowUpCircle, FileText, Handshake, Layers, Mail, MessageCircle, Wallet } from 'lucide-react';
 
+import { DashboardMetricCard } from '../../-components/dashboard/dashboard-metric-card';
+
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -17,7 +19,6 @@ import {
   useFinancialSummaryReport
 } from '@/lib/ops-api';
 
-import { DashboardMetricCard } from '../../-components/dashboard/dashboard-metric-card';
 
 export function FinanceDashboardView() {
   const summaryQuery = useFinancialSummary();

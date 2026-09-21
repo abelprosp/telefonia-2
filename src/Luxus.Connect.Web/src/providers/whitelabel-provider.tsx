@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, type ReactNode } from 'react';
+
 import { useOrganizationSettingsQuery, type WhitelabelSettings } from '@/api/settings-api';
 
 type WhitelabelContextType = {

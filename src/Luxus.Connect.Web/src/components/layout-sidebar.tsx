@@ -33,8 +33,8 @@ import {
   SidebarMenuItem,
   SidebarRail
 } from '@/components/ui/sidebar';
-import { useAuthRoles } from '@/lib/auth-roles';
 import { performLogout } from '@/lib/auth-actions';
+import { useAuthRoles } from '@/lib/auth-roles';
 import { useWhitelabel } from '@/providers/whitelabel-provider';
 
 type MenuItem = {
