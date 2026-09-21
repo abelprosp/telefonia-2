@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -221,7 +222,7 @@ func (s *Service) HandleSicrediWebhook(ctx context.Context, r *http.Request) err
 	if s.Sicredi != nil && s.Sicredi.Enabled() {
 		cfg := s.Sicredi.Config()
 		token := strings.TrimSpace(cfg.WebhookToken)
-		if token != "" && (authHeader == "Bearer "+token || authHeader == token) {
+		if token != "" && (secureTokenEqual(authHeader, "Bearer "+token) || secureTokenEqual(authHeader, token)) {
 			tokenOK = true
 		}
 	}
@@ -299,6 +300,13 @@ func (s *Service) HandleSicrediWebhook(ctx context.Context, r *http.Request) err
 	}
 	_ = s.Store.MarkSicrediWebhookEventProcessed(ctx, eventID, errMsg, time.Now().UTC())
 	return nil
+}
+
+func secureTokenEqual(got, expected string) bool {
+	if got == "" || expected == "" {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(got), []byte(expected)) == 1
 }
 
 func (s *Service) processSicrediWebhookEvent(ctx context.Context, eventType, nossoNumero, idEmpresa string, payload map[string]any) error {

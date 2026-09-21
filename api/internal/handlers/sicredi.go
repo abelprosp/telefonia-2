@@ -11,6 +11,9 @@ import (
 )
 
 func (h *Handler) sicrediWebhook(w http.ResponseWriter, r *http.Request) {
+	// Sicredi sends a small JSON event. Bound the body before parsing so the
+	// public webhook cannot be used to exhaust API memory.
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	if err := h.Svc.HandleSicrediWebhook(r.Context(), r); err != nil {
 		httputil.HandleServiceError(w, err)
 		return
