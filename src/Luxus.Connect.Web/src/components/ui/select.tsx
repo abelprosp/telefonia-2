@@ -5,7 +5,69 @@ import { ChevronDownIcon, CheckIcon, ChevronUpIcon } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 
-const Select = SelectPrimitive.Root;
+type SelectItemsMap = Record<string, React.ReactNode>;
+
+const SelectItemsRegistrarContext = React.createContext<
+  ((items: SelectItemsMap) => void) | null
+>(null);
+
+function collectSelectItemLabels(node: React.ReactNode, out: SelectItemsMap = {}): SelectItemsMap {
+  React.Children.forEach(node, (child) => {
+    if (!React.isValidElement(child)) return;
+    const props = child.props as {
+      value?: unknown;
+      children?: React.ReactNode;
+    };
+    // SelectItem always has a value; SelectGroup/Fragment only nest children.
+    if ('value' in props && props.value != null && props.value !== '') {
+      out[String(props.value)] = props.children;
+    }
+    if (props.children) {
+      collectSelectItemLabels(props.children, out);
+    }
+  });
+  return out;
+}
+
+function Select<Value = string>({
+  items: itemsProp,
+  children,
+  ...props
+}: SelectPrimitive.Root.Props<Value>) {
+  const [autoItems, setAutoItems] = React.useState<SelectItemsMap>({});
+  const registerItems = React.useCallback((next: SelectItemsMap) => {
+    setAutoItems((prev) => {
+      const keys = Object.keys(next);
+      if (
+        keys.length === Object.keys(prev).length &&
+        keys.every((k) => prev[k] === next[k])
+      ) {
+        return prev;
+      }
+      return { ...prev, ...next };
+    });
+  }, []);
+
+  const items = React.useMemo(() => {
+    if (!itemsProp && Object.keys(autoItems).length === 0) return undefined;
+    if (Array.isArray(itemsProp)) {
+      // Prefer explicit array shape; still merge auto labels for missing entries.
+      return itemsProp;
+    }
+    return {
+      ...autoItems,
+      ...(itemsProp as SelectItemsMap | undefined)
+    };
+  }, [autoItems, itemsProp]);
+
+  return (
+    <SelectItemsRegistrarContext.Provider value={registerItems}>
+      <SelectPrimitive.Root items={items} {...props}>
+        {children}
+      </SelectPrimitive.Root>
+    </SelectItemsRegistrarContext.Provider>
+  );
+}
 
 function SelectGroup({ className, ...props }: SelectPrimitive.Group.Props) {
   return (
@@ -69,6 +131,14 @@ function SelectContent({
     SelectPrimitive.Positioner.Props,
     'align' | 'alignOffset' | 'side' | 'sideOffset' | 'alignItemWithTrigger'
   >) {
+  const registerItems = React.useContext(SelectItemsRegistrarContext);
+  const labels = React.useMemo(() => collectSelectItemLabels(children), [children]);
+
+  React.useLayoutEffect(() => {
+    if (!registerItems || Object.keys(labels).length === 0) return;
+    registerItems(labels);
+  }, [labels, registerItems]);
+
   return (
     <SelectPrimitive.Portal>
       <SelectPrimitive.Positioner
