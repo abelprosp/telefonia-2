@@ -109,6 +109,9 @@ func (s *Service) CreateAccountPayableFromInvoice(ctx context.Context, invoiceID
 	}
 	vendor, desc, dueDate, amount, err := s.Store.GetProviderInvoiceForPayable(ctx, orgID, invoiceID)
 	if err != nil {
+		if isPgNoRows(err) {
+			return nil, httputil.NotFoundError(notifications.InvoiceNotFound)
+		}
 		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
 	id := uuid.New().String()

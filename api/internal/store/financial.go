@@ -553,8 +553,7 @@ func (s *Store) ProviderInvoiceExistsInOrg(ctx context.Context, orgID, invoiceID
 	err := s.q(ctx).QueryRow(ctx, `
 		SELECT EXISTS(
 			SELECT 1 FROM "ProviderInvoices" i
-			JOIN "ProviderAccounts" pa ON pa."Id" = i."ProviderAccountId"
-			JOIN "ContractingCompanies" cc ON cc."Id" = pa."ContractingCompanyId"
+			JOIN "ContractingCompanies" cc ON cc."Id" = i."ContractingCompanyId"
 			JOIN "Providers" p ON p."Id" = cc."ProviderId"
 			WHERE p."OrganizationId" = $1 AND i."Id" = $2
 			AND i."Status" NOT IN ('cancelled', 'substituted'))`, orgID, invoiceID).Scan(&exists)
