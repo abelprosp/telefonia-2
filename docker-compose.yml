@@ -9,7 +9,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: luxus_connect_dev
     ports:
-      - '${POSTGRES_PORT:-5433}:5432'
+      - '127.0.0.1:${POSTGRES_PORT:-5433}:5432'
 
     volumes:
       - postgres-vol:/var/lib/postgresql
@@ -26,8 +26,8 @@ services:
     image: rabbitmq:management
     container_name: rabbitmq.connect.luxus
     ports:
-      - 5672:5672
-      - 15672:15672
+      - '127.0.0.1:5672:5672'
+      - '127.0.0.1:15672:15672'
     environment:
       - RABBITMQ_DEFAULT_USER=${RMQ_USER}
       - RABBITMQ_DEFAULT_PASS=${RMQ_PWD}
@@ -41,8 +41,8 @@ services:
     image: datalust/seq:latest
     container_name: seq.connect.luxus
     ports:
-      - 81:80
-      - 5341:5341
+      - '127.0.0.1:81:80'
+      - '127.0.0.1:5341:5341'
     environment:
       - ACCEPT_EULA=Y
       - SEQ_FIRSTRUN_ADMINPASSWORDHASH=${SEQ_PWD_HASH}
