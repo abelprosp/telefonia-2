@@ -571,7 +571,8 @@ func (s *Store) PayableExistsForProviderInvoice(ctx context.Context, orgID, invo
 
 func (s *Store) GetProviderInvoiceForPayable(ctx context.Context, orgID, invoiceID string) (vendorName, description string, dueDate time.Time, amount float64, err error) {
 	err = s.q(ctx).QueryRow(ctx, `
-		SELECT p."Name" || ' - ' || pa."AccountNumber", 'Fatura operadora ' || COALESCE(NULLIF(i."Number", ''), i."Id"),
+		SELECT COALESCE(NULLIF(p."Name", ''), 'Operadora') || ' - ' || COALESCE(NULLIF(pa."AccountNumber", ''), 'Conta não informada'),
+			'Fatura operadora ' || COALESCE(NULLIF(i."Number", ''), i."Id"),
 			i."DueDate", i."TotalAmount"
 		FROM "ProviderInvoices" i
 		JOIN "ProviderAccounts" pa ON pa."Id" = i."ProviderAccountId"
