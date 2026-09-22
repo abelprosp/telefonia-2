@@ -74,8 +74,11 @@ export type Sale = {
   salesperson_user_id: string;
   contract_template_id?: string | null;
   contract_template_name?: string | null;
-  status: 'draft' | 'confirmed' | 'cancelled';
+  status: 'draft' | 'confirmed' | 'paid' | 'cancelled';
   sold_at?: string | null;
+  paid_at?: string | null;
+  payment_method?: string | null;
+  payment_notes?: string | null;
   total_amount: number;
   notes?: string | null;
   created_at: string;
@@ -125,6 +128,7 @@ export function formatSaleStatus(status: string) {
   const map: Record<string, string> = {
     draft: 'Rascunho',
     confirmed: 'Confirmada',
+    paid: 'Paga',
     cancelled: 'Cancelada'
   };
   return map[status] ?? status;
@@ -211,6 +215,32 @@ export function useCancelSale() {
     onSuccess: (_data, id) => {
       void qc.invalidateQueries({ queryKey: salesKeys.all });
       void qc.invalidateQueries({ queryKey: salesKeys.detail(id) });
+    }
+  });
+}
+
+export function useMarkSalePaid() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      id,
+      ...body
+    }: {
+      id: string;
+      payment_date?: string;
+      payment_method?: 'cash' | 'pix_presencial' | 'card_presencial';
+      notes?: string;
+    }) => {
+      const { data } = await client<SaleDetail>({
+        url: `/v1/sales/${id}/mark-paid`,
+        method: 'POST',
+        data: body
+      });
+      return data;
+    },
+    onSuccess: (_data, vars) => {
+      void qc.invalidateQueries({ queryKey: salesKeys.all });
+      void qc.invalidateQueries({ queryKey: salesKeys.detail(vars.id) });
     }
   });
 }

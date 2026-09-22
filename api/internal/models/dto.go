@@ -914,6 +914,23 @@ type RegisterFinancialPaymentInput struct {
 	Notes       *string `json:"notes"`
 }
 
+// ManualCashPaymentInput registers an in-person payment (cash / presencial).
+type ManualCashPaymentInput struct {
+	PaymentDate   *string `json:"payment_date,omitempty"`
+	Amount        *float64 `json:"amount,omitempty"`
+	PaymentMethod *string `json:"payment_method,omitempty"` // cash | pix_presencial | card_presencial
+	Notes         *string `json:"notes,omitempty"`
+	Reference     *string `json:"reference,omitempty"`
+}
+
+type ManualCashPaymentResponse struct {
+	ID            string    `json:"id"`
+	PaidAt        time.Time `json:"paid_at"`
+	Amount        float64   `json:"amount"`
+	PaymentMethod string    `json:"payment_method"`
+	Message       string    `json:"message"`
+}
+
 type ListPartnerSaleResponse struct {
 	ID                string    `json:"id"`
 	SalespersonUserID string    `json:"salesperson_user_id"`
@@ -1080,6 +1097,9 @@ type ListSaleResponse struct {
 	ContractTemplateName *string    `json:"contract_template_name"`
 	Status               string     `json:"status"`
 	SoldAt               *time.Time `json:"sold_at"`
+	PaidAt               *time.Time `json:"paid_at,omitempty"`
+	PaymentMethod        *string    `json:"payment_method,omitempty"`
+	PaymentNotes         *string    `json:"payment_notes,omitempty"`
 	TotalAmount          float64    `json:"total_amount"`
 	Notes                *string    `json:"notes"`
 	CreatedAt            time.Time  `json:"created_at"`
@@ -1218,6 +1238,8 @@ type ListCustomerBillingDocumentResponse struct {
 	SicrediBoletoStatus     *string    `json:"sicredi_boleto_status,omitempty"`
 	SicrediBoletoError      *string    `json:"sicredi_boleto_error,omitempty"`
 	SicrediPaidAt           *time.Time `json:"sicredi_paid_at,omitempty"`
+	PaymentMethod           *string    `json:"payment_method,omitempty"`
+	ManualPaymentNotes      *string    `json:"manual_payment_notes,omitempty"`
 	PhoneLineID             *string    `json:"phone_line_id,omitempty"`
 	PhoneLineNumber         *string    `json:"phone_line_number,omitempty"`
 	BillingGroupType        *string    `json:"billing_group_type,omitempty"`

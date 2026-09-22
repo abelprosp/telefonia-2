@@ -1254,8 +1254,11 @@ function SettingsPage() {
                         type="password"
                         value={sicrediForm.api_key}
                         onChange={(e) => setSicrediForm({ ...sicrediForm, api_key: e.target.value })}
-                        placeholder={sicrediMeta.api_key_set ? 'Deixe em branco para manter' : 'API Key'}
+                        placeholder={sicrediMeta.api_key_set ? 'Deixe em branco para manter' : 'API Key do portal Sicredi'}
                       />
+                      <p className="text-muted-foreground text-xs">
+                        Use a API Key do portal Sicredi API Parceiro. Não use chaves OpenAI (sk-proj / sk-).
+                      </p>
                     </div>
                     <div className="space-y-2">
                       <Label>Senha OAuth {sicrediMeta.password_set ? '(já salva)' : ''}</Label>

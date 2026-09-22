@@ -376,6 +376,83 @@ func (s *Service) ConfirmSale(ctx context.Context, id string, partnerScoped bool
 	return s.GetSale(ctx, id)
 }
 
+func (s *Service) MarkSalePaid(ctx context.Context, id string, input models.ManualCashPaymentInput, partnerScoped bool) (*models.GetSaleResponse, error) {
+	orgID, err := orgFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var salespersonFilter *string
+	if partnerScoped {
+		user, err := partnerUserFrom(ctx)
+		if err != nil {
+			return nil, err
+		}
+		salespersonFilter = &user.ID
+	}
+	sale, err := s.Store.GetSaleInOrg(ctx, orgID, id, salespersonFilter)
+	if err != nil {
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+	if sale == nil {
+		return nil, httputil.NotFoundError(notifications.SaleNotFound)
+	}
+	if sale.Status == "paid" {
+		return nil, httputil.BusinessError(notifications.SaleAlreadyPaid)
+	}
+	if sale.Status != "confirmed" && sale.Status != "draft" {
+		return nil, httputil.BusinessError(notifications.SaleManualPayBlocked)
+	}
+	if sale.Status == "draft" {
+		count, err := s.Store.SaleItemCount(ctx, sale.ID)
+		if err != nil {
+			return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+		}
+		if count == 0 {
+			return nil, httputil.BusinessError(notifications.SaleItemsRequired)
+		}
+		now := time.Now().UTC()
+		if err := s.Store.ConfirmSale(ctx, orgID, sale.ID, now, now); err != nil {
+			return nil, httputil.BusinessError(notifications.SaleStatusInvalid)
+		}
+	}
+	method, err := normalizeManualPaymentMethod(input.PaymentMethod)
+	if err != nil {
+		return nil, err
+	}
+	paidAt := time.Now().UTC()
+	if input.PaymentDate != nil && strings.TrimSpace(*input.PaymentDate) != "" {
+		parsed, err := parseFinancialDate(*input.PaymentDate)
+		if err != nil {
+			return nil, err
+		}
+		paidAt = parsed
+	}
+	var notes *string
+	if input.Notes != nil && strings.TrimSpace(*input.Notes) != "" {
+		n := strings.TrimSpace(*input.Notes)
+		notes = &n
+	}
+	var actor *string
+	if u := auth.UserFromContext(ctx); u != nil && u.ID != "" {
+		actor = &u.ID
+	}
+	now := time.Now().UTC()
+	if err := s.Store.MarkSalePaid(ctx, orgID, id, paidAt, method, notes, actor, now); err != nil {
+		if isPgNoRows(err) {
+			return nil, httputil.BusinessError(notifications.SaleManualPayBlocked)
+		}
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+	_ = s.recordDomainAudit(ctx, orgID, "sale", id, "manual_cash_payment", map[string]any{
+		"payment_method": method, "paid_at": paidAt.Format("2006-01-02"), "amount": sale.TotalAmount,
+	}, map[string]any{"status": sale.Status})
+	if partnerScoped {
+		user, _ := userFrom(ctx)
+		return s.partnerGetSale(ctx, orgID, id, user.ID)
+	}
+	return s.GetSale(ctx, id)
+}
+
 func (s *Service) CancelSale(ctx context.Context, id string, partnerScoped bool) (*models.GetSaleResponse, error) {
 	orgID, err := orgFrom(ctx)
 	if err != nil {
@@ -398,6 +475,12 @@ func (s *Service) CancelSale(ctx context.Context, id string, partnerScoped bool)
 	}
 	if sale.Status == "cancelled" {
 		return sale, nil
+	}
+	if sale.Status == "paid" {
+		return nil, httputil.BusinessError(notifications.N(
+			"SALE_PAID_CANNOT_CANCEL",
+			"Venda já paga não pode ser cancelada. Estorne o pagamento antes, se necessário.",
+		))
 	}
 	now := time.Now().UTC()
 	if err := s.Store.CancelSale(ctx, orgID, id, now); err != nil {

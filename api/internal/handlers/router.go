@@ -439,6 +439,8 @@ func (h *Handler) RegisterRoutes(
 
 					r.Post("/confirm", h.confirmSale)
 
+					r.Post("/mark-paid", h.markSalePaid)
+
 					r.Post("/cancel", h.cancelSale)
 
 					r.Post("/items", h.addSaleLineItem)
@@ -586,6 +588,7 @@ func (h *Handler) RegisterRoutes(
 					r.Patch("/boleto-due-date", h.alterSicrediBoletoDueDate)
 
 					r.Post("/sync-payment", h.syncSicrediPayment)
+					r.Post("/manual-payment", h.manualMarkCustomerBillingPayment)
 					r.Post("/generate-pix", h.generateSicrediPix)
 					r.Post("/send", h.sendCustomerBillingDocument)
 					r.Get("/send-log", h.listCustomerBillingSendLog)

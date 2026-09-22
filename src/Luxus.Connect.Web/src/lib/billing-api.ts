@@ -43,6 +43,8 @@ export type CustomerBillingDocument = {
   sicredi_boleto_status?: string | null;
   sicredi_boleto_error?: string | null;
   sicredi_paid_at?: string | null;
+  payment_method?: string | null;
+  manual_payment_notes?: string | null;
   phone_line_id?: string | null;
   phone_line_number?: string | null;
   billing_group_type?: string | null;
@@ -507,6 +509,42 @@ export function useSyncSicrediPayment() {
     },
     onSuccess: (_, id) => {
       void qc.invalidateQueries({ queryKey: billingKeys.document(id) });
+      void qc.invalidateQueries({ queryKey: ['billing', 'documents'] });
+      void qc.invalidateQueries({ queryKey: ['financial', 'receivables'] });
+    }
+  });
+}
+
+export type ManualCashPaymentInput = {
+  payment_date?: string;
+  amount?: number;
+  payment_method?: 'cash' | 'pix_presencial' | 'card_presencial';
+  notes?: string;
+  reference?: string;
+};
+
+export function useManualCustomerInvoicePayment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      id,
+      ...body
+    }: ManualCashPaymentInput & { id: string }) => {
+      const { data } = await client<{
+        id: string;
+        paid_at: string;
+        amount: number;
+        payment_method: string;
+        message: string;
+      }>({
+        url: `/v1/customer-billing-documents/${id}/manual-payment`,
+        method: 'POST',
+        data: body
+      });
+      return data;
+    },
+    onSuccess: (_, vars) => {
+      void qc.invalidateQueries({ queryKey: billingKeys.document(vars.id) });
       void qc.invalidateQueries({ queryKey: ['billing', 'documents'] });
       void qc.invalidateQueries({ queryKey: ['financial', 'receivables'] });
     }

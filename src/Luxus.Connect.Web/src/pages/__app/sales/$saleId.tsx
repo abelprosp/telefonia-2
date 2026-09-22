@@ -1,9 +1,21 @@
+import { useState } from 'react';
+
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { toast } from 'sonner';
 
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { PageWrapper } from '@/components/page-wrapper';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { getErrorMessage, isApiHttpError } from '@/lib/api-error';
 import {
   formatLineItemType,
@@ -11,6 +23,7 @@ import {
   formatSaleStatus,
   useCancelSale,
   useConfirmSale,
+  useMarkSalePaid,
   useSale
 } from '@/lib/sales-api';
 
@@ -23,6 +36,10 @@ function SaleDetailPage() {
   const saleQuery = useSale(saleId);
   const confirmMutation = useConfirmSale();
   const cancelMutation = useCancelSale();
+  const markPaidMutation = useMarkSalePaid();
+  const [payOpen, setPayOpen] = useState(false);
+  const [payMethod, setPayMethod] = useState('cash');
+  const [payNotes, setPayNotes] = useState('');
 
   if (saleQuery.isLoading) {
     return (
@@ -61,6 +78,8 @@ function SaleDetailPage() {
     });
   };
 
+  const canMarkPaid = sale.status === 'draft' || sale.status === 'confirmed';
+
   return (
     <PageWrapper
       breadcrumbs={[
@@ -76,8 +95,16 @@ function SaleDetailPage() {
             <p className="text-muted-foreground">
               {sale.customer_name} · {formatSaleStatus(sale.status)} · {formatMoney(sale.total_amount)}
             </p>
+            {sale.paid_at ? (
+              <p className="text-muted-foreground mt-1 text-sm">
+                Paga em {new Date(sale.paid_at).toLocaleDateString('pt-BR')}
+                {sale.payment_method
+                  ? ` · ${sale.payment_method === 'cash' ? 'Dinheiro' : sale.payment_method}`
+                  : ''}
+              </p>
+            ) : null}
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {sale.status === 'draft' && (
               <>
                 <Button onClick={handleConfirm} disabled={confirmMutation.isPending || sale.items.length === 0}>
@@ -88,6 +115,11 @@ function SaleDetailPage() {
                 </Button>
               </>
             )}
+            {canMarkPaid ? (
+              <Button variant="secondary" onClick={() => setPayOpen(true)} disabled={markPaidMutation.isPending}>
+                Dar baixa (pagamento presencial)
+              </Button>
+            ) : null}
             {sale.status === 'confirmed' && (
               <Button variant="outline" onClick={handleCancel} disabled={cancelMutation.isPending}>
                 Cancelar venda
@@ -143,6 +175,79 @@ function SaleDetailPage() {
           Voltar para vendas
         </Link>
       </div>
+
+      {payOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          role="presentation"
+          onClick={() => setPayOpen(false)}
+        >
+          <div
+            className="bg-background border-border w-full max-w-md space-y-4 rounded-lg border p-5 shadow-lg"
+            role="dialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div>
+              <h2 className="text-base font-semibold">Registrar pagamento presencial</h2>
+              <p className="text-muted-foreground mt-2 text-sm">
+                Confirma a baixa desta venda no valor de {formatMoney(sale.total_amount)}? Use quando o
+                cliente pagar em dinheiro ou outra forma presencial.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label>Forma de pagamento</Label>
+              <Select value={payMethod} onValueChange={(v) => setPayMethod(v ?? 'cash')}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Dinheiro</SelectItem>
+                  <SelectItem value="pix_presencial">PIX presencial</SelectItem>
+                  <SelectItem value="card_presencial">Cartão presencial</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Observação (opcional)</Label>
+              <Textarea
+                value={payNotes}
+                onChange={(e) => setPayNotes(e.target.value)}
+                placeholder="Ex.: recebido no balcão"
+                className="min-h-[72px]"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setPayOpen(false)}>
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                disabled={markPaidMutation.isPending}
+                onClick={() =>
+                  markPaidMutation.mutate(
+                    {
+                      id: saleId,
+                      payment_method: payMethod as 'cash' | 'pix_presencial' | 'card_presencial',
+                      ...(payNotes.trim() ? { notes: payNotes.trim() } : {})
+                    },
+                    {
+                      onSuccess: () => {
+                        setPayOpen(false);
+                        toast.success('Pagamento presencial registrado. Venda marcada como paga.');
+                        void saleQuery.refetch();
+                      },
+                      onError: (e) => toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+                    }
+                  )
+                }
+              >
+                Confirmar baixa
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </PageWrapper>
   );
 }

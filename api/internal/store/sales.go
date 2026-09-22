@@ -199,8 +199,9 @@ func (s *Store) ListSales(ctx context.Context, orgID string, status *string, sal
 
 	selectQ := `
 		SELECT s."Id", s."SaleNumber", s."CustomerId", c."Name", s."SalespersonUserId",
-			s."ContractTemplateId", ct."Name", s."Status"::text, s."SoldAt", s."TotalAmount",
-			s."Notes", s."CreatedAt", s."UpdatedAt"
+			s."ContractTemplateId", ct."Name", s."Status"::text, s."SoldAt",
+			s."PaidAt", s."PaymentMethod", s."PaymentNotes",
+			s."TotalAmount", s."Notes", s."CreatedAt", s."UpdatedAt"
 		` + base + `
 		ORDER BY s."CreatedAt" DESC
 		OFFSET $` + itoa(len(args)+1) + ` LIMIT $` + itoa(len(args)+2)
@@ -217,8 +218,9 @@ func (s *Store) ListSales(ctx context.Context, orgID string, status *string, sal
 		var item models.ListSaleResponse
 		if err := rows.Scan(
 			&item.ID, &item.SaleNumber, &item.CustomerID, &item.CustomerName, &item.SalespersonUserID,
-			&item.ContractTemplateID, &item.ContractTemplateName, &item.Status, &item.SoldAt, &item.TotalAmount,
-			&item.Notes, &item.CreatedAt, &item.UpdatedAt,
+			&item.ContractTemplateID, &item.ContractTemplateName, &item.Status, &item.SoldAt,
+			&item.PaidAt, &item.PaymentMethod, &item.PaymentNotes,
+			&item.TotalAmount, &item.Notes, &item.CreatedAt, &item.UpdatedAt,
 		); err != nil {
 			return nil, 0, err
 		}
@@ -242,12 +244,14 @@ func (s *Store) GetSaleInOrg(ctx context.Context, orgID, id string, salespersonU
 	var sale models.GetSaleResponse
 	err := s.q(ctx).QueryRow(ctx, `
 		SELECT s."Id", s."SaleNumber", s."CustomerId", c."Name", s."SalespersonUserId",
-			s."ContractTemplateId", ct."Name", s."Status"::text, s."SoldAt", s."TotalAmount",
-			s."Notes", s."CreatedAt", s."UpdatedAt"
+			s."ContractTemplateId", ct."Name", s."Status"::text, s."SoldAt",
+			s."PaidAt", s."PaymentMethod", s."PaymentNotes",
+			s."TotalAmount", s."Notes", s."CreatedAt", s."UpdatedAt"
 		`+base, args...).Scan(
 		&sale.ID, &sale.SaleNumber, &sale.CustomerID, &sale.CustomerName, &sale.SalespersonUserID,
-		&sale.ContractTemplateID, &sale.ContractTemplateName, &sale.Status, &sale.SoldAt, &sale.TotalAmount,
-		&sale.Notes, &sale.CreatedAt, &sale.UpdatedAt,
+		&sale.ContractTemplateID, &sale.ContractTemplateName, &sale.Status, &sale.SoldAt,
+		&sale.PaidAt, &sale.PaymentMethod, &sale.PaymentNotes,
+		&sale.TotalAmount, &sale.Notes, &sale.CreatedAt, &sale.UpdatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -401,10 +405,35 @@ func (s *Store) ConfirmSale(ctx context.Context, orgID, saleID string, soldAt ti
 	return nil
 }
 
+func (s *Store) MarkSalePaid(ctx context.Context, orgID, saleID string, paidAt time.Time, paymentMethod string, notes, paidByUserID *string, now time.Time) error {
+	if paymentMethod == "" {
+		paymentMethod = "cash"
+	}
+	tag, err := s.q(ctx).Exec(ctx, `
+		UPDATE "Sales"
+		SET "Status" = 'paid'::sale_status,
+			"PaidAt" = $1,
+			"PaymentMethod" = $2,
+			"PaymentNotes" = $3,
+			"PaidByUserId" = $4,
+			"UpdatedAt" = $5
+		WHERE "OrganizationId" = $6 AND "Id" = $7
+			AND "Status" IN ('confirmed'::sale_status, 'draft'::sale_status)`,
+		paidAt, paymentMethod, notes, paidByUserID, now, orgID, saleID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+	return nil
+}
+
 func (s *Store) CancelSale(ctx context.Context, orgID, saleID string, now time.Time) error {
 	tag, err := s.q(ctx).Exec(ctx, `
 		UPDATE "Sales" SET "Status" = 'cancelled'::sale_status, "UpdatedAt" = $1
-		WHERE "OrganizationId" = $2 AND "Id" = $3 AND "Status" <> 'cancelled'::sale_status`,
+		WHERE "OrganizationId" = $2 AND "Id" = $3
+			AND "Status" IN ('draft'::sale_status, 'confirmed'::sale_status)`,
 		now, orgID, saleID)
 	if err != nil {
 		return err

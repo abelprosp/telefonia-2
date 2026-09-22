@@ -140,7 +140,8 @@ func (s *Store) ListCustomerBillingDocuments(ctx context.Context, orgID string, 
 			d."RecipientEmail", d."EmailSubject", d."SendCount", d."SentAt", d."LastSentAt", d."CreatedAt",
 			d."SicrediNossoNumero", d."SicrediLinhaDigitavel", d."SicrediCodigoBarras",
 			d."SicrediPixQrCode", d."SicrediPixTxId", d."SicrediBoletoStatus", d."SicrediBoletoError",
-			d."SicrediPaidAt", d."PhoneLineId", d."BillingGroupType", pl."Number"
+			d."SicrediPaidAt", d."PaymentMethod", d."ManualPaymentNotes",
+			d."PhoneLineId", d."BillingGroupType", pl."Number"
 		` + base + `
 		ORDER BY d."CreatedAt" DESC
 		OFFSET $` + itoa(len(args)+1) + ` LIMIT $` + itoa(len(args)+2)
@@ -159,7 +160,8 @@ func (s *Store) ListCustomerBillingDocuments(ctx context.Context, orgID string, 
 			&item.RecipientEmail, &item.EmailSubject, &item.SendCount, &item.SentAt, &item.LastSentAt, &item.CreatedAt,
 			&item.SicrediNossoNumero, &item.SicrediLinhaDigitavel, &item.SicrediCodigoBarras,
 			&item.SicrediPixQrCode, &item.SicrediPixTxID, &item.SicrediBoletoStatus, &item.SicrediBoletoError,
-			&item.SicrediPaidAt, &item.PhoneLineID, &item.BillingGroupType, &item.PhoneLineNumber,
+			&item.SicrediPaidAt, &item.PaymentMethod, &item.ManualPaymentNotes,
+			&item.PhoneLineID, &item.BillingGroupType, &item.PhoneLineNumber,
 		); err != nil {
 			return nil, 0, err
 		}
@@ -177,7 +179,8 @@ func (s *Store) GetCustomerBillingDocument(ctx context.Context, orgID, id string
 			d."CreatedAt", d."UpdatedAt",
 			d."SicrediNossoNumero", d."SicrediLinhaDigitavel", d."SicrediCodigoBarras",
 			d."SicrediPixQrCode", d."SicrediPixTxId", d."SicrediBoletoStatus", d."SicrediBoletoError",
-			d."SicrediPaidAt", d."PhoneLineId", d."BillingGroupType", pl."Number"
+			d."SicrediPaidAt", d."PaymentMethod", d."ManualPaymentNotes",
+			d."PhoneLineId", d."BillingGroupType", pl."Number"
 		FROM "CustomerBillingDocuments" d
 		JOIN "Customers" c ON c."Id" = d."CustomerId"
 		LEFT JOIN "PhoneLines" pl ON pl."Id" = d."PhoneLineId"
@@ -188,7 +191,8 @@ func (s *Store) GetCustomerBillingDocument(ctx context.Context, orgID, id string
 		&item.CreatedAt, &item.UpdatedAt,
 		&item.SicrediNossoNumero, &item.SicrediLinhaDigitavel, &item.SicrediCodigoBarras,
 		&item.SicrediPixQrCode, &item.SicrediPixTxID, &item.SicrediBoletoStatus, &item.SicrediBoletoError,
-		&item.SicrediPaidAt, &item.PhoneLineID, &item.BillingGroupType, &item.PhoneLineNumber,
+		&item.SicrediPaidAt, &item.PaymentMethod, &item.ManualPaymentNotes,
+		&item.PhoneLineID, &item.BillingGroupType, &item.PhoneLineNumber,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -872,13 +876,32 @@ func (s *Store) GetBillingDocumentBySicrediNossoNumero(ctx context.Context, orgI
 }
 
 func (s *Store) MarkSicrediBoletoPaid(ctx context.Context, orgID, documentID string, paidAt time.Time) error {
+	return s.MarkCustomerBillingDocumentPaid(ctx, orgID, documentID, paidAt, "sicredi", nil, nil)
+}
+
+func (s *Store) MarkCustomerBillingDocumentPaid(ctx context.Context, orgID, documentID string, paidAt time.Time, paymentMethod string, notes, paidByUserID *string) error {
+	if paymentMethod == "" {
+		paymentMethod = "sicredi"
+	}
 	tag, err := s.q(ctx).Exec(ctx, `
 		UPDATE "CustomerBillingDocuments"
 		SET "SicrediBoletoStatus" = 'paid',
 			"SicrediPaidAt" = $3,
+			"PaymentMethod" = $4,
+			"ManualPaymentNotes" = COALESCE($5, "ManualPaymentNotes"),
+			"PaidByUserId" = COALESCE($6, "PaidByUserId"),
 			"UpdatedAt" = $3
 		WHERE "OrganizationId" = $1 AND "Id" = $2 AND "SicrediPaidAt" IS NULL`,
-		orgID, documentID, paidAt)
+		orgID, documentID, paidAt, paymentMethod, notes, paidByUserID)
+	if err != nil && isUndefinedColumn(err) {
+		tag, err = s.q(ctx).Exec(ctx, `
+			UPDATE "CustomerBillingDocuments"
+			SET "SicrediBoletoStatus" = 'paid',
+				"SicrediPaidAt" = $3,
+				"UpdatedAt" = $3
+			WHERE "OrganizationId" = $1 AND "Id" = $2 AND "SicrediPaidAt" IS NULL`,
+			orgID, documentID, paidAt)
+	}
 	if err != nil {
 		return err
 	}

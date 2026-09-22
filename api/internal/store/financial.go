@@ -277,6 +277,22 @@ func (s *Store) UpdateAccountReceivable(ctx context.Context, orgID, id, descript
 	return nil
 }
 
+func (s *Store) GetAccountReceivableBalance(ctx context.Context, orgID, id string) (amount, received, balance float64, err error) {
+	err = s.q(ctx).QueryRow(ctx, `
+		SELECT "Amount", "ReceivedAmount"
+		FROM "AccountsReceivable"
+		WHERE "OrganizationId" = $1 AND "Id" = $2 AND "Status" <> 'cancelled'`,
+		orgID, id).Scan(&amount, &received)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	balance = amount - received
+	if balance < 0 {
+		balance = 0
+	}
+	return amount, received, balance, nil
+}
+
 func (s *Store) RegisterReceivablePayment(ctx context.Context, paymentID, orgID, accountID, userID string, amount float64, paymentDate time.Time, reference, notes *string, now time.Time) error {
 	return s.WithTx(ctx, func(ctx context.Context, tx pgx.Tx) error {
 		var totalAmount, receivedAmount float64

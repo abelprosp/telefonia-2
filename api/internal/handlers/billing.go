@@ -210,6 +210,19 @@ func (h *Handler) syncSicrediPayment(w http.ResponseWriter, r *http.Request) {
 	httputil.WriteJSON(w, http.StatusOK, item)
 }
 
+func (h *Handler) manualMarkCustomerBillingPayment(w http.ResponseWriter, r *http.Request) {
+	var input models.ManualCashPaymentInput
+	if err := decodeJSON(r, &input); err != nil {
+		input = models.ManualCashPaymentInput{}
+	}
+	item, err := h.Svc.ManualMarkCustomerBillingPayment(r.Context(), chi.URLParam(r, "id"), input)
+	if err != nil {
+		httputil.HandleServiceError(w, err)
+		return
+	}
+	httputil.WriteJSON(w, http.StatusOK, item)
+}
+
 func (h *Handler) syncSicrediPayments(w http.ResponseWriter, r *http.Request) {
 	daysBack := 7
 	if v := queryParam(r, "days_back"); v != nil && *v != "" {

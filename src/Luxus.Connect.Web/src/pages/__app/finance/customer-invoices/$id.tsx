@@ -30,6 +30,7 @@ import {
   useCustomerBillingDocument,
   useGenerateSicrediPix,
   useIssueSicrediBoleto,
+  useManualCustomerInvoicePayment,
   useSendCustomerBillingDocument,
   useSyncSicrediPayment,
   useUpdateCustomerBillingDocument
@@ -52,6 +53,7 @@ function CustomerInvoiceDetailPage() {
   const syncPaymentMutation = useSyncSicrediPayment();
   const cancelBoletoMutation = useCancelSicrediBoleto();
   const alterDueDateMutation = useAlterSicrediBoletoDueDate();
+  const manualPaymentMutation = useManualCustomerInvoicePayment();
 
   const [recipient, setRecipient] = useState('');
   const [subject, setSubject] = useState('');
@@ -61,6 +63,9 @@ function CustomerInvoiceDetailPage() {
   const [pdfLoading, setPdfLoading] = useState(false);
   const [invoiceDownloadLoading, setInvoiceDownloadLoading] = useState(false);
   const [cancelBoletoConfirmOpen, setCancelBoletoConfirmOpen] = useState(false);
+  const [payOpen, setPayOpen] = useState(false);
+  const [payMethod, setPayMethod] = useState('cash');
+  const [payNotes, setPayNotes] = useState('');
 
   useEffect(() => {
     const d = docQuery.data;
@@ -193,6 +198,10 @@ function CustomerInvoiceDetailPage() {
     return <p className="p-6 text-sm">Fatura não encontrada.</p>;
   }
 
+  const isPaid =
+    Boolean(doc.sicredi_paid_at) || doc.sicredi_boleto_status === 'paid';
+  const canMarkPaid =
+    !isPaid && doc.status !== 'cancelled';
   const boletoActive =
     Boolean(doc.sicredi_nosso_numero) &&
     !doc.sicredi_paid_at &&
@@ -218,6 +227,14 @@ function CustomerInvoiceDetailPage() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="outline">{formatBillingStatus(doc.status)}</Badge>
+            {isPaid && (
+              <Badge className="bg-green-600 text-white hover:bg-green-600">
+                Pago em {doc.sicredi_paid_at ? new Date(doc.sicredi_paid_at).toLocaleDateString('pt-BR') : '—'}
+                {doc.payment_method
+                  ? ` · ${doc.payment_method === 'cash' ? 'Dinheiro' : doc.payment_method}`
+                  : ''}
+              </Badge>
+            )}
             <Button
               size="sm"
               variant="outline"
@@ -227,12 +244,17 @@ function CustomerInvoiceDetailPage() {
               <FileDown className="mr-2 size-4" />
               {invoiceDownloadLoading ? 'Baixando…' : 'Baixar fatura'}
             </Button>
+            {canMarkPaid ? (
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={manualPaymentMutation.isPending}
+                onClick={() => setPayOpen(true)}
+              >
+                Dar baixa (pagamento presencial)
+              </Button>
+            ) : null}
           </div>
-          {(doc.sicredi_paid_at || doc.sicredi_boleto_status === 'paid') && (
-            <Badge className="bg-green-600 text-white hover:bg-green-600">
-              Pago em {doc.sicredi_paid_at ? new Date(doc.sicredi_paid_at).toLocaleDateString('pt-BR') : '—'}
-            </Badge>
-          )}
         </div>
 
         <div className="grid gap-6 lg:grid-cols-2">
@@ -487,6 +509,80 @@ function CustomerInvoiceDetailPage() {
           }
         }}
       />
+
+      {payOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          role="presentation"
+          onClick={() => setPayOpen(false)}
+        >
+          <div
+            className="bg-background border-border w-full max-w-md space-y-4 rounded-lg border p-5 shadow-lg"
+            role="dialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div>
+              <h2 className="text-base font-semibold">Registrar pagamento presencial</h2>
+              <p className="text-muted-foreground mt-2 text-sm">
+                Confirma a baixa desta fatura no valor de {formatMoney(doc.amount)}? Use quando o
+                cliente pagar em dinheiro ou outra forma presencial.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label>Forma de pagamento</Label>
+              <Select value={payMethod} onValueChange={(v) => setPayMethod(v ?? 'cash')}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Dinheiro</SelectItem>
+                  <SelectItem value="pix_presencial">PIX presencial</SelectItem>
+                  <SelectItem value="card_presencial">Cartão presencial</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Observação (opcional)</Label>
+              <Textarea
+                value={payNotes}
+                onChange={(e) => setPayNotes(e.target.value)}
+                placeholder="Ex.: recebido no balcão"
+                className="min-h-[72px]"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setPayOpen(false)}>
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                disabled={manualPaymentMutation.isPending}
+                onClick={() =>
+                  manualPaymentMutation.mutate(
+                    {
+                      id,
+                      payment_method: payMethod as 'cash' | 'pix_presencial' | 'card_presencial',
+                      ...(payNotes.trim() ? { notes: payNotes.trim() } : {})
+                    },
+                    {
+                      onSuccess: () => {
+                        setPayOpen(false);
+                        setPayNotes('');
+                        toast.success('Pagamento presencial registrado. Fatura marcada como paga.');
+                        void docQuery.refetch();
+                      },
+                      onError: (e) => toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+                    }
+                  )
+                }
+              >
+                Confirmar baixa
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </PageWrapper>
   );
 }

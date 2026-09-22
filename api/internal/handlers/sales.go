@@ -137,6 +137,20 @@ func (h *Handler) confirmSale(w http.ResponseWriter, r *http.Request) {
 	httputil.WriteJSON(w, http.StatusOK, item)
 }
 
+func (h *Handler) markSalePaid(w http.ResponseWriter, r *http.Request) {
+	var input models.ManualCashPaymentInput
+	if err := decodeJSON(r, &input); err != nil {
+		// empty body is fine — defaults to cash / today
+		input = models.ManualCashPaymentInput{}
+	}
+	item, err := h.Svc.MarkSalePaid(r.Context(), chi.URLParam(r, "id"), input, false)
+	if err != nil {
+		httputil.HandleServiceError(w, err)
+		return
+	}
+	httputil.WriteJSON(w, http.StatusOK, item)
+}
+
 func (h *Handler) cancelSale(w http.ResponseWriter, r *http.Request) {
 	item, err := h.Svc.CancelSale(r.Context(), chi.URLParam(r, "id"), false)
 	if err != nil {

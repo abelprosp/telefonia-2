@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/luxus-connect/telefonia/api/internal/auth"
 	"github.com/luxus-connect/telefonia/api/internal/email"
 	"github.com/luxus-connect/telefonia/api/internal/httputil"
 	"github.com/luxus-connect/telefonia/api/internal/invoicelayout"
@@ -164,6 +165,119 @@ func (s *Service) GetCustomerBillingDocument(ctx context.Context, id string) (*m
 		doc.SicrediPixQrCodeDataURL = invoicelayout.PixQRCodeDataURL(*doc.SicrediPixQrCode)
 	}
 	return doc, nil
+}
+
+func normalizeManualPaymentMethod(raw *string) (string, error) {
+	v := "cash"
+	if raw != nil && strings.TrimSpace(*raw) != "" {
+		v = strings.ToLower(strings.TrimSpace(*raw))
+	}
+	switch v {
+	case "cash", "dinheiro":
+		return "cash", nil
+	case "pix_presencial", "pix":
+		return "pix_presencial", nil
+	case "card_presencial", "cartao", "cartão", "card":
+		return "card_presencial", nil
+	default:
+		return "", httputil.ValidationError(notifications.PaymentMethodInvalid)
+	}
+}
+
+func (s *Service) ManualMarkCustomerBillingPayment(ctx context.Context, id string, input models.ManualCashPaymentInput) (*models.ManualCashPaymentResponse, error) {
+	orgID, err := orgFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !auth.HasRole(ctx, auth.RoleFinancial) && !auth.HasRole(ctx, auth.RoleMaster) && !auth.HasRole(ctx, auth.RoleAdmin) {
+		return nil, httputil.ForbiddenError(notifications.N("MANUAL_PAYMENT_FORBIDDEN", "Sem permissão para dar baixa manual em faturas."))
+	}
+	doc, err := s.GetCustomerBillingDocument(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if strings.EqualFold(doc.Status, "cancelled") {
+		return nil, httputil.BusinessError(notifications.BillingDocumentCancelled)
+	}
+	if doc.SicrediPaidAt != nil || strings.EqualFold(derefStr(doc.SicrediBoletoStatus), "paid") {
+		return nil, httputil.BusinessError(notifications.BillingDocumentAlreadyPaid)
+	}
+	method, err := normalizeManualPaymentMethod(input.PaymentMethod)
+	if err != nil {
+		return nil, err
+	}
+	paidAt := time.Now().UTC()
+	if input.PaymentDate != nil && strings.TrimSpace(*input.PaymentDate) != "" {
+		parsed, err := parseFinancialDate(*input.PaymentDate)
+		if err != nil {
+			return nil, err
+		}
+		paidAt = parsed
+	}
+	amount := doc.Amount
+	if input.Amount != nil && *input.Amount > 0 {
+		amount = *input.Amount
+	}
+	ref := "Pagamento presencial"
+	if input.Reference != nil && strings.TrimSpace(*input.Reference) != "" {
+		ref = strings.TrimSpace(*input.Reference)
+	} else {
+		ref = fmt.Sprintf("Pagamento presencial (%s) — fatura %s", method, doc.InvoiceNumber)
+	}
+	notes := "Baixa manual por pagamento presencial."
+	if input.Notes != nil && strings.TrimSpace(*input.Notes) != "" {
+		notes = strings.TrimSpace(*input.Notes)
+	}
+	var actor *string
+	if u := auth.UserFromContext(ctx); u != nil && u.ID != "" {
+		actor = &u.ID
+	}
+	userID := "manual-cash"
+	if actor != nil {
+		userID = *actor
+	}
+
+	if doc.AccountsReceivableID != nil && strings.TrimSpace(*doc.AccountsReceivableID) != "" {
+		receivableID := strings.TrimSpace(*doc.AccountsReceivableID)
+		_, _, balance, err := s.Store.GetAccountReceivableBalance(ctx, orgID, receivableID)
+		if err != nil {
+			if isPgNoRows(err) {
+				return nil, httputil.NotFoundError(notifications.FinancialReceivableNotFound)
+			}
+			return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+		}
+		payAmount := amount
+		if balance > 0 && payAmount > balance {
+			payAmount = balance
+		}
+		if payAmount > 0 && balance > 0 {
+			exists, err := s.Store.ReceivablePaymentExistsByReference(ctx, orgID, receivableID, ref)
+			if err != nil {
+				return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+			}
+			if !exists {
+				if err := s.Store.RegisterReceivablePayment(ctx, uuid.New().String(), orgID, receivableID, userID, payAmount, paidAt, &ref, &notes, time.Now().UTC()); err != nil {
+					return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+				}
+			}
+			amount = payAmount
+		}
+	}
+
+	if err := s.Store.MarkCustomerBillingDocumentPaid(ctx, orgID, id, paidAt, method, &notes, actor); err != nil {
+		if isPgNoRows(err) {
+			return nil, httputil.BusinessError(notifications.BillingDocumentAlreadyPaid)
+		}
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+	_ = s.recordDomainAudit(ctx, orgID, "customer_billing_document", id, "manual_cash_payment", map[string]any{
+		"amount": amount, "payment_method": method, "paid_at": paidAt.Format("2006-01-02"),
+	}, nil)
+
+	return &models.ManualCashPaymentResponse{
+		ID: id, PaidAt: paidAt, Amount: amount, PaymentMethod: method,
+		Message: "Baixa registrada. Pagamento presencial confirmado.",
+	}, nil
 }
 
 func (s *Service) CreateCustomerBillingDocumentFromReceivable(ctx context.Context, receivableID, templateCode, layoutTemplateCode string) (*models.CreateCustomerBillingDocumentFromReceivableResponse, error) {

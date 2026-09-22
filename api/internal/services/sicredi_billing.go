@@ -54,7 +54,7 @@ func (s *Service) tryAttachSicrediBoleto(ctx context.Context, orgID, documentID 
 		if ae, ok := err.(*httputil.AppError); ok {
 			return false, ae.Error()
 		}
-		return false, err.Error()
+		return false, sicredi.UserFacingError(err)
 	}
 	return true, ""
 }
@@ -140,11 +140,17 @@ func (s *Service) issueSicrediBoletoForDocument(ctx context.Context, orgID strin
 		s.saveSicrediBoletoError(ctx, orgID, doc.ID, doc.EmailBodyHtml, "Sicredi não configurado para esta empresa")
 		return nil, httputil.BusinessError(notifications.SicrediNotConfigured)
 	}
+	if sicredi.LooksLikeForeignAPIKey(client.Config().APIKey) {
+		msg := "API Key Sicredi inválida: parece uma chave OpenAI (sk-proj/sk-). Cadastre a API Key do portal Sicredi Parceiro."
+		s.saveSicrediBoletoError(ctx, orgID, doc.ID, doc.EmailBodyHtml, msg)
+		return nil, httputil.BusinessError(notifications.N("SICREDI_API_KEY_INVALID", msg))
+	}
 	boleto, err := client.CreateHybridBoleto(ctx, input)
 	now := time.Now().UTC()
 	if err != nil {
-		s.saveSicrediBoletoError(ctx, orgID, doc.ID, doc.EmailBodyHtml, err.Error())
-		return nil, httputil.BusinessError(notifications.N("SICREDI_BOLETO_FAILED", err.Error()))
+		friendly := sicredi.UserFacingError(err)
+		s.saveSicrediBoletoError(ctx, orgID, doc.ID, doc.EmailBodyHtml, friendly)
+		return nil, httputil.BusinessError(notifications.N("SICREDI_BOLETO_FAILED", friendly))
 	}
 
 	payment := invoicelayout.PaymentData{

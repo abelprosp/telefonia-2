@@ -8,6 +8,7 @@ import (
 	"github.com/luxus-connect/telefonia/api/internal/httputil"
 	"github.com/luxus-connect/telefonia/api/internal/models"
 	"github.com/luxus-connect/telefonia/api/internal/notifications"
+	"github.com/luxus-connect/telefonia/api/internal/sicredi"
 	"github.com/luxus-connect/telefonia/api/internal/store"
 )
 
@@ -338,6 +339,12 @@ func (s *Service) UpdateSicrediSettings(ctx context.Context, input models.Update
 	if input.APIKey != nil {
 		v := strings.TrimSpace(*input.APIKey)
 		if v != "" && v != "********" {
+			if sicredi.LooksLikeForeignAPIKey(v) {
+				return nil, httputil.ValidationError(notifications.N(
+					"SICREDI_API_KEY_INVALID",
+					"A API Key informada parece ser da OpenAI (sk-proj/sk-), não da Sicredi. Use a chave do portal API Parceiro Sicredi.",
+				))
+			}
 			sec.APIKey = v
 		}
 	}

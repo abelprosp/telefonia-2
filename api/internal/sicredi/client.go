@@ -251,7 +251,76 @@ func parseHTTPError(status int, body []byte) error {
 	if msg == "" {
 		msg = http.StatusText(status)
 	}
+	msg = sanitizePublicError(msg)
 	return fmt.Errorf("sicredi HTTP %d: %s", status, msg)
+}
+
+// sanitizePublicError removes secrets and maps opaque upstream bodies to safe text.
+func sanitizePublicError(msg string) string {
+	msg = strings.TrimSpace(msg)
+	if msg == "" {
+		return "erro desconhecido"
+	}
+	lower := strings.ToLower(msg)
+	// Never echo API keys / bearer tokens back to operators.
+	if strings.HasPrefix(msg, "sk-") ||
+		strings.HasPrefix(msg, "sk-proj-") ||
+		strings.Contains(lower, "sk-proj-") ||
+		looksLikeSecretToken(msg) {
+		return "credencial rejeitada pela Sicredi"
+	}
+	if len(msg) > 280 {
+		msg = msg[:280] + "…"
+	}
+	return msg
+}
+
+func looksLikeSecretToken(s string) bool {
+	if len(s) < 40 {
+		return false
+	}
+	// Long opaque strings without spaces are almost never useful to end users.
+	if strings.ContainsAny(s, " \n\t") {
+		return false
+	}
+	alnum := 0
+	for _, r := range s {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' || r == '-' {
+			alnum++
+		}
+	}
+	return alnum*10 >= len(s)*9
+}
+
+// UserFacingError turns low-level Sicredi failures into actionable Portuguese messages.
+func UserFacingError(err error) string {
+	if err == nil {
+		return ""
+	}
+	msg := err.Error()
+	lower := strings.ToLower(msg)
+	switch {
+	case strings.Contains(lower, "401"), strings.Contains(lower, "403"),
+		strings.Contains(lower, "unauthorized"), strings.Contains(lower, "forbidden"),
+		strings.Contains(lower, "invalid_client"), strings.Contains(lower, "invalid_grant"),
+		strings.Contains(lower, "credencial rejeitada"):
+		return "Falha na autenticação Sicredi. Em Configurações → Sicredi, confira a API Key do portal Sicredi (não use chaves OpenAI/sk-proj), usuário e senha OAuth."
+	case strings.Contains(lower, "timeout"), strings.Contains(lower, "deadline"):
+		return "Timeout ao falar com a Sicredi. Tente novamente em instantes."
+	case strings.Contains(lower, "não configurado"), strings.Contains(lower, "not configured"):
+		return "Sicredi não está configurado completamente para esta empresa."
+	default:
+		return "Falha ao gerar boleto Sicredi: " + sanitizePublicError(strings.TrimPrefix(msg, "sicredi HTTP "))
+	}
+}
+
+// LooksLikeForeignAPIKey detects keys that are clearly not Sicredi (e.g. OpenAI).
+func LooksLikeForeignAPIKey(apiKey string) bool {
+	k := strings.TrimSpace(apiKey)
+	lower := strings.ToLower(k)
+	return strings.HasPrefix(lower, "sk-proj-") ||
+		strings.HasPrefix(lower, "sk-") ||
+		strings.HasPrefix(lower, "openai-")
 }
 
 func (c *Client) GetBoleto(ctx context.Context, nossoNumero string) (*BoletoDetail, error) {
