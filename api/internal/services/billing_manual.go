@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
@@ -167,6 +168,11 @@ func (s *Service) GenerateCustomerBillingDocument(ctx context.Context, customerI
 		}
 	}
 	if bulk.Created == 0 {
+		for _, item := range bulk.Items {
+			if item.Status == "failed" && strings.TrimSpace(item.Message) != "" {
+				return nil, httputil.ValidationError(notifications.N("BILLING_GENERATE_FAILED", item.Message))
+			}
+		}
 		msg := "Nenhuma fatura gerada."
 		if len(bulk.Items) > 0 && bulk.Items[0].Message != "" {
 			msg = bulk.Items[0].Message
@@ -225,8 +231,9 @@ func (s *Service) generateBillingDocumentsForCandidates(
 		docID, receivableID, err := s.createBillingDocumentForAmount(ctx, orgID, c.CustomerID, desc, c.MonthlyAmount, processingMonthID, issueDate, dueDate, templateCode, layoutCode, c.PhoneLineID, c.BillingGroupType)
 		if err != nil {
 			result.Status = "failed"
-			if svcErr, ok := err.(*httputil.AppError); ok {
-				result.Message = svcErr.Error()
+			var ae *httputil.AppError
+			if errors.As(err, &ae) {
+				result.Message = ae.Error()
 			} else {
 				result.Message = err.Error()
 			}
@@ -259,10 +266,13 @@ func (s *Service) createBillingDocumentForAmount(
 	receivableID = uuid.New().String()
 	now := time.Now().UTC()
 	if err := s.Store.CreateBillingReceivable(ctx, receivableID, orgID, customerID, description, processingMonthID, phoneLineID, issueDate, dueDate, amount, now); err != nil {
-		return "", "", httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+		return "", "", billingStoreError("Falha ao criar conta a receber.", err)
 	}
 	rec, err := s.Store.GetReceivableForBilling(ctx, orgID, receivableID)
 	if err != nil || rec == nil {
+		if err != nil {
+			return "", "", billingStoreError("Falha ao carregar conta a receber criada.", err)
+		}
 		return "", "", httputil.InternalError(notifications.N("BILLING_RECEIVABLE_FAILED", "Falha ao carregar conta a receber criada."))
 	}
 	rec.PhoneLineID = phoneLineID

@@ -201,6 +201,18 @@ func main() {
 					WHERE table_schema = 'public'
 					  AND table_name = 'OrganizationSettings'
 					  AND column_name = 'ProrataDivisor'
+				)
+				AND EXISTS (
+					SELECT 1 FROM information_schema.columns
+					WHERE table_schema = 'public'
+					  AND table_name = 'CustomerBillingDocuments'
+					  AND column_name = 'PhoneLineId'
+				)
+				AND EXISTS (
+					SELECT 1 FROM information_schema.columns
+					WHERE table_schema = 'public'
+					  AND table_name = 'CustomerBillingDocuments'
+					  AND column_name = 'PaymentMethod'
 				)`).Scan(&ready)
 		if err != nil {
 			return observability.ComponentHealth{Status: observability.StatusDown, Message: "schema check failed"}

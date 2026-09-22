@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -99,6 +100,89 @@ func (s *Store) CreateInvoiceEmailTemplate(ctx context.Context, id, orgID, name,
 		) VALUES ($1, $2, $3, $4, $5::invoice_email_template_kind, $6, $7, $8, $9, $9)`,
 		id, orgID, name, code, kind, subject, body, active, now)
 	return err
+}
+
+// EnsureDefaultBillingTemplates creates default email/layout templates for an org when missing.
+func (s *Store) EnsureDefaultBillingTemplates(ctx context.Context, orgID string) error {
+	now := time.Now().UTC()
+	emailExists, err := s.InvoiceEmailTemplateCodeExists(ctx, orgID, "default-billing-invoice", nil)
+	if err != nil {
+		return err
+	}
+	if !emailExists {
+		if err := s.CreateInvoiceEmailTemplate(ctx,
+			newUUID(), orgID,
+			"Fatura mensal padrão",
+			"default-billing-invoice",
+			"billing_invoice",
+			"Fatura {{invoice.number}} — {{customer.name}}",
+			`<h2>Fatura {{invoice.number}}</h2>
+<p>Olá, <strong>{{customer.name}}</strong>.</p>
+<p>Segue a fatura referente ao período, no valor de <strong>{{invoice.amount}}</strong>, com vencimento em <strong>{{invoice.due_date}}</strong>.</p>
+<p>{{invoice.description}}</p>
+<p>Em caso de dúvidas, entre em contato conosco.</p>`,
+			true, now,
+		); err != nil {
+			return err
+		}
+	}
+
+	layoutExists, err := s.InvoiceLayoutTemplateCodeExists(ctx, orgID, "default-invoice-layout", nil)
+	if err != nil {
+		return err
+	}
+	if !layoutExists {
+		config := json.RawMessage(`{
+  "theme": {
+    "primaryColor": "#4a4a4a",
+    "accentColor": "#00a0c6",
+    "borderColor": "#222222",
+    "headerBackground": "#ffffff",
+    "titleColor": "#1a1a1a",
+    "textColor": "#333333",
+    "tableHeaderBackground": "#f7f7f7",
+    "borderRadius": 12
+  },
+  "branding": {
+    "logoDataUrl": "",
+    "companyName": "LUXUS",
+    "tagline": "SOLUÇÃO EM TELEFONIA",
+    "documentTitle": "Detalhamento da Fatura"
+  },
+  "sections": {
+    "userData": { "enabled": true, "title": "Dados do Usuário" },
+    "accountValue": { "enabled": true, "title": "VALOR DA SUA CONTA" },
+    "billingDates": { "enabled": true },
+    "accountSummary": { "enabled": true, "title": "Resumo da Conta" },
+    "detailedConsumption": { "enabled": true, "title": "Consumo Detalhado" }
+  },
+  "labels": {
+    "name": "Nome:",
+    "address": "Endereço:",
+    "phone": "Número do telefone:",
+    "totalServices": "Total Serviços:",
+    "discounts": "Descontos:",
+    "billingPeriod": "Período de faturamento:",
+    "referenceMonth": "Mês de referência:",
+    "dueDate": "Data de Vencimento:",
+    "description": "Descrição",
+    "quantity": "Quantidade",
+    "type": "Tipo",
+    "unitPrice": "Preço Unitário",
+    "total": "Total",
+    "totalLabel": "Total:"
+  }
+}`)
+		if err := s.CreateInvoiceLayoutTemplate(ctx,
+			newUUID(), orgID,
+			"Detalhamento padrão",
+			"default-invoice-layout",
+			config, true, now,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *Store) UpdateInvoiceEmailTemplate(ctx context.Context, orgID, id, name, subject, body string, active bool, now time.Time) error {

@@ -177,14 +177,23 @@ func buildLayoutRenderDataFromReceivable(rec *store.ReceivableForBilling, invoic
 func renderInvoiceLayoutBody(ctx context.Context, s *Service, orgID, layoutCode, invoiceNumber string, rec *store.ReceivableForBilling) (string, error) {
 	layout, err := s.Store.GetInvoiceLayoutTemplateByCode(ctx, orgID, layoutCode)
 	if err != nil {
-		return "", err
+		return "", billingStoreError("Falha ao carregar layout da fatura.", err)
 	}
 	if layout == nil {
-		return "", httputil.NotFoundError(notifications.BillingLayoutTemplateNotFound)
+		if err := s.Store.EnsureDefaultBillingTemplates(ctx, orgID); err != nil {
+			return "", billingStoreError("Falha ao criar templates padrão de fatura.", err)
+		}
+		layout, err = s.Store.GetInvoiceLayoutTemplateByCode(ctx, orgID, layoutCode)
+		if err != nil {
+			return "", billingStoreError("Falha ao carregar layout da fatura.", err)
+		}
+		if layout == nil {
+			return "", httputil.NotFoundError(notifications.BillingLayoutTemplateNotFound)
+		}
 	}
 	cfg, err := invoicelayout.ParseConfig(layout.ConfigJson)
 	if err != nil {
-		return "", httputil.ValidationError(notifications.N("BILLING_LAYOUT_INVALID_CONFIG", "Invalid layout configuration JSON."))
+		return "", httputil.ValidationError(notifications.N("BILLING_LAYOUT_INVALID_CONFIG", "Configuração do layout de fatura inválida."))
 	}
 	address, _ := s.Store.GetCustomerAddressForBilling(ctx, rec.CustomerID)
 	phone, _ := s.Store.GetCustomerPhoneForBilling(ctx, rec.CustomerID)
@@ -198,7 +207,7 @@ func renderInvoiceLayoutBody(ctx context.Context, s *Service, orgID, layoutCode,
 		billingItems, err = s.Store.ListCustomerBillingItems(ctx, rec.CustomerID)
 	}
 	if err != nil {
-		return "", httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+		return "", billingStoreError("Falha ao montar itens da fatura.", err)
 	}
 
 	data := buildLayoutRenderDataFromReceivable(rec, invoiceNumber, address, phone, providerCtx)

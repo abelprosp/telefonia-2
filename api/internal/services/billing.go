@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -305,15 +306,24 @@ func (s *Service) createBillingDocumentFromReceivable(ctx context.Context, orgID
 	}
 	tmpl, err := s.Store.GetInvoiceEmailTemplateByCode(ctx, orgID, templateCode)
 	if err != nil {
-		return "", httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+		return "", billingStoreError("Falha ao carregar template de e-mail da fatura.", err)
 	}
 	if tmpl == nil {
-		return "", httputil.NotFoundError(notifications.BillingEmailTemplateNotFound)
+		if err := s.Store.EnsureDefaultBillingTemplates(ctx, orgID); err != nil {
+			return "", billingStoreError("Falha ao criar templates padrão de fatura.", err)
+		}
+		tmpl, err = s.Store.GetInvoiceEmailTemplateByCode(ctx, orgID, templateCode)
+		if err != nil {
+			return "", billingStoreError("Falha ao carregar template de e-mail da fatura.", err)
+		}
+		if tmpl == nil {
+			return "", httputil.NotFoundError(notifications.BillingEmailTemplateNotFound)
+		}
 	}
 
 	invoiceNumber, err := s.Store.NextBillingInvoiceNumber(ctx, orgID)
 	if err != nil {
-		return "", httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+		return "", billingStoreError("Falha ao gerar número da fatura.", err)
 	}
 
 	data := invoiceTemplateData{
@@ -360,10 +370,36 @@ func (s *Service) createBillingDocumentFromReceivable(ctx context.Context, orgID
 		BillingGroupType:     rec.BillingGroupType,
 	}
 	if err := s.Store.CreateCustomerBillingDocument(ctx, row); err != nil {
-		return "", httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+		var ae *httputil.AppError
+		if errors.As(err, &ae) {
+			return "", ae
+		}
+		return "", billingStoreError("Não foi possível gravar a fatura.", err)
 	}
 	s.tryAttachSicrediBoleto(ctx, orgID, id)
 	return id, nil
+}
+
+func billingStoreError(prefix string, err error) error {
+	if err == nil {
+		return nil
+	}
+	var ae *httputil.AppError
+	if errors.As(err, &ae) {
+		return ae
+	}
+	msg := prefix
+	detail := strings.TrimSpace(err.Error())
+	lower := strings.ToLower(detail)
+	switch {
+	case strings.Contains(lower, "column") && strings.Contains(lower, "does not exist"):
+		msg = prefix + " Schema desatualizado (coluna ausente). Reinicie a API para aplicar as migrações ou rode scripts/apply-migrations.sh."
+	case strings.Contains(lower, "relation") && strings.Contains(lower, "does not exist"):
+		msg = prefix + " Schema desatualizado (tabela ausente). Aplique as migrações do banco."
+	case detail != "" && !strings.Contains(lower, "sk-") && len(detail) < 180:
+		msg = prefix + " " + detail
+	}
+	return httputil.InternalError(notifications.N("BILLING_DOCUMENT_CREATE_FAILED", msg))
 }
 
 func (s *Service) UpdateCustomerBillingDocument(ctx context.Context, id string, input models.UpdateCustomerBillingDocumentInput) (*models.GetCustomerBillingDocumentResponse, error) {
