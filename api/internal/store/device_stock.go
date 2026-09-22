@@ -31,8 +31,19 @@ func (s *Store) ListDeviceStockItems(ctx context.Context, orgID string, status *
 	base := ` FROM "DeviceStockItems" WHERE "OrganizationId" = $1`
 	args := []any{orgID}
 	if status != nil && *status != "" {
-		base += ` AND "Status" = $2::device_stock_status`
+		base += ` AND "Status" = $` + itoa(len(args)+1) + `::device_stock_status`
 		args = append(args, *status)
+	}
+	if page.Search != "" {
+		args = append(args, "%"+page.Search+"%")
+		idx := len(args)
+		base += ` AND (
+			"Sku" ILIKE $` + itoa(idx) + `
+			OR "Brand" ILIKE $` + itoa(idx) + `
+			OR "Model" ILIKE $` + itoa(idx) + `
+			OR COALESCE("Imei", '') ILIKE $` + itoa(idx) + `
+			OR COALESCE("Notes", '') ILIKE $` + itoa(idx) + `
+		)`
 	}
 
 	var total int64

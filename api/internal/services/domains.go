@@ -122,11 +122,22 @@ func (s *Service) CreateStockPhoneLine(ctx context.Context, input models.CreateS
 	}
 
 	id := uuid.New().String()
-	if err := s.Store.CreatePhoneLineWithIdentity(ctx, id, planID, account.ID, number, numberNorm.Original, number); err != nil {
+	simType := phone.SimUnknown
+	if input.SimType != nil {
+		simType = phone.NormalizeSimType(*input.SimType)
+	}
+	var iccid *string
+	if input.ICCID != nil {
+		trimmed := strings.TrimSpace(*input.ICCID)
+		if trimmed != "" {
+			iccid = &trimmed
+		}
+	}
+	if err := s.Store.CreatePhoneLineWithIdentity(ctx, id, planID, account.ID, number, numberNorm.Original, number, simType, iccid); err != nil {
 		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
 	_ = s.recordDomainAudit(ctx, orgID, "phone_line", id, "create", map[string]any{
-		"number": number, "status": "in_stock",
+		"number": number, "status": "in_stock", "sim_type": simType,
 	}, nil)
 	return s.GetPhoneLine(ctx, id)
 }
@@ -173,6 +184,8 @@ func (s *Service) BulkCreateStockPhoneLines(ctx context.Context, input models.Bu
 			ProviderID:            providerID,
 			ProviderAccountNumber: account,
 			ProviderPlanID:        planID,
+			SimType:               line.SimType,
+			ICCID:                 line.ICCID,
 		}
 		if p.norm == "" {
 			p.reject = "Número vazio ou sem dígitos."
@@ -487,6 +500,70 @@ func (s *Service) UnassignPhoneLineCustomer(ctx context.Context, phoneLineID str
 		_ = s.Store.InactivateCustomer(ctx, activeCustomerID)
 	}
 	return nil
+}
+
+func (s *Service) ReactivateCancelledPhoneLine(ctx context.Context, phoneLineID string) (*models.GetPhoneLineResponse, error) {
+	orgID, err := orgFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+	line, err := s.GetPhoneLine(ctx, phoneLineID)
+	if err != nil {
+		return nil, err
+	}
+	if line.Status != "cancelled" {
+		return nil, httputil.BusinessError(notifications.N(
+			"PHONE_LINE_NOT_CANCELLED",
+			"Somente linhas canceladas podem ser reativadas para o estoque.",
+		))
+	}
+	if err := s.SM().ValidateTransition(statemachine.EntityPhoneLine, line.Status, "in_stock", userRoles(ctx)); err != nil {
+		return nil, err
+	}
+	if err := s.Store.ReactivateCancelledPhoneLine(ctx, phoneLineID); err != nil {
+		if isPgNoRows(err) {
+			return nil, httputil.BusinessError(notifications.N(
+				"PHONE_LINE_REACTIVATE_FAILED",
+				"Não foi possível reativar a linha. Verifique se ainda está cancelada.",
+			))
+		}
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+	var actorUserID *string
+	if u := auth.UserFromContext(ctx); u != nil && u.ID != "" {
+		actorUserID = &u.ID
+	}
+	_ = s.SM().RecordTransition(ctx, orgID, statemachine.EntityPhoneLine, phoneLineID, "cancelled", "in_stock", "reactivate_cancelled", nil, actorUserID, nil)
+	s.auditLog(ctx, "Reactivate", "PhoneLine", phoneLineID,
+		map[string]any{"status": "cancelled"}, map[string]any{"status": "in_stock"})
+	_ = s.recordDomainAudit(ctx, orgID, "phone_line", phoneLineID, "reactivate_to_stock", map[string]any{
+		"status": "in_stock",
+	}, map[string]any{"status": "cancelled"})
+	return s.GetPhoneLine(ctx, phoneLineID)
+}
+
+func (s *Service) UpdatePhoneLineSimIdentity(ctx context.Context, phoneLineID string, input models.UpdatePhoneLineSimTypeInput) (*models.GetPhoneLineResponse, error) {
+	orgID, err := orgFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+	line, err := s.GetPhoneLine(ctx, phoneLineID)
+	if err != nil {
+		return nil, err
+	}
+	simType := phone.NormalizeSimType(input.SimType)
+	var iccid *string
+	if input.ICCID != nil {
+		trimmed := strings.TrimSpace(*input.ICCID)
+		iccid = &trimmed
+	}
+	if err := s.Store.UpdatePhoneLineSimIdentity(ctx, phoneLineID, simType, iccid); err != nil {
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	}
+	_ = s.recordDomainAudit(ctx, orgID, "phone_line", phoneLineID, "update_sim_identity", map[string]any{
+		"sim_type": simType, "iccid": iccid,
+	}, map[string]any{"sim_type": line.SimType, "iccid": line.ICCID})
+	return s.GetPhoneLine(ctx, phoneLineID)
 }
 
 func (s *Service) activePhoneLineCustomerLink(ctx context.Context, orgID, phoneLineID string) (*models.PhoneLineCustomerLinkResponse, error) {

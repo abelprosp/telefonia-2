@@ -96,4 +96,15 @@ export type ListPhoneLineResponse = {
    * @type null,number, decimal
    */
   cost_with_consumption: number | null;
+  /**
+   * PHYSICAL | ESIM | UNKNOWN
+   * @type string | undefined
+   */
+  sim_type?: string;
+  /**
+   * @type null,string | undefined
+   */
+  iccid?: string | null;
+  charge_exceedances?: boolean;
+  exceedance_charge_type?: string;
 };

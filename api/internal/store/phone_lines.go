@@ -58,7 +58,8 @@ func (s *Store) ListPhoneLines(ctx context.Context, orgID string, status *string
 			pl."TitularLineId", tit."Number", pl."Number", pl."LineClassification"::text,
 			pl."Status"::text, pl."TransitionSubStatus"::text, pl."TransitionStartedAt",
 			pl."ActivationDate", pl."CancellationDate", pl."BaseCost", pl."CostWithConsumption",
-			COALESCE(pl."ChargeExceedances", true), COALESCE(pl."ExceedanceChargeType"::text, 'mirroed')
+			COALESCE(pl."ChargeExceedances", true), COALESCE(pl."ExceedanceChargeType"::text, 'mirroed'),
+			COALESCE(pl."SimType", 'UNKNOWN'), pl."ICCID"
 		` + base + `
 		ORDER BY pl."Number"
 		OFFSET $` + itoa(offsetParam) + ` LIMIT $` + itoa(limitParam)
@@ -83,8 +84,12 @@ func scanPhoneLineList(rows pgx.Rows, total int64) ([]models.ListPhoneLineRespon
 			&item.LastInvoiceID, &item.LastInvoiceNumber, &item.TitularLineID, &item.TitularLineNumber,
 			&item.Number, &item.LineClassification, &item.Status, &item.TransitionSubStatus,
 			&item.TransitionStartedAt, &item.ActivationDate, &item.CancellationDate,
-			&item.BaseCost, &item.CostWithConsumption, &item.ChargeExceedances, &item.ExceedanceChargeType); err != nil {
+			&item.BaseCost, &item.CostWithConsumption, &item.ChargeExceedances, &item.ExceedanceChargeType,
+			&item.SimType, &item.ICCID); err != nil {
 			return nil, 0, err
+		}
+		if item.SimType == "" {
+			item.SimType = "UNKNOWN"
 		}
 		item.ExceedanceChargeType = ExceedanceChargeTypeAPI(item.ExceedanceChargeType)
 		items = append(items, item)
@@ -102,7 +107,8 @@ func (s *Store) GetPhoneLine(ctx context.Context, orgID, id string) (*models.Get
 			pl."TitularLineId", tit."Number", pl."Number", pl."LineClassification"::text,
 			pl."Status"::text, pl."TransitionSubStatus"::text, pl."TransitionStartedAt",
 			pl."ActivationDate", pl."CancellationDate", pl."BaseCost", pl."CostWithConsumption",
-			COALESCE(pl."ChargeExceedances", true), COALESCE(pl."ExceedanceChargeType"::text, 'mirroed')
+			COALESCE(pl."ChargeExceedances", true), COALESCE(pl."ExceedanceChargeType"::text, 'mirroed'),
+			COALESCE(pl."SimType", 'UNKNOWN'), pl."ICCID"
 		FROM "PhoneLines" pl
 		JOIN "ProviderAccounts" pa ON pa."Id" = pl."ProviderAccountId"
 		JOIN "ContractingCompanies" cc ON cc."Id" = pa."ContractingCompanyId"
@@ -119,12 +125,16 @@ func (s *Store) GetPhoneLine(ctx context.Context, orgID, id string) (*models.Get
 			&item.LastInvoiceID, &item.LastInvoiceNumber, &item.TitularLineID, &item.TitularLineNumber,
 			&item.Number, &item.LineClassification, &item.Status, &item.TransitionSubStatus,
 			&item.TransitionStartedAt, &item.ActivationDate, &item.CancellationDate,
-			&item.BaseCost, &item.CostWithConsumption, &item.ChargeExceedances, &item.ExceedanceChargeType)
+			&item.BaseCost, &item.CostWithConsumption, &item.ChargeExceedances, &item.ExceedanceChargeType,
+			&item.SimType, &item.ICCID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
+	}
+	if item.SimType == "" {
+		item.SimType = "UNKNOWN"
 	}
 	item.ExceedanceChargeType = ExceedanceChargeTypeAPI(item.ExceedanceChargeType)
 
@@ -231,13 +241,29 @@ func (s *Store) GetActivePhoneLineCustomerLink(ctx context.Context, phoneLineID 
 
 func (s *Store) AssignPhoneLineCustomer(ctx context.Context, phoneLineID, customerID string, start time.Time, monthlyAmount *float64) error {
 	if _, err := s.q(ctx).Exec(ctx, `
-		UPDATE "PhoneLineCustomerLinks" SET "EndDate" = $2
+		UPDATE "PhoneLineCustomerLinks"
+		SET "EndDate" = $2,
+			"Status" = 'ended',
+			"EndReason" = COALESCE("EndReason", 'reassigned')
 		WHERE "PhoneLineId" = $1 AND "EndDate" IS NULL`, phoneLineID, start); err != nil {
-		return err
+		if isUndefinedColumn(err) {
+			if _, err2 := s.q(ctx).Exec(ctx, `
+				UPDATE "PhoneLineCustomerLinks" SET "EndDate" = $2
+				WHERE "PhoneLineId" = $1 AND "EndDate" IS NULL`, phoneLineID, start); err2 != nil {
+				return err2
+			}
+		} else {
+			return err
+		}
 	}
 	_, err := s.q(ctx).Exec(ctx, `
-		INSERT INTO "PhoneLineCustomerLinks" ("Id", "PhoneLineId", "CustomerId", "StartDate", "MonthlyAmount")
-		VALUES ($1, $2, $3, $4, $5)`, newUUID(), phoneLineID, customerID, start, monthlyAmount)
+		INSERT INTO "PhoneLineCustomerLinks" ("Id", "PhoneLineId", "CustomerId", "StartDate", "MonthlyAmount", "Status")
+		VALUES ($1, $2, $3, $4, $5, 'active')`, newUUID(), phoneLineID, customerID, start, monthlyAmount)
+	if err != nil && isUndefinedColumn(err) {
+		_, err = s.q(ctx).Exec(ctx, `
+			INSERT INTO "PhoneLineCustomerLinks" ("Id", "PhoneLineId", "CustomerId", "StartDate", "MonthlyAmount")
+			VALUES ($1, $2, $3, $4, $5)`, newUUID(), phoneLineID, customerID, start, monthlyAmount)
+	}
 	return err
 }
 
@@ -360,27 +386,37 @@ func (s *Store) GetPhoneLineByNumber(ctx context.Context, number string) (*Phone
 }
 
 func (s *Store) CreatePhoneLine(ctx context.Context, id, planID, accountID, number string) error {
-	return s.CreatePhoneLineWithIdentity(ctx, id, planID, accountID, number, number, httputil.NormalizeDigits(number))
+	return s.CreatePhoneLineWithIdentity(ctx, id, planID, accountID, number, number, httputil.NormalizeDigits(number), "UNKNOWN", nil)
 }
 
-func (s *Store) CreatePhoneLineWithIdentity(ctx context.Context, id, planID, accountID, number, original, normalized string) error {
+func (s *Store) CreatePhoneLineWithIdentity(ctx context.Context, id, planID, accountID, number, original, normalized, simType string, iccid *string) error {
 	if normalized == "" {
 		normalized = httputil.NormalizeDigits(number)
 	}
 	if original == "" {
 		original = number
 	}
+	if simType == "" {
+		simType = "UNKNOWN"
+	}
 	_, err := s.q(ctx).Exec(ctx, `
 		INSERT INTO "PhoneLines" ("Id", "Number", "NumberOriginal", "NormalizedNumber",
-			"ProviderAccountId", "ProviderPlanId", "LineClassification", "Status")
-		VALUES ($1, $2, $3, $4, $5, $6, 'normal'::line_classification, 'in_stock'::phone_line_status)`,
-		id, number, original, normalized, accountID, planID)
+			"ProviderAccountId", "ProviderPlanId", "LineClassification", "Status", "SimType", "ICCID")
+		VALUES ($1, $2, $3, $4, $5, $6, 'normal'::line_classification, 'in_stock'::phone_line_status, $7, $8)`,
+		id, number, original, normalized, accountID, planID, simType, iccid)
 	if err != nil && isUndefinedColumn(err) {
 		_, err = s.q(ctx).Exec(ctx, `
-			INSERT INTO "PhoneLines" ("Id", "Number", "ProviderAccountId", "ProviderPlanId",
-				"LineClassification", "Status")
-			VALUES ($1, $2, $3, $4, 'normal'::line_classification, 'in_stock'::phone_line_status)`,
-			id, number, accountID, planID)
+			INSERT INTO "PhoneLines" ("Id", "Number", "NumberOriginal", "NormalizedNumber",
+				"ProviderAccountId", "ProviderPlanId", "LineClassification", "Status")
+			VALUES ($1, $2, $3, $4, $5, $6, 'normal'::line_classification, 'in_stock'::phone_line_status)`,
+			id, number, original, normalized, accountID, planID)
+		if err != nil && isUndefinedColumn(err) {
+			_, err = s.q(ctx).Exec(ctx, `
+				INSERT INTO "PhoneLines" ("Id", "Number", "ProviderAccountId", "ProviderPlanId",
+					"LineClassification", "Status")
+				VALUES ($1, $2, $3, $4, 'normal'::line_classification, 'in_stock'::phone_line_status)`,
+				id, number, accountID, planID)
+		}
 	}
 	return err
 }
@@ -417,6 +453,30 @@ func (s *Store) ProviderPlanExistsForProvider(ctx context.Context, orgID, provid
 func (s *Store) UpdatePhoneLineStatus(ctx context.Context, id, status string) error {
 	_, err := s.q(ctx).Exec(ctx, `
 		UPDATE "PhoneLines" SET "Status" = $2::phone_line_status WHERE "Id" = $1`, id, status)
+	return err
+}
+
+func (s *Store) ReactivateCancelledPhoneLine(ctx context.Context, id string) error {
+	tag, err := s.q(ctx).Exec(ctx, `
+		UPDATE "PhoneLines"
+		SET "Status" = 'in_stock'::phone_line_status,
+			"CancellationDate" = NULL,
+			"TransitionSubStatus" = NULL,
+			"TransitionStartedAt" = NULL
+		WHERE "Id" = $1 AND "Status" = 'cancelled'::phone_line_status`, id)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+	return nil
+}
+
+func (s *Store) UpdatePhoneLineSimIdentity(ctx context.Context, id, simType string, iccid *string) error {
+	_, err := s.q(ctx).Exec(ctx, `
+		UPDATE "PhoneLines" SET "SimType" = $2, "ICCID" = COALESCE($3, "ICCID")
+		WHERE "Id" = $1`, id, simType, iccid)
 	return err
 }
 

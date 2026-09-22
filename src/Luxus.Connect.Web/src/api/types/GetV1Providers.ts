@@ -15,6 +15,10 @@ export type GetV1ProvidersQueryParams = {
    * @type integer | undefined, int32
    */
   page_size?: number;
+  /**
+   * Free-text search (name / slug).
+   */
+  q?: string;
 };
 
 /**

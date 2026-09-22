@@ -16,6 +16,7 @@ import {
   usePostV1ProcessingMonthsIdClose,
   usePostV1ProcessingMonthsIdCloseContingency
 } from '@/api';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import { Separator } from '@/components/ui/separator';
@@ -92,6 +93,8 @@ export function ProcessingMonthDetailView({
   const queryClient = useQueryClient();
   const [closeSheetOpen, setCloseSheetOpen] = useState(false);
   const [contingencySheetOpen, setContingencySheetOpen] = useState(false);
+  const [confirmCloseHashOpen, setConfirmCloseHashOpen] = useState(false);
+  const [confirmReopenOpen, setConfirmReopenOpen] = useState(false);
 
   const open = isProcessingMonthOpen(month.status);
 
@@ -247,24 +250,7 @@ export function ProcessingMonthDetailView({
                 variant="outline"
                 size="sm"
                 disabled={closeWithHash.isPending}
-                onClick={() =>
-                  closeWithHash.mutate(undefined, {
-                    onSuccess: async (res) => {
-                      toast.success(
-                        res.status === 'pending_approval'
-                          ? 'Fechamento com hash enviado para aprovação em dois níveis.'
-                          : `Hash SHA-256: ${res.consolidation_hash || '—'}`
-                      );
-                      await queryClient.invalidateQueries({
-                        queryKey: getV1ProcessingMonthsQueryKey()
-                      });
-                      await queryClient.invalidateQueries({
-                        queryKey: processingMonthsControllerGetByIdQueryKey(month.id)
-                      });
-                    },
-                    onError: (e) => toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
-                  })
-                }
+                onClick={() => setConfirmCloseHashOpen(true)}
               >
                 <Lock className="size-4" />
                 Fechar com hash
@@ -276,20 +262,7 @@ export function ProcessingMonthDetailView({
               variant="outline"
               size="sm"
               disabled={reopenMonth.isPending}
-              onClick={() =>
-                reopenMonth.mutate(undefined, {
-                  onSuccess: async () => {
-                    toast.success('Reabertura enviada para aprovação auditada.');
-                    await queryClient.invalidateQueries({
-                      queryKey: getV1ProcessingMonthsQueryKey()
-                    });
-                    await queryClient.invalidateQueries({
-                      queryKey: processingMonthsControllerGetByIdQueryKey(month.id)
-                    });
-                  },
-                  onError: (e) => toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
-                })
-              }
+              onClick={() => setConfirmReopenOpen(true)}
             >
               <RotateCcw className="size-4" />
               Reabrir competência
@@ -297,6 +270,60 @@ export function ProcessingMonthDetailView({
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmCloseHashOpen}
+        title="Fechar competência com hash"
+        description="Tem certeza que deseja fechar esta competência? O fechamento gera hash de consolidação e pode exigir aprovação em dois níveis."
+        confirmLabel="Confirmar fechamento"
+        destructive
+        loading={closeWithHash.isPending}
+        onCancel={() => setConfirmCloseHashOpen(false)}
+        onConfirm={() =>
+          closeWithHash.mutate(undefined, {
+            onSuccess: async (res) => {
+              setConfirmCloseHashOpen(false);
+              toast.success(
+                res.status === 'pending_approval'
+                  ? 'Fechamento com hash enviado para aprovação em dois níveis.'
+                  : `Hash SHA-256: ${res.consolidation_hash || '—'}`
+              );
+              await queryClient.invalidateQueries({
+                queryKey: getV1ProcessingMonthsQueryKey()
+              });
+              await queryClient.invalidateQueries({
+                queryKey: processingMonthsControllerGetByIdQueryKey(month.id)
+              });
+            },
+            onError: (e) => toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+          })
+        }
+      />
+
+      <ConfirmDialog
+        open={confirmReopenOpen}
+        title="Reabrir competência"
+        description="Tem certeza que deseja solicitar a reabertura desta competência? A ação será auditada e pode exigir aprovação."
+        confirmLabel="Confirmar reabertura"
+        destructive
+        loading={reopenMonth.isPending}
+        onCancel={() => setConfirmReopenOpen(false)}
+        onConfirm={() =>
+          reopenMonth.mutate(undefined, {
+            onSuccess: async () => {
+              setConfirmReopenOpen(false);
+              toast.success('Reabertura enviada para aprovação auditada.');
+              await queryClient.invalidateQueries({
+                queryKey: getV1ProcessingMonthsQueryKey()
+              });
+              await queryClient.invalidateQueries({
+                queryKey: processingMonthsControllerGetByIdQueryKey(month.id)
+              });
+            },
+            onError: (e) => toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+          })
+        }
+      />
 
       <Separator />
 

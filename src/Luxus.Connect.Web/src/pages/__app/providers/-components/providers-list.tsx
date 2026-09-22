@@ -11,7 +11,9 @@ import {
   useDeleteV1ProvidersId,
   useGetV1Providers
 } from '@/api';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { DataTable, DataTablePagination } from '@/components/data-table';
+import { DynamicSearchInput } from '@/components/dynamic-search-input';
 import { ListPageHeader, ListPageSkeleton } from '@/components/list-page';
 import { Button } from '@/components/ui/button';
 import {
@@ -21,15 +23,6 @@ import {
   EmptyMedia,
   EmptyTitle
 } from '@/components/ui/empty';
-import {
-  Sheet,
-  SheetClose,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle
-} from '@/components/ui/sheet';
 import { getErrorMessage, isApiHttpError } from '@/lib/api-error';
 import { invalidateDashboardCaches, parseTotalCount } from '@/lib/query-utils';
 
@@ -50,7 +43,7 @@ const PROVIDERS_SKELETON_COLUMNS = [
 ];
 
 export function ProvidersList() {
-  const { page, pageSize } = routeApi.useSearch();
+  const { page, pageSize, q } = routeApi.useSearch();
   const navigate = routeApi.useNavigate();
   const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
@@ -59,7 +52,8 @@ export function ProvidersList() {
 
   const listQuery = useGetV1Providers({
     page_index: pageIndex,
-    page_size: pageSize
+    page_size: pageSize,
+    ...(q ? { q } : {})
   });
 
   const deleteMutation = useDeleteV1ProvidersId({
@@ -99,6 +93,16 @@ export function ProvidersList() {
     });
   };
 
+  const setSearch = (next: string) => {
+    navigate({
+      search: (prev) => ({
+        ...prev,
+        page: 1,
+        ...(next ? { q: next } : { q: undefined })
+      })
+    });
+  };
+
   if (listQuery.isPending) {
     return (
       <ListPageSkeleton
@@ -130,6 +134,13 @@ export function ProvidersList() {
             Cadastrar operadora
           </Button>
         }
+      />
+
+      <DynamicSearchInput
+        value={q ?? ''}
+        onChange={setSearch}
+        placeholder="Pesquisar por nome ou slug…"
+        aria-label="Pesquisar operadoras"
       />
 
       <ProvidersTable
@@ -167,16 +178,12 @@ function ProvidersTable({
   onDelete: (id: string) => void;
   deletePending: boolean;
 }) {
-  const [open, setOpen] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
 
   const columns = useMemo(
     () =>
       createProvidersColumns({
-        onDeleteClick: (id) => {
-          setPendingId(id);
-          setOpen(true);
-        },
+        onDeleteClick: (id) => setPendingId(id),
         deletePending,
         listSearch: { page, pageSize }
       }),
@@ -206,34 +213,21 @@ function ProvidersTable({
         getRowId={(row) => row.id}
       />
 
-      <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent side="right" className="sm:max-w-md">
-          <SheetHeader>
-            <SheetTitle>Excluir operadora</SheetTitle>
-            <SheetDescription>
-              Esta ação não pode ser desfeita. Confirma a exclusão?
-            </SheetDescription>
-          </SheetHeader>
-          <SheetFooter className="gap-2 sm:justify-end">
-            <SheetClose render={<Button variant="outline" />}>
-              Cancelar
-            </SheetClose>
-            <Button
-              variant="destructive"
-              disabled={deletePending || !pendingId}
-              onClick={() => {
-                if (pendingId) {
-                  onDelete(pendingId);
-                  setOpen(false);
-                  setPendingId(null);
-                }
-              }}
-            >
-              Excluir
-            </Button>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
+      <ConfirmDialog
+        open={Boolean(pendingId)}
+        title="Excluir operadora"
+        description="Tem certeza que deseja excluir esta operadora? Esta ação não pode ser desfeita."
+        confirmLabel="Confirmar exclusão"
+        destructive
+        loading={deletePending}
+        onCancel={() => setPendingId(null)}
+        onConfirm={() => {
+          if (pendingId) {
+            onDelete(pendingId);
+            setPendingId(null);
+          }
+        }}
+      />
     </>
   );
 }

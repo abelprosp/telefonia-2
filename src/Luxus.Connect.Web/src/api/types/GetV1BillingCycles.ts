@@ -15,6 +15,10 @@ export type GetV1BillingCyclesQueryParams = {
    * @type integer | undefined, int32
    */
   page_size?: number;
+  /**
+   * Free-text search (code / name).
+   */
+  q?: string;
 };
 
 /**

@@ -16,6 +16,7 @@ import {
   type GetPhoneLineResponse,
   type GetPhoneLineServiceResponse
 } from '@/api';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
@@ -61,7 +62,9 @@ import {
 } from '@/lib/phone-line-api';
 import {
   usePutPhoneLineTransition,
-  useUpdatePhoneLineClassification
+  useReactivateCancelledPhoneLine,
+  useUpdatePhoneLineClassification,
+  useUpdatePhoneLineSimIdentity
 } from '@/lib/phone-line-spec-api';
 import { cn } from '@/lib/utils';
 
@@ -151,6 +154,11 @@ export function PhoneLineDetailView({
   const [transitionSub, setTransitionSub] = useState(
     line.transition_sub_status ?? 'pending_portability'
   );
+  const [reactivateOpen, setReactivateOpen] = useState(false);
+  const [simType, setSimType] = useState(
+    (line as { sim_type?: string }).sim_type ?? 'UNKNOWN'
+  );
+  const [iccid, setIccid] = useState((line as { iccid?: string | null }).iccid ?? '');
 
   const customerLinksQuery = useGetV1PhoneLinesIdCustomerLinks(line.id);
   const historyQuery = useStateTransitions('phone_line', line.id);
@@ -186,6 +194,8 @@ export function PhoneLineDetailView({
   const updateMonthlyMutation = useUpdatePhoneLineMonthlyAmount();
   const classificationMutation = useUpdatePhoneLineClassification(line.id);
   const transitionMutation = usePutPhoneLineTransition(line.id);
+  const reactivateMutation = useReactivateCancelledPhoneLine(line.id);
+  const simIdentityMutation = useUpdatePhoneLineSimIdentity(line.id);
   const exceedanceMutation = useUpdatePhoneLineExceedance(line.id);
   const chargeExceedances =
     (line as { charge_exceedances?: boolean }).charge_exceedances !== false;
@@ -275,7 +285,31 @@ export function PhoneLineDetailView({
             </p>
           </div>
         </div>
+        {line.status === 'cancelled' ? (
+          <Button type="button" variant="outline" onClick={() => setReactivateOpen(true)}>
+            Reativar para estoque
+          </Button>
+        ) : null}
       </div>
+
+      <ConfirmDialog
+        open={reactivateOpen}
+        title="Reativar linha cancelada"
+        description="Tem certeza que deseja reativar esta linha cancelada e devolvê-la ao estoque? O histórico de clientes anteriores será preservado."
+        confirmLabel="Confirmar reativação"
+        loading={reactivateMutation.isPending}
+        onCancel={() => setReactivateOpen(false)}
+        onConfirm={() =>
+          reactivateMutation.mutate(undefined, {
+            onSuccess: () => {
+              setReactivateOpen(false);
+              toast.success('Linha reativada e disponível no estoque.');
+              void queryClient.invalidateQueries({ queryKey: ['v1', 'phone-lines'] });
+            },
+            onError: (e) => toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+          })
+        }
+      />
 
       <DetailSection
         title="Identificação"
@@ -307,7 +341,47 @@ export function PhoneLineDetailView({
                 className="text-xs"
               />
             </Field>
+            <Field>
+              <FieldLabel htmlFor="line-sim-type">Tipo de SIM</FieldLabel>
+              <Select value={simType} onValueChange={(v) => setSimType(v ?? 'UNKNOWN')}>
+                <SelectTrigger id="line-sim-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="PHYSICAL">SIM físico</SelectItem>
+                  <SelectItem value="ESIM">eSIM / digital</SelectItem>
+                  <SelectItem value="UNKNOWN">Desconhecido</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="line-iccid">ICCID</FieldLabel>
+              <Input
+                id="line-iccid"
+                value={iccid}
+                onChange={(e) => setIccid(e.target.value)}
+                placeholder="Opcional"
+              />
+            </Field>
           </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={simIdentityMutation.isPending}
+            onClick={() =>
+              simIdentityMutation.mutate(
+                { sim_type: simType, iccid: iccid.trim() || null },
+                {
+                  onSuccess: () => toast.success('Identidade do SIM atualizada.'),
+                  onError: (e) =>
+                    toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+                }
+              )
+            }
+          >
+            Salvar SIM / ICCID
+          </Button>
         </FieldGroup>
       </DetailSection>
 

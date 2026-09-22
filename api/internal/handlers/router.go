@@ -248,6 +248,8 @@ func (h *Handler) RegisterRoutes(
 
 					r.Patch("/classification", h.updatePhoneLineClassification)
 					r.Post("/transition", h.putPhoneLineTransition)
+					r.Post("/reactivate", h.reactivateCancelledPhoneLine)
+					r.Patch("/sim-identity", h.updatePhoneLineSimIdentity)
 					r.Post("/services", h.createPhoneLineService)
 					r.Delete("/services/{serviceId}", h.deletePhoneLineService)
 					r.Patch("/exceedance-settings", h.updatePhoneLineExceedanceSettings)

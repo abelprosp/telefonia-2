@@ -4,7 +4,9 @@ import { getRouteApi } from '@tanstack/react-router';
 import { PackageX, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { DataTable, DataTablePagination } from '@/components/data-table';
+import { DynamicSearchInput } from '@/components/dynamic-search-input';
 import { ListPageHeader, ListPageSkeleton } from '@/components/list-page';
 import { Button } from '@/components/ui/button';
 import {
@@ -31,15 +33,17 @@ const SKELETON_COLUMNS = [
 ];
 
 export function DeviceStockList() {
-  const { page, pageSize } = routeApi.useSearch();
+  const { page, pageSize, q } = routeApi.useSearch();
   const navigate = routeApi.useNavigate();
   const [createOpen, setCreateOpen] = useState(false);
+  const [pendingSoldId, setPendingSoldId] = useState<string | null>(null);
   const markSoldMutation = useUpdateDeviceStockItem();
 
   const listQuery = useDeviceStockList({
     page_index: page - 1,
     page_size: pageSize,
-    status: 'in_stock'
+    status: 'in_stock',
+    ...(q ? { q } : {})
   });
 
   const total = parseTotalCount(listQuery.data?.total_count);
@@ -64,6 +68,16 @@ export function DeviceStockList() {
     });
   };
 
+  const setSearch = (next: string) => {
+    navigate({
+      search: (prev) => ({
+        ...prev,
+        page: 1,
+        ...(next ? { q: next } : { q: undefined })
+      })
+    });
+  };
+
   const handleMarkSold = useCallback(
     (id: string) => {
       markSoldMutation.mutate(
@@ -71,6 +85,7 @@ export function DeviceStockList() {
         {
           onSuccess: () => {
             toast.success('Aparelho marcado como vendido.');
+            setPendingSoldId(null);
             void listQuery.refetch();
           },
           onError: (e) => toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
@@ -83,9 +98,9 @@ export function DeviceStockList() {
   const columns = useMemo(
     () =>
       createDeviceStockColumns({
-        onMarkSold: (item) => handleMarkSold(item.id)
+        onMarkSold: (item) => setPendingSoldId(item.id)
       }),
-    [handleMarkSold]
+    []
   );
 
   if (listQuery.isPending) {
@@ -123,6 +138,13 @@ export function DeviceStockList() {
         onSuccess={() => void listQuery.refetch()}
       />
 
+      <DynamicSearchInput
+        value={q ?? ''}
+        onChange={setSearch}
+        placeholder="Pesquisar por SKU, marca, modelo ou IMEI…"
+        aria-label="Pesquisar aparelhos"
+      />
+
       <DataTable
         columns={columns}
         data={items}
@@ -149,6 +171,19 @@ export function DeviceStockList() {
         total={total}
         onPageChange={setPage}
         onPageSizeChange={setPageSize}
+      />
+
+      <ConfirmDialog
+        open={Boolean(pendingSoldId)}
+        title="Marcar como vendido"
+        description="Tem certeza que deseja marcar este aparelho como vendido? Ele sairá do estoque disponível."
+        confirmLabel="Confirmar venda"
+        destructive
+        loading={markSoldMutation.isPending}
+        onCancel={() => setPendingSoldId(null)}
+        onConfirm={() => {
+          if (pendingSoldId) handleMarkSold(pendingSoldId);
+        }}
       />
     </div>
   );

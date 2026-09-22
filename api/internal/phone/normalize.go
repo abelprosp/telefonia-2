@@ -63,3 +63,28 @@ func IsValidBasic(raw string, minDigits, maxDigits int) bool {
 	}
 	return true
 }
+
+// Canonical SIM form factors used across cadastro, import and reconciliation.
+const (
+	SimPhysical = "PHYSICAL"
+	SimEsim     = "ESIM"
+	SimUnknown  = "UNKNOWN"
+)
+
+// NormalizeSimType maps free-text labels to PHYSICAL | ESIM | UNKNOWN.
+func NormalizeSimType(raw string) string {
+	v := strings.ToUpper(strings.TrimSpace(raw))
+	v = strings.ReplaceAll(v, "-", "")
+	v = strings.ReplaceAll(v, "_", "")
+	v = strings.ReplaceAll(v, " ", "")
+	switch v {
+	case "PHYSICAL", "SIM", "SIMPHYSICAL", "FISICO", "FÍSICO", "CHIP":
+		return SimPhysical
+	case "ESIM", "ESIMDIGITAL", "DIGITAL", "EMBEDDED":
+		return SimEsim
+	case "", "UNKNOWN", "DESCONHECIDO", "N/A", "NA":
+		return SimUnknown
+	default:
+		return SimUnknown
+	}
+}

@@ -12,17 +12,26 @@ import (
 
 func (s *Store) ListBillingCycles(ctx context.Context, orgID string, page httputil.PageSearch) ([]models.ListBillingCycleResponse, int64, error) {
 	q := s.q(ctx)
+	base := ` FROM "BillingCycles" WHERE "OrganizationId" = $1`
+	args := []any{orgID}
+	if page.Search != "" {
+		args = append(args, "%"+page.Search+"%")
+		idx := len(args)
+		base += ` AND ("Code" ILIKE $` + itoa(idx) + ` OR "Name" ILIKE $` + itoa(idx) + `)`
+	}
 	var total int64
-	if err := q.QueryRow(ctx, `SELECT COUNT(*) FROM "BillingCycles" WHERE "OrganizationId" = $1`, orgID).Scan(&total); err != nil {
+	if err := q.QueryRow(ctx, `SELECT COUNT(*)`+base, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
+	offsetParam := len(args) + 1
+	limitParam := len(args) + 2
 	rows, err := q.Query(ctx, `
 		SELECT "Id", "ProviderId", "Code", "Name", "StartDate", "EndDate",
 			"Status"::text, "ClosedAt", "ClosedBy"
-		FROM "BillingCycles"
-		WHERE "OrganizationId" = $1
+		`+base+`
 		ORDER BY "StartDate" DESC
-		OFFSET $2 LIMIT $3`, orgID, page.Offset(), page.Limit())
+		OFFSET $`+itoa(offsetParam)+` LIMIT $`+itoa(limitParam),
+		append(args, page.Offset(), page.Limit())...)
 	if err != nil {
 		return nil, 0, err
 	}

@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
@@ -118,11 +119,18 @@ func (s *Service) CreateAccountPayableFromInvoice(ctx context.Context, invoiceID
 	now := time.Now().UTC()
 	invID := invoiceID
 	if err := s.Store.CreateAccountPayable(ctx, id, orgID, desc, vendor, &invID, nil, now, dueDate, amount, nil, now); err != nil {
+		var ae *httputil.AppError
+		if errors.As(err, &ae) {
+			return nil, ae
+		}
 		if isPgUnique(err) {
 			return nil, httputil.BusinessError(notifications.FinancialPayableFromInvoiceExists)
 		}
 		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
+	_ = s.recordDomainAudit(ctx, orgID, "account_payable", id, "create_from_invoice", map[string]any{
+		"provider_invoice_id": invoiceID, "amount": amount,
+	}, nil)
 	return &models.CreateAccountPayableFromInvoiceResponse{ID: id}, nil
 }
 

@@ -12,16 +12,25 @@ import (
 
 func (s *Store) ListProviders(ctx context.Context, orgID string, page httputil.PageSearch) ([]models.ListProvidersResponse, int64, error) {
 	q := s.q(ctx)
+	base := ` FROM "Providers" WHERE "OrganizationId" = $1`
+	args := []any{orgID}
+	if page.Search != "" {
+		args = append(args, "%"+page.Search+"%")
+		idx := len(args)
+		base += ` AND ("Name" ILIKE $` + itoa(idx) + ` OR "Slug" ILIKE $` + itoa(idx) + `)`
+	}
 	var total int64
-	if err := q.QueryRow(ctx, `SELECT COUNT(*) FROM "Providers" WHERE "OrganizationId" = $1`, orgID).Scan(&total); err != nil {
+	if err := q.QueryRow(ctx, `SELECT COUNT(*)`+base, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
+	offsetParam := len(args) + 1
+	limitParam := len(args) + 2
 	rows, err := q.Query(ctx, `
 		SELECT "Id", "Name", "Slug", "Active"
-		FROM "Providers"
-		WHERE "OrganizationId" = $1
+		`+base+`
 		ORDER BY "Name"
-		OFFSET $2 LIMIT $3`, orgID, page.Offset(), page.Limit())
+		OFFSET $`+itoa(offsetParam)+` LIMIT $`+itoa(limitParam),
+		append(args, page.Offset(), page.Limit())...)
 	if err != nil {
 		return nil, 0, err
 	}

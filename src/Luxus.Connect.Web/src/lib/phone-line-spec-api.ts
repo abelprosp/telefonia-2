@@ -44,6 +44,42 @@ export function usePutPhoneLineTransition(phoneLineId: string) {
   });
 }
 
+export function useReactivateCancelledPhoneLine(phoneLineId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const { data } = await client({
+        url: `/v1/phone-lines/${phoneLineId}/reactivate`,
+        method: 'POST'
+      });
+      return data;
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['v1', 'phone-lines'] });
+      void qc.invalidateQueries({ queryKey: ['phoneLinesController'] });
+      void qc.invalidateQueries({ queryKey: ['phone-line-360', phoneLineId] });
+    }
+  });
+}
+
+export function useUpdatePhoneLineSimIdentity(phoneLineId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: { sim_type: string; iccid?: string | null }) => {
+      const { data } = await client({
+        url: `/v1/phone-lines/${phoneLineId}/sim-identity`,
+        method: 'PATCH',
+        data: body
+      });
+      return data;
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['v1', 'phone-lines'] });
+      void qc.invalidateQueries({ queryKey: ['phoneLinesController'] });
+    }
+  });
+}
+
 export function useCreatePhoneLineService(phoneLineId: string) {
   const qc = useQueryClient();
   return useMutation({

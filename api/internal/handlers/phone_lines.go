@@ -250,6 +250,29 @@ func (h *Handler) putPhoneLineTransition(w http.ResponseWriter, r *http.Request)
 	httputil.WriteJSON(w, http.StatusOK, item)
 }
 
+func (h *Handler) reactivateCancelledPhoneLine(w http.ResponseWriter, r *http.Request) {
+	item, err := h.Svc.ReactivateCancelledPhoneLine(r.Context(), chi.URLParam(r, "id"))
+	if err != nil {
+		httputil.HandleServiceError(w, err)
+		return
+	}
+	httputil.WriteJSON(w, http.StatusOK, item)
+}
+
+func (h *Handler) updatePhoneLineSimIdentity(w http.ResponseWriter, r *http.Request) {
+	var input models.UpdatePhoneLineSimTypeInput
+	if err := decodeJSON(r, &input); err != nil {
+		httputil.WriteFail(w, http.StatusBadRequest, notifications.N("REQUEST_VALIDATION", "Invalid request body"))
+		return
+	}
+	item, err := h.Svc.UpdatePhoneLineSimIdentity(r.Context(), chi.URLParam(r, "id"), input)
+	if err != nil {
+		httputil.HandleServiceError(w, err)
+		return
+	}
+	httputil.WriteJSON(w, http.StatusOK, item)
+}
+
 func (h *Handler) createPhoneLineService(w http.ResponseWriter, r *http.Request) {
 	var input models.CreatePhoneLineServiceInput
 	if err := decodeJSON(r, &input); err != nil {

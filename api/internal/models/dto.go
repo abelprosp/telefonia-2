@@ -291,13 +291,22 @@ type ListPhoneLineResponse struct {
 	CostWithConsumption   *float64   `json:"cost_with_consumption"`
 	ChargeExceedances     bool       `json:"charge_exceedances"`
 	ExceedanceChargeType  string     `json:"exceedance_charge_type"`
+	SimType               string     `json:"sim_type"`
+	ICCID                 *string    `json:"iccid,omitempty"`
 }
 
 type CreateStockPhoneLineInput struct {
-	Number                string `json:"number"`
-	ProviderID            string `json:"provider_id"`
-	ProviderAccountNumber string `json:"provider_account_number"`
-	ProviderPlanID        string `json:"provider_plan_id"`
+	Number                string  `json:"number"`
+	ProviderID            string  `json:"provider_id"`
+	ProviderAccountNumber string  `json:"provider_account_number"`
+	ProviderPlanID        string  `json:"provider_plan_id"`
+	SimType               *string `json:"sim_type,omitempty"`
+	ICCID                 *string `json:"iccid,omitempty"`
+}
+
+type UpdatePhoneLineSimTypeInput struct {
+	SimType string  `json:"sim_type"`
+	ICCID   *string `json:"iccid,omitempty"`
 }
 
 type BulkCreateStockPhoneLineItemInput struct {
@@ -305,6 +314,8 @@ type BulkCreateStockPhoneLineItemInput struct {
 	ProviderID            *string `json:"provider_id,omitempty"`
 	ProviderAccountNumber *string `json:"provider_account_number,omitempty"`
 	ProviderPlanID        *string `json:"provider_plan_id,omitempty"`
+	SimType               *string `json:"sim_type,omitempty"`
+	ICCID                 *string `json:"iccid,omitempty"`
 }
 
 type BulkCreateStockPhoneLinesInput struct {

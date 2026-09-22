@@ -5,6 +5,7 @@ import { Calendar, Plus } from 'lucide-react';
 
 import { useGetV1BillingCycles } from '@/api';
 import { DataTable, DataTablePagination } from '@/components/data-table';
+import { DynamicSearchInput } from '@/components/dynamic-search-input';
 import { ListPageHeader, ListPageSkeleton } from '@/components/list-page';
 import { Button } from '@/components/ui/button';
 import {
@@ -36,7 +37,7 @@ const BILLING_CYCLES_SKELETON_COLUMNS = [
 ];
 
 export function BillingCyclesList() {
-  const { page, pageSize } = routeApi.useSearch();
+  const { page, pageSize, q } = routeApi.useSearch();
   const navigate = routeApi.useNavigate();
   const [createOpen, setCreateOpen] = useState(false);
 
@@ -44,7 +45,8 @@ export function BillingCyclesList() {
 
   const listQuery = useGetV1BillingCycles({
     page_index: pageIndex,
-    page_size: pageSize
+    page_size: pageSize,
+    ...(q ? { q } : {})
   });
 
   const total = parseTotalCount(listQuery.data?.total_count);
@@ -65,6 +67,16 @@ export function BillingCyclesList() {
         ...prev,
         page: 1,
         pageSize: next
+      })
+    });
+  };
+
+  const setSearch = (next: string) => {
+    navigate({
+      search: (prev) => ({
+        ...prev,
+        page: 1,
+        ...(next ? { q: next } : { q: undefined })
       })
     });
   };
@@ -108,6 +120,13 @@ export function BillingCyclesList() {
             Novo ciclo
           </Button>
         }
+      />
+
+      <DynamicSearchInput
+        value={q ?? ''}
+        onChange={setSearch}
+        placeholder="Pesquisar por código ou nome…"
+        aria-label="Pesquisar ciclos"
       />
 
       <DataTable

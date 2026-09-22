@@ -83,3 +83,21 @@ func TestDigits_duplicatesFormats(t *testing.T) {
 		t.Fatalf("got %q and %q", a, b)
 	}
 }
+
+func TestNormalizeSimType(t *testing.T) {
+	cases := map[string]string{
+		"":           SimUnknown,
+		"physical":   SimPhysical,
+		"SIM":        SimPhysical,
+		"e-sim":      SimEsim,
+		"digital":    SimEsim,
+		"unknown":    SimUnknown,
+		"chip":       SimPhysical,
+		"weird":      SimUnknown,
+	}
+	for in, want := range cases {
+		if got := NormalizeSimType(in); got != want {
+			t.Errorf("NormalizeSimType(%q)=%q want %q", in, got, want)
+		}
+	}
+}

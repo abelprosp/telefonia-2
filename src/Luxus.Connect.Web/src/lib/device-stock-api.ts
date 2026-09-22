@@ -43,12 +43,14 @@ export const deviceStockQueryKey = (params?: {
   page_index?: number;
   page_size?: number;
   status?: string;
+  q?: string;
 }) => ['device-stock', params] as const;
 
 export function useDeviceStockList(params: {
   page_index: number;
   page_size: number;
   status?: string;
+  q?: string;
 }) {
   return useQuery({
     queryKey: deviceStockQueryKey(params),

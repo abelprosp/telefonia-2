@@ -114,19 +114,31 @@ func (s *Store) ListAccountsPayable(ctx context.Context, orgID string, status *s
 }
 
 func (s *Store) CreateAccountPayable(ctx context.Context, id, orgID, description, vendorName string, providerInvoiceID, partnerUserID *string, issueDate, dueDate time.Time, amount float64, notes *string, now time.Time) error {
+	if len(vendorName) > 256 {
+		vendorName = vendorName[:256]
+	}
+	if len(description) > 512 {
+		description = description[:512]
+	}
+	// Align org/invoice check with ProviderInvoiceExistsInOrg (via ProviderAccount).
 	tag, err := s.q(ctx).Exec(ctx, `
 		INSERT INTO "AccountsPayable" (
 			"Id", "OrganizationId", "Description", "VendorName", "ProviderInvoiceId",
 			"PartnerSalespersonUserId", "IssueDate", "DueDate", "Amount", "PaidAmount",
 			"Status", "Notes", "CreatedAt", "UpdatedAt"
-		) SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, 0, 'open'::financial_entry_status, $10, $11, $11
-		WHERE $5::varchar IS NULL OR EXISTS (SELECT 1 FROM "ProviderInvoices" i
-		JOIN "ContractingCompanies" cc ON cc."Id"=i."ContractingCompanyId" JOIN "Providers" p ON p."Id"=cc."ProviderId"
-		WHERE i."Id"=$5 AND p."OrganizationId"=$2 AND i."Status" NOT IN ('cancelled','substituted'))`,
+		) SELECT $1, $2, $3, $4, $5, $6, $7::date, $8::date, $9, 0, 'open'::financial_entry_status, $10, $11, $11
+		WHERE $5::text IS NULL OR EXISTS (
+			SELECT 1 FROM "ProviderInvoices" i
+			JOIN "ProviderAccounts" pa ON pa."Id" = i."ProviderAccountId"
+			JOIN "ContractingCompanies" cc ON cc."Id" = pa."ContractingCompanyId"
+			JOIN "Providers" p ON p."Id" = cc."ProviderId"
+			WHERE i."Id" = $5 AND p."OrganizationId" = $2
+			  AND i."Status" NOT IN ('cancelled', 'substituted')
+		)`,
 		id, orgID, description, vendorName, providerInvoiceID, partnerUserID,
 		issueDate, dueDate, amount, notes, now)
 	if err == nil && tag.RowsAffected() == 0 {
-		return undoBlocked("A fatura foi cancelada ou substituída e não pode gerar uma conta a pagar.")
+		return undoBlocked("A fatura foi cancelada, substituída ou não pertence à organização e não pode gerar uma conta a pagar.")
 	}
 	return err
 }
@@ -565,20 +577,22 @@ func (s *Store) PayableExistsForProviderInvoice(ctx context.Context, orgID, invo
 	err := s.q(ctx).QueryRow(ctx, `
 		SELECT EXISTS(
 			SELECT 1 FROM "AccountsPayable"
-			WHERE "OrganizationId" = $1 AND "ProviderInvoiceId" = $2)`, orgID, invoiceID).Scan(&exists)
+			WHERE "OrganizationId" = $1 AND "ProviderInvoiceId" = $2
+			  AND "Status" <> 'cancelled')`, orgID, invoiceID).Scan(&exists)
 	return exists, err
 }
 
 func (s *Store) GetProviderInvoiceForPayable(ctx context.Context, orgID, invoiceID string) (vendorName, description string, dueDate time.Time, amount float64, err error) {
 	err = s.q(ctx).QueryRow(ctx, `
-		SELECT COALESCE(NULLIF(p."Name", ''), 'Operadora') || ' - ' || COALESCE(NULLIF(pa."AccountNumber", ''), 'Conta não informada'),
-			'Fatura operadora ' || COALESCE(NULLIF(i."Number", ''), i."Id"),
+		SELECT LEFT(COALESCE(NULLIF(p."Name", ''), 'Operadora') || ' - ' || COALESCE(NULLIF(pa."AccountNumber", ''), 'Conta não informada'), 256),
+			LEFT('Fatura operadora ' || COALESCE(NULLIF(i."Number", ''), i."Id"), 512),
 			i."DueDate", i."TotalAmount"
 		FROM "ProviderInvoices" i
 		JOIN "ProviderAccounts" pa ON pa."Id" = i."ProviderAccountId"
-		JOIN "ContractingCompanies" cc ON cc."Id" = i."ContractingCompanyId"
+		JOIN "ContractingCompanies" cc ON cc."Id" = pa."ContractingCompanyId"
 		JOIN "Providers" p ON p."Id" = cc."ProviderId"
-		WHERE p."OrganizationId" = $1 AND i."Id" = $2`, orgID, invoiceID).Scan(&vendorName, &description, &dueDate, &amount)
+		WHERE p."OrganizationId" = $1 AND i."Id" = $2
+		  AND i."Status" NOT IN ('cancelled', 'substituted')`, orgID, invoiceID).Scan(&vendorName, &description, &dueDate, &amount)
 	return vendorName, description, dueDate, amount, err
 }
 
