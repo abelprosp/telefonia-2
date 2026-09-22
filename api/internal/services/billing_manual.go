@@ -139,14 +139,33 @@ func (s *Service) GenerateCustomerBillingDocument(ctx context.Context, customerI
 
 	candidates, err := s.Store.ListManualBillingCandidates(ctx, orgID, []string{customerID})
 	if err != nil {
-		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+		return nil, billingStoreError("Falha ao calcular grupos de cobrança do cliente.", err)
 	}
 	if len(candidates) == 0 {
 		return nil, httputil.ValidationError(notifications.N("BILLING_NO_LINES", "Cliente sem linhas ou aparelhos ativos vinculados."))
 	}
-	if input.Amount != nil && *input.Amount > 0 && len(candidates) == 1 {
-		candidates[0].MonthlyAmount = *input.Amount
-		candidates[0].Eligible = *input.Amount > 0
+	// Se o operador informou valor e há um único grupo elegível (ou só um grupo),
+	// aplica o valor informado. Com vários grupos, cada um usa o valor calculado.
+	if input.Amount != nil && *input.Amount > 0 {
+		if len(candidates) == 1 {
+			candidates[0].MonthlyAmount = *input.Amount
+			candidates[0].Eligible = true
+		} else {
+			eligibleIdx := -1
+			for i, c := range candidates {
+				if c.Eligible {
+					if eligibleIdx >= 0 {
+						eligibleIdx = -2
+						break
+					}
+					eligibleIdx = i
+				}
+			}
+			if eligibleIdx >= 0 {
+				candidates[eligibleIdx].MonthlyAmount = *input.Amount
+				candidates[eligibleIdx].Eligible = true
+			}
+		}
 	}
 	bulk, err := s.generateBillingDocumentsForCandidates(ctx, orgID, candidates, nil, issueDate, dueDate, description, templateCode, layoutCode)
 	if err != nil {

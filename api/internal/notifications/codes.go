@@ -1,5 +1,7 @@
 package notifications
 
+import "strings"
+
 type Notification struct {
 	Code    string  `json:"code"`
 	Message string  `json:"message"`
@@ -15,8 +17,20 @@ func NP(code, message, param string) Notification {
 }
 
 // Shared
-func SharedUnexpectedError(_ string) Notification {
-	return N("UNEXPECTED_ERROR", "An unexpected error occurred. Please try again.")
+func SharedUnexpectedError(detail string) Notification {
+	msg := "Ocorreu um erro inesperado. Tente novamente."
+	d := strings.ToLower(strings.TrimSpace(detail))
+	switch {
+	case strings.Contains(d, "column") && strings.Contains(d, "does not exist"):
+		msg = "Schema do banco desatualizado (coluna ausente). Reinicie a API para aplicar as migrações."
+	case strings.Contains(d, "relation") && strings.Contains(d, "does not exist"):
+		msg = "Schema do banco desatualizado (tabela ausente). Aplique as migrações."
+	case strings.Contains(d, "violates foreign key"):
+		msg = "Não foi possível gravar: referência inválida no banco."
+	case strings.Contains(d, "duplicate key"):
+		msg = "Registro duplicado. Atualize a página e tente novamente."
+	}
+	return N("UNEXPECTED_ERROR", msg)
 }
 
 var (
