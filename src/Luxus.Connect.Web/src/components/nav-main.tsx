@@ -34,6 +34,7 @@ export const NavMain = ({
     items?: {
       title: string;
       url: string;
+      hash?: string;
     }[];
   }[];
 }) => {
@@ -64,8 +65,16 @@ export const NavMain = ({
             <SidebarMenuItem key={item.title}>
               <SidebarMenuButton
                 isActive={active}
-                className={cn(active && 'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground')}
-                render={<Link to={item.url} activeOptions={{ exact: item.url === '/' }} />}
+                className={cn(
+                  active &&
+                    'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground'
+                )}
+                render={
+                  <Link
+                    to={item.url}
+                    activeOptions={{ exact: item.url === '/' }}
+                  />
+                }
               >
                 {item.icon}
                 <span>{item.title}</span>
@@ -93,12 +102,13 @@ function NavCollapsibleItem({
     url: string;
     icon?: React.ReactNode;
     badge?: string;
-    items?: { title: string; url: string }[];
+    items?: { title: string; url: string; hash?: string }[];
   };
   active: boolean;
   isPathActive: (url: string) => boolean;
 }) {
   const [open, setOpen] = useState(active);
+  const currentHash = useRouterState({ select: (s) => s.location.hash });
 
   useEffect(() => {
     if (active) {
@@ -118,7 +128,10 @@ function NavCollapsibleItem({
           <SidebarMenuButton
             tooltip={item.title}
             isActive={active}
-            className={cn(active && 'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground')}
+            className={cn(
+              active &&
+                'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground'
+            )}
           />
         }
       >
@@ -136,8 +149,17 @@ function NavCollapsibleItem({
           {item.items?.map((subItem) => (
             <SidebarMenuSubItem key={subItem.title}>
               <SidebarMenuSubButton
-                isActive={isPathActive(subItem.url)}
-                render={<Link to={subItem.url} activeOptions={{ exact: subItem.url === '/' }} />}
+                isActive={
+                  isPathActive(subItem.url) &&
+                  (subItem.hash ? currentHash === subItem.hash : !currentHash)
+                }
+                render={
+                  <Link
+                    to={subItem.url}
+                    hash={subItem.hash}
+                    activeOptions={{ exact: subItem.url === '/' }}
+                  />
+                }
               >
                 <span>{subItem.title}</span>
               </SidebarMenuSubButton>

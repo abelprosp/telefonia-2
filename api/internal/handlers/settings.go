@@ -40,6 +40,15 @@ func (h *Handler) getOrganizationSettings(w http.ResponseWriter, r *http.Request
 	httputil.WriteJSON(w, http.StatusOK, settings)
 }
 
+func (h *Handler) getPublicOrganizationBranding(w http.ResponseWriter, r *http.Request) {
+	settings, err := h.Svc.PublicOrganizationBranding(r.Context())
+	if err != nil {
+		httputil.HandleServiceError(w, err)
+		return
+	}
+	httputil.WriteJSON(w, http.StatusOK, settings)
+}
+
 func (h *Handler) updateCompanySettings(w http.ResponseWriter, r *http.Request) {
 	var input models.UpdateCompanySettingsInput
 	if err := decodeJSON(r, &input); err != nil {

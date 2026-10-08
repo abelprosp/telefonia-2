@@ -28,6 +28,7 @@ export function DataTableColumnHeader<TData, TValue>({
         size="sm"
         className="-ml-3 h-8"
         onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+        title="Ordenar os registros desta página"
       >
         <span>{title}</span>
         {column.getIsSorted() === 'desc' ? (

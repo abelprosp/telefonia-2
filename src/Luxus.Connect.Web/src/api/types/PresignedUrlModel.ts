@@ -4,6 +4,8 @@
  */
 
 export type PresignedUrlModel = {
+  object_key: string;
+  bucket_name: string;
   /**
    * @type string
    */

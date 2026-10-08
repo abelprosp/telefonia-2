@@ -188,7 +188,7 @@ export function CustomerAttachmentsView({
               title: file.name.trim() || null,
               original_file_name: file.name,
               storage_bucket: DEFAULT_STORAGE_BUCKET_NAME,
-              storage_object_key: objectKey,
+              storage_object_key: presigned.object_key,
               content_type: file.type || null,
               size_bytes: file.size
             }

@@ -7,7 +7,7 @@
   "duplicateEmailsAllowed": false,
   "resetPasswordAllowed": true,
   "editUsernameAllowed": false,
-  "bruteForceProtected": false,
+  "bruteForceProtected": true,
   "roles": {
     "realm": [
       {
@@ -48,7 +48,9 @@
       }
     ]
   },
-  "defaultRoles": ["user"],
+  "defaultRoles": [
+    "user"
+  ],
   "users": [
     {
       "username": "dev",
@@ -64,7 +66,11 @@
           "temporary": false
         }
       ],
-      "realmRoles": ["master", "admin", "user"],
+      "realmRoles": [
+        "master",
+        "admin",
+        "user"
+      ],
       "attributes": {
         "organization": [
           "{\"luxus\":{\"id\":\"00000000-0000-0000-0000-000000000001\",\"name\":[\"Luxus Connect\"]}}"
@@ -85,7 +91,10 @@
           "temporary": false
         }
       ],
-      "realmRoles": ["partner", "user"],
+      "realmRoles": [
+        "partner",
+        "user"
+      ],
       "attributes": {
         "organization": [
           "{\"luxus\":{\"id\":\"00000000-0000-0000-0000-000000000001\",\"name\":[\"Luxus Connect\"]}}"
@@ -106,7 +115,10 @@
           "temporary": false
         }
       ],
-      "realmRoles": ["employee", "user"],
+      "realmRoles": [
+        "employee",
+        "user"
+      ],
       "attributes": {
         "organization": [
           "{\"luxus\":{\"id\":\"00000000-0000-0000-0000-000000000001\",\"name\":[\"Luxus Connect\"]}}"
@@ -127,7 +139,10 @@
           "temporary": false
         }
       ],
-      "realmRoles": ["financial", "user"],
+      "realmRoles": [
+        "financial",
+        "user"
+      ],
       "attributes": {
         "organization": [
           "{\"luxus\":{\"id\":\"00000000-0000-0000-0000-000000000001\",\"name\":[\"Luxus Connect\"]}}"
@@ -148,7 +163,10 @@
           "temporary": false
         }
       ],
-      "realmRoles": ["operator", "user"],
+      "realmRoles": [
+        "operator",
+        "user"
+      ],
       "attributes": {
         "organization": [
           "{\"luxus\":{\"id\":\"00000000-0000-0000-0000-000000000001\",\"name\":[\"Luxus Connect\"]}}"
@@ -169,7 +187,10 @@
           "temporary": false
         }
       ],
-      "realmRoles": ["sales", "user"],
+      "realmRoles": [
+        "sales",
+        "user"
+      ],
       "attributes": {
         "organization": [
           "{\"luxus\":{\"id\":\"00000000-0000-0000-0000-000000000001\",\"name\":[\"Luxus Connect\"]}}"
@@ -190,7 +211,10 @@
           "temporary": false
         }
       ],
-      "realmRoles": ["viewer", "user"],
+      "realmRoles": [
+        "viewer",
+        "user"
+      ],
       "attributes": {
         "organization": [
           "{\"luxus\":{\"id\":\"00000000-0000-0000-0000-000000000001\",\"name\":[\"Luxus Connect\"]}}"
@@ -211,7 +235,11 @@
           "temporary": false
         }
       ],
-      "realmRoles": ["master", "admin", "user"],
+      "realmRoles": [
+        "master",
+        "admin",
+        "user"
+      ],
       "attributes": {
         "organization": [
           "{\"luxus\":{\"id\":\"00000000-0000-0000-0000-000000000001\",\"name\":[\"Luxus Connect\"]}}"
@@ -232,12 +260,16 @@
           "temporary": false
         }
       ],
-      "realmRoles": ["user"],
+      "realmRoles": [
+        "user"
+      ],
       "attributes": {
         "organization": [
           "{\"luxus\":{\"id\":\"00000000-0000-0000-0000-000000000001\",\"name\":[\"Luxus Connect\"]}}"
         ],
-        "cpf_cnpj": ["52998224725"]
+        "cpf_cnpj": [
+          "52998224725"
+        ]
       }
     }
   ],
@@ -343,8 +375,16 @@
       "attributes": {
         "client.use.lightweight.access.token.enabled": "false"
       },
-      "defaultClientScopes": ["openid", "profile", "email", "tenant-organization", "luxus-roles"],
-      "optionalClientScopes": ["offline_access"],
+      "defaultClientScopes": [
+        "openid",
+        "profile",
+        "email",
+        "tenant-organization",
+        "luxus-roles"
+      ],
+      "optionalClientScopes": [
+        "offline_access"
+      ],
       "protocolMappers": [
         {
           "name": "realm-roles-direct",
@@ -386,5 +426,11 @@
       "defaultAction": false,
       "priority": 10
     }
-  ]
+  ],
+  "failureFactor": 5,
+  "waitIncrementSeconds": 60,
+  "maxFailureWaitSeconds": 900,
+  "quickLoginCheckMilliSeconds": 1000,
+  "minimumQuickLoginWaitSeconds": 60,
+  "maxDeltaTimeSeconds": 43200
 }

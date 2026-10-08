@@ -12,8 +12,8 @@ import {
   useGetV1Customers,
   useProvidersControllerGetById
 } from '@/api';
-import { DataTable, DataTablePagination } from '@/components/data-table';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { DataTable, DataTablePagination } from '@/components/data-table';
 import { DynamicSearchInput } from '@/components/dynamic-search-input';
 import { ListPageHeader, ListPageSkeleton } from '@/components/list-page';
 import { Button } from '@/components/ui/button';
@@ -26,6 +26,7 @@ import {
   EmptyTitle
 } from '@/components/ui/empty';
 import { getErrorMessage, isApiHttpError } from '@/lib/api-error';
+import { useAuthRoles } from '@/lib/auth-roles';
 import { invalidateDashboardCaches, parseTotalCount } from '@/lib/query-utils';
 
 import { createCustomersColumns } from './columns';
@@ -68,7 +69,7 @@ export function CustomersList() {
   const deleteMutation = useDeleteV1CustomersId({
     mutation: {
       onSuccess: () => {
-        toast.success('Cliente excluído.');
+        toast.success('Cliente inativado.');
         void queryClient.invalidateQueries({
           queryKey: getV1CustomersQueryKey()
         });
@@ -194,6 +195,8 @@ function CustomersTable({
   onDelete: (id: string) => void;
   deletePending: boolean;
 }) {
+  const { isMaster, isEmployee, isOperator } = useAuthRoles();
+  const canInactivate = isMaster || isEmployee || isOperator;
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState<ListCustomerResponse | null>(null);
 
@@ -206,13 +209,14 @@ function CustomersTable({
           setOpen(true);
         },
         deletePending,
+        canInactivate,
         listSearch: {
           page,
           pageSize,
           providerId: providerId ?? undefined
         }
       }),
-    [deletePending, page, pageSize, providerId, rows]
+    [canInactivate, deletePending, page, pageSize, providerId, rows]
   );
 
   return (
@@ -226,11 +230,9 @@ function CustomersTable({
               <EmptyMedia variant="icon">
                 <Users />
               </EmptyMedia>
-              <EmptyTitle>
-                Você ainda não possui nenhum cliente cadastrado
-              </EmptyTitle>
+              <EmptyTitle>Nenhum cliente encontrado</EmptyTitle>
               <EmptyDescription>
-                Clique no botão abaixo para cadastrar um novo cliente.
+                Revise os filtros ou cadastre um novo cliente.
               </EmptyDescription>
             </EmptyHeader>
             <EmptyContent>
@@ -247,13 +249,13 @@ function CustomersTable({
 
       <ConfirmDialog
         open={open}
-        title="Excluir cliente"
+        title="Inativar cliente"
         description={
           pending
-            ? `Confirma a exclusão de "${pending.name}" (${pending.cpf_cnpj || 'sem documento'})? Ação sensível e de difícil reversão.`
-            : 'Confirma a exclusão deste cliente?'
+            ? `Confirma a inativação de "${pending.name}" (${pending.cpf_cnpj || 'sem documento'})? O cadastro e o histórico serão preservados.`
+            : 'Confirma a inativação deste cliente?'
         }
-        confirmLabel="Excluir"
+        confirmLabel="Inativar"
         destructive
         loading={deletePending}
         onCancel={() => {

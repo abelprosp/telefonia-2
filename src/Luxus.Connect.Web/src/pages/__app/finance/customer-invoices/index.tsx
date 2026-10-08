@@ -74,20 +74,25 @@ function CustomerInvoicesPage() {
     {
       accessorKey: 'due_date',
       header: 'Vencimento',
-      cell: ({ row }) => new Date(row.original.due_date).toLocaleDateString('pt-BR')
+      cell: ({ row }) =>
+        new Date(row.original.due_date).toLocaleDateString('pt-BR')
     },
     {
       accessorKey: 'status',
       header: 'Status',
       cell: ({ row }) => (
-        <Badge variant="outline">{formatBillingStatus(row.original.status)}</Badge>
+        <Badge variant="outline">
+          {formatBillingStatus(row.original.status)}
+        </Badge>
       )
     },
     {
       id: 'payment',
       header: 'Pagamento',
       cell: ({ row }) => {
-        const paid = Boolean(row.original.sicredi_paid_at) || row.original.sicredi_boleto_status === 'paid';
+        const paid =
+          Boolean(row.original.sicredi_paid_at) ||
+          row.original.sicredi_boleto_status === 'paid';
         return paid ? (
           <Badge className="bg-green-600 text-white hover:bg-green-600">
             Pago
@@ -96,7 +101,9 @@ function CustomerInvoicesPage() {
               : ''}
           </Badge>
         ) : row.original.sicredi_nosso_numero ? (
-          <Badge variant="secondary">{formatSicrediBoletoStatus(row.original.sicredi_boleto_status)}</Badge>
+          <Badge variant="secondary">
+            {formatSicrediBoletoStatus(row.original.sicredi_boleto_status)}
+          </Badge>
         ) : (
           '—'
         );
@@ -123,7 +130,16 @@ function CustomerInvoicesPage() {
   ];
 
   if (listQuery.isPending) {
-    return <ListPageSkeleton pageSize={pageSize} columns={[{ header: 'A', cell: 'text' }, { header: 'B', cell: 'text' }, { header: 'C', cell: 'text' }]} />;
+    return (
+      <ListPageSkeleton
+        pageSize={pageSize}
+        columns={[
+          { header: 'A', cell: 'text' },
+          { header: 'B', cell: 'text' },
+          { header: 'C', cell: 'text' }
+        ]}
+      />
+    );
   }
 
   const total = listQuery.data?.totalCount ?? 0;
@@ -142,16 +158,22 @@ function CustomerInvoicesPage() {
               onClick={() =>
                 syncPaymentsMutation.mutate(7, {
                   onSuccess: (data) =>
-                    toast.success(`${data.paid} pagamento(s) sincronizado(s) de ${data.checked} fatura(s).`),
+                    toast.success(
+                      `${data.paid} pagamento(s) sincronizado(s) de ${data.checked} fatura(s).`
+                    ),
                   onError: (e) =>
-                    toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+                    toast.error(
+                      isApiHttpError(e) ? e.message : getErrorMessage(e)
+                    )
                 })
               }
             >
               <RefreshCw className="mr-2 size-4" />
               Sincronizar pagamentos
             </Button>
-            <Button render={<Link to="/finance/customer-invoices/bulk-generate" />}>
+            <Button
+              render={<Link to="/finance/customer-invoices/bulk-generate" />}
+            >
               <FileStack className="mr-2 size-4" />
               Gerar em massa
             </Button>
@@ -169,24 +191,43 @@ function CustomerInvoicesPage() {
                 {sicrediStatusQuery.data.codigo_beneficiario}
               </p>
               <div className="mt-2 flex flex-wrap gap-2">
-                <Badge variant={sicrediStatusQuery.data.connected ? 'default' : 'destructive'}>
-                  {sicrediStatusQuery.data.connected ? 'Conectado' : 'Desconectado'}
+                <Badge
+                  variant={
+                    sicrediStatusQuery.data.connected
+                      ? 'default'
+                      : 'destructive'
+                  }
+                >
+                  {sicrediStatusQuery.data.connected
+                    ? 'Conectado'
+                    : 'Desconectado'}
                 </Badge>
-                <Badge variant={sicrediStatusQuery.data.webhook_registered ? 'default' : 'outline'}>
-                  {sicrediStatusQuery.data.webhook_registered ? 'Webhook ativo' : 'Webhook pendente'}
+                <Badge
+                  variant={
+                    sicrediStatusQuery.data.webhook_registered
+                      ? 'default'
+                      : 'outline'
+                  }
+                >
+                  {sicrediStatusQuery.data.webhook_registered
+                    ? 'Webhook ativo'
+                    : 'Webhook pendente'}
                 </Badge>
                 {sicrediStatusQuery.data.ready_for_production && (
                   <Badge variant="default">Pronto para produção</Badge>
                 )}
-                {!sicrediStatusQuery.data.webhook_token_set && !sicrediStatusQuery.data.sandbox && (
-                  <Badge variant="destructive">Token webhook ausente</Badge>
-                )}
+                {!sicrediStatusQuery.data.webhook_token_set &&
+                  !sicrediStatusQuery.data.sandbox && (
+                    <Badge variant="destructive">Token webhook ausente</Badge>
+                  )}
               </div>
               {sicrediStatusQuery.data.connection_error && (
-                <p className="text-destructive mt-2 text-xs">{sicrediStatusQuery.data.connection_error}</p>
+                <p className="text-destructive mt-2 text-xs">
+                  {sicrediStatusQuery.data.connection_error}
+                </p>
               )}
               {sicrediStatusQuery.data.webhook_url && (
-                <p className="text-muted-foreground mt-2 break-all text-xs">
+                <p className="text-muted-foreground mt-2 text-xs break-all">
                   Webhook: {sicrediStatusQuery.data.webhook_url}
                 </p>
               )}
@@ -199,35 +240,55 @@ function CustomerInvoicesPage() {
                 onClick={() =>
                   testConnectionMutation.mutate(undefined, {
                     onSuccess: (data) =>
-                      data.success ? toast.success(data.message) : toast.error(data.message),
+                      data.success
+                        ? toast.success(data.message)
+                        : toast.error(data.message),
                     onError: (e) =>
-                      toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+                      toast.error(
+                        isApiHttpError(e) ? e.message : getErrorMessage(e)
+                      )
                   })
                 }
               >
                 <Plug className="mr-2 size-4" />
-                {testConnectionMutation.isPending ? 'Testando…' : 'Testar conexão'}
+                {testConnectionMutation.isPending
+                  ? 'Testando…'
+                  : 'Testar conexão'}
               </Button>
               <Button
                 size="sm"
-                disabled={setupProductionMutation.isPending || !sicrediStatusQuery.data.connected}
+                disabled={
+                  setupProductionMutation.isPending ||
+                  !sicrediStatusQuery.data.connected
+                }
                 onClick={() => {
-                  const url = (publicApiUrl || sicrediStatusQuery.data.public_api_url || '').trim();
+                  const url = (
+                    publicApiUrl ||
+                    sicrediStatusQuery.data.public_api_url ||
+                    ''
+                  ).trim();
                   setupProductionMutation.mutate(url || undefined, {
                     onSuccess: (data) => {
                       if (data.success) {
                         toast.success(data.message);
                       } else {
-                        const failed = data.steps.filter((s) => !s.ok).map((s) => s.message).join(' · ');
+                        const failed = data.steps
+                          .filter((s) => !s.ok)
+                          .map((s) => s.message)
+                          .join(' · ');
                         toast.error(failed || data.message);
                       }
                     },
                     onError: (e) =>
-                      toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+                      toast.error(
+                        isApiHttpError(e) ? e.message : getErrorMessage(e)
+                      )
                   });
                 }}
               >
-                {setupProductionMutation.isPending ? 'Configurando…' : 'Configurar produção'}
+                {setupProductionMutation.isPending
+                  ? 'Configurando…'
+                  : 'Configurar produção'}
               </Button>
             </div>
           </div>
@@ -235,42 +296,70 @@ function CustomerInvoicesPage() {
             <div className="flex flex-wrap items-end gap-2 border-t pt-3">
               <div className="min-w-[280px] flex-1">
                 <label className="text-muted-foreground mb-1 block text-xs">
-                  URL pública da API (HTTPS, ex. ngrok) para registrar webhook no Sicredi
+                  URL pública da API (HTTPS, ex. ngrok) para registrar webhook
+                  no Sicredi
                 </label>
                 <Input
                   placeholder="https://xxxx.ngrok-free.app"
-                  value={publicApiUrl || sicrediStatusQuery.data.public_api_url || ''}
+                  value={
+                    publicApiUrl || sicrediStatusQuery.data.public_api_url || ''
+                  }
                   onChange={(e) => setPublicApiUrl(e.target.value)}
                 />
               </div>
               <Button
                 size="sm"
                 variant="outline"
-                disabled={registerWebhookMutation.isPending || !sicrediStatusQuery.data.connected}
+                disabled={
+                  registerWebhookMutation.isPending ||
+                  !sicrediStatusQuery.data.connected
+                }
                 onClick={() => {
-                  const url = (publicApiUrl || sicrediStatusQuery.data.public_api_url || '').trim();
+                  const url = (
+                    publicApiUrl ||
+                    sicrediStatusQuery.data.public_api_url ||
+                    ''
+                  ).trim();
                   registerWebhookMutation.mutate(url || undefined, {
                     onSuccess: (data) => toast.success(data.message),
                     onError: (e) =>
-                      toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+                      toast.error(
+                        isApiHttpError(e) ? e.message : getErrorMessage(e)
+                      )
                   });
                 }}
               >
-                {registerWebhookMutation.isPending ? 'Registrando…' : 'Registrar webhook'}
+                {registerWebhookMutation.isPending
+                  ? 'Registrando…'
+                  : 'Registrar webhook'}
               </Button>
             </div>
           )}
         </div>
       )}
-      <DataTable columns={columns} data={listQuery.data?.items ?? []} getRowId={(r) => r.id} />
+      <DataTable
+        columns={columns}
+        data={listQuery.data?.items ?? []}
+        getRowId={(r) => r.id}
+      />
       <DataTablePagination
         page={page}
         pageSize={pageSize}
         total={total}
         totalPages={totalPages}
-        onPageChange={(p) => void navigate({ search: (s) => ({ ...s, page: p }) })}
+        onPageChange={(p) =>
+          void navigate({
+            search: (s: z.infer<typeof searchSchema>) => ({ ...s, page: p })
+          })
+        }
         onPageSizeChange={(ps) =>
-          void navigate({ search: (s) => ({ ...s, page: 1, pageSize: ps }) })
+          void navigate({
+            search: (s: z.infer<typeof searchSchema>) => ({
+              ...s,
+              page: 1,
+              pageSize: ps
+            })
+          })
         }
       />
     </div>

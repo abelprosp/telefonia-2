@@ -110,6 +110,7 @@ func (h *HealthChecker) ReadinessHandler() http.HandlerFunc {
 		} else {
 			w.WriteHeader(http.StatusOK)
 		}
-		_ = json.NewEncoder(w).Encode(health)
+		// Detailed component errors are internal operational information.
+		_ = json.NewEncoder(w).Encode(map[string]string{"status": health.Status})
 	}
 }

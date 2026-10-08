@@ -338,7 +338,37 @@ func (s *Service) ListCustomers(ctx context.Context, providerID *string, page ht
 	if err != nil {
 		return nil, 0, err
 	}
-	return s.Store.ListCustomers(ctx, orgID, providerID, nil, page)
+	items, total, err := s.Store.ListCustomers(ctx, orgID, providerID, nil, page)
+	if err != nil || s.Keycloak == nil || !s.Keycloak.Enabled() {
+		return items, total, err
+	}
+	lookupCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	names := map[string]*string{}
+	for i := range items {
+		id := items[i].ResponsibleSalespersonUserID
+		if id == nil || *id == "" {
+			continue
+		}
+		if name, found := names[*id]; found {
+			items[i].ResponsibleSalespersonName = name
+			continue
+		}
+		names[*id] = nil
+		if lookupCtx.Err() != nil {
+			continue
+		}
+		user, lookupErr := s.Keycloak.GetUserByID(lookupCtx, *id)
+		if lookupErr == nil && user != nil && toListUser(*user).OrganizationID == orgID {
+			name := strings.TrimSpace(user.FirstName + " " + user.LastName)
+			if name == "" {
+				name = user.Username
+			}
+			names[*id] = &name
+			items[i].ResponsibleSalespersonName = &name
+		}
+	}
+	return items, total, nil
 }
 
 func (s *Service) requireCustomer(ctx context.Context, id string) (*models.ListCustomerResponse, error) {

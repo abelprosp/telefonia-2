@@ -77,7 +77,9 @@ function LineRequestsAdminPage() {
         accessorKey: 'operation_type',
         header: 'Operação',
         cell: ({ row }) =>
-          row.original.operation_type === 'activation' ? 'Ativação' : 'Desativação'
+          row.original.operation_type === 'activation'
+            ? 'Ativação'
+            : 'Desativação'
       },
       {
         accessorKey: 'status',
@@ -97,7 +99,10 @@ function LineRequestsAdminPage() {
                 size="sm"
                 onClick={() => {
                   setAdminNotes('');
-                  setReviewTarget({ request: row.original, status: 'approved' });
+                  setReviewTarget({
+                    request: row.original,
+                    status: 'approved'
+                  });
                 }}
               >
                 Aprovar
@@ -107,7 +112,10 @@ function LineRequestsAdminPage() {
                 variant="outline"
                 onClick={() => {
                   setAdminNotes('');
-                  setReviewTarget({ request: row.original, status: 'rejected' });
+                  setReviewTarget({
+                    request: row.original,
+                    status: 'rejected'
+                  });
                 }}
               >
                 Rejeitar
@@ -151,14 +159,12 @@ function LineRequestsAdminPage() {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   if (listQuery.isPending) {
-    return (
-      <ListPageSkeleton pageSize={pageSize} columns={SKELETON_COLUMNS} />
-    );
+    return <ListPageSkeleton pageSize={pageSize} columns={SKELETON_COLUMNS} />;
   }
 
   if (listQuery.error) {
     return (
-      <div className="p-6 text-sm text-destructive">
+      <div className="text-destructive p-6 text-sm">
         {isApiHttpError(listQuery.error)
           ? listQuery.error.message
           : getErrorMessage(listQuery.error)}
@@ -182,10 +188,21 @@ function LineRequestsAdminPage() {
         total={total}
         totalPages={totalPages}
         onPageChange={(next) =>
-          navigate({ search: (prev) => ({ ...prev, page: next }) })
+          navigate({
+            search: (prev: z.infer<typeof searchSchema>) => ({
+              ...prev,
+              page: next
+            })
+          })
         }
         onPageSizeChange={(next) =>
-          navigate({ search: (prev) => ({ ...prev, page: 1, pageSize: next }) })
+          navigate({
+            search: (prev: z.infer<typeof searchSchema>) => ({
+              ...prev,
+              page: 1,
+              pageSize: next
+            })
+          })
         }
       />
 

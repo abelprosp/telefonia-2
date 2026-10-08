@@ -23,7 +23,6 @@ import { getErrorMessage, isApiHttpError } from '@/lib/api-error';
 import { formatCpfCnpj } from '@/lib/format';
 import { usePartnerCustomers } from '@/lib/partner-api';
 
-
 const searchSchema = z.object({
   page: z.number().int().min(1).catch(1),
   pageSize: z.number().int().min(5).max(100).catch(10),
@@ -58,7 +57,9 @@ function PartnerCustomersPage() {
       {
         accessorKey: 'name',
         header: 'Nome',
-        cell: ({ row }) => <span className="font-medium">{row.original.name}</span>
+        cell: ({ row }) => (
+          <span className="font-medium">{row.original.name}</span>
+        )
       },
       {
         accessorKey: 'cpf_cnpj',
@@ -82,14 +83,12 @@ function PartnerCustomersPage() {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   if (listQuery.isPending) {
-    return (
-      <ListPageSkeleton pageSize={pageSize} columns={SKELETON_COLUMNS} />
-    );
+    return <ListPageSkeleton pageSize={pageSize} columns={SKELETON_COLUMNS} />;
   }
 
   if (listQuery.error) {
     return (
-      <div className="p-6 text-sm text-destructive">
+      <div className="text-destructive p-6 text-sm">
         {isApiHttpError(listQuery.error)
           ? listQuery.error.message
           : getErrorMessage(listQuery.error)}
@@ -132,17 +131,32 @@ function PartnerCustomersPage() {
         </Empty>
       ) : (
         <>
-          <DataTable columns={columns} data={items} getRowId={(row) => row.id} />
+          <DataTable
+            columns={columns}
+            data={items}
+            getRowId={(row) => row.id}
+          />
           <DataTablePagination
             page={page}
             pageSize={pageSize}
             total={total}
             totalPages={totalPages}
             onPageChange={(next) =>
-              navigate({ search: (prev) => ({ ...prev, page: next }) })
+              navigate({
+                search: (prev: z.infer<typeof searchSchema>) => ({
+                  ...prev,
+                  page: next
+                })
+              })
             }
             onPageSizeChange={(next) =>
-              navigate({ search: (prev) => ({ ...prev, page: 1, pageSize: next }) })
+              navigate({
+                search: (prev: z.infer<typeof searchSchema>) => ({
+                  ...prev,
+                  page: 1,
+                  pageSize: next
+                })
+              })
             }
           />
         </>

@@ -43,6 +43,12 @@ func (m *Middleware) Authenticate(next http.Handler) http.Handler {
 			httputil.WriteFail(w, http.StatusUnauthorized, notifications.N("UNAUTHORIZED", err.Error()))
 			return
 		}
+		u := UserFromContext(req.Context())
+		if m.cfg.IsProduction() && (IsMaster(req.Context()) || IsFinancial(req.Context())) &&
+			(u == nil || !MFAVerifiedFromClaims(u.Acr, u.Amr)) && strings.TrimSuffix(r.URL.Path, "/") != "/v1/me" {
+			httputil.WriteFail(w, http.StatusForbidden, notifications.N("MFA_REQUIRED", "Confirme sua identidade com autenticação de dois fatores na página de segurança da conta e entre novamente."))
+			return
+		}
 		next.ServeHTTP(w, req)
 	})
 }
@@ -87,7 +93,7 @@ func (m *Middleware) authenticateRequest(r *http.Request, required bool) (*http.
 		return nil, err
 	}
 
-	user := extractUser(claims)
+	user := extractUser(claims, m.cfg.KeycloakResource)
 	user = m.enrichUserIdentity(r.Context(), tokenStr, claims, user)
 	ctx := WithUser(r.Context(), user)
 
@@ -151,6 +157,12 @@ func (m *Middleware) requireRole(next http.Handler, check func(context.Context) 
 			httputil.WriteFail(w, http.StatusForbidden, notifications.N("FORBIDDEN", message))
 			return
 		}
+		u := UserFromContext(r.Context())
+		if m.cfg.IsProduction() && (IsMaster(r.Context()) || IsFinancial(r.Context())) &&
+			(u == nil || !MFAVerifiedFromClaims(u.Acr, u.Amr)) {
+			httputil.WriteFail(w, http.StatusForbidden, notifications.N("MFA_REQUIRED", "Confirme sua identidade com autenticação de dois fatores na página de segurança da conta e entre novamente."))
+			return
+		}
 		next.ServeHTTP(w, r)
 	})
 }
@@ -165,7 +177,7 @@ func (m *Middleware) RequirePartner(next http.Handler) http.Handler {
 	})
 }
 
-func extractUser(claims jwt.MapClaims) *User {
+func extractUser(claims jwt.MapClaims, clientID string) *User {
 	sub, _ := claims["sub"].(string)
 	if sub == "" {
 		if alt, ok := claims["connect_user_id"].(string); ok {
@@ -181,7 +193,7 @@ func extractUser(claims jwt.MapClaims) *User {
 		Email:    email,
 		Name:     name,
 		Username: preferred,
-		Roles:    extractRoles(claims),
+		Roles:    extractRoles(claims, clientID),
 		Document: extractDocument(claims),
 		Acr:      claimString(claims["acr"]),
 		Amr:      parseRoleSlice(claims["amr"]),
@@ -287,7 +299,7 @@ func onlyDigits(s string) string {
 	return b.String()
 }
 
-func extractRoles(claims jwt.MapClaims) []string {
+func extractRoles(claims jwt.MapClaims, clientID string) []string {
 	seen := make(map[string]struct{})
 	var roles []string
 	add := func(items []string) {
@@ -310,10 +322,8 @@ func extractRoles(claims jwt.MapClaims) []string {
 	}
 
 	if resourceAccess, ok := claims["resource_access"].(map[string]interface{}); ok {
-		for _, raw := range resourceAccess {
-			if client, ok := raw.(map[string]interface{}); ok {
-				add(parseRoleSlice(client["roles"]))
-			}
+		if client, ok := resourceAccess[clientID].(map[string]interface{}); ok {
+			add(parseRoleSlice(client["roles"]))
 		}
 	}
 

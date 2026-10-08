@@ -59,12 +59,18 @@ function PartnerSalesAdminPage() {
       {
         accessorKey: 'phone_line_number',
         header: 'Linha',
-        cell: ({ row }) => formatPhoneNumber(row.original.phone_line_number) ?? row.original.phone_line_number
+        cell: ({ row }) =>
+          formatPhoneNumber(row.original.phone_line_number) ??
+          row.original.phone_line_number
       },
       {
         accessorKey: 'reference_month',
         header: 'Mês ref.',
-        cell: ({ row }) => new Date(row.original.reference_month).toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' })
+        cell: ({ row }) =>
+          new Date(row.original.reference_month).toLocaleDateString('pt-BR', {
+            month: 'short',
+            year: 'numeric'
+          })
       },
       {
         accessorKey: 'gross_amount',
@@ -95,9 +101,14 @@ function PartnerSalesAdminPage() {
                     statusMutation.mutate(
                       { id: row.original.id, status: 'approved' },
                       {
-                        onSuccess: () => toast.success('Venda aprovada. Conta a pagar gerada.'),
+                        onSuccess: () =>
+                          toast.success(
+                            'Venda aprovada. Conta a pagar gerada.'
+                          ),
                         onError: (e) =>
-                          toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+                          toast.error(
+                            isApiHttpError(e) ? e.message : getErrorMessage(e)
+                          )
                       }
                     )
                   }
@@ -115,7 +126,9 @@ function PartnerSalesAdminPage() {
                       {
                         onSuccess: () => toast.success('Comissão paga.'),
                         onError: (e) =>
-                          toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+                          toast.error(
+                            isApiHttpError(e) ? e.message : getErrorMessage(e)
+                          )
                       }
                     )
                   }
@@ -135,7 +148,16 @@ function PartnerSalesAdminPage() {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   if (listQuery.isPending) {
-    return <ListPageSkeleton pageSize={pageSize} columns={[{ header: 'A', cell: 'text' }, { header: 'B', cell: 'text' }, { header: 'C', cell: 'text' }]} />;
+    return (
+      <ListPageSkeleton
+        pageSize={pageSize}
+        columns={[
+          { header: 'A', cell: 'text' },
+          { header: 'B', cell: 'text' },
+          { header: 'C', cell: 'text' }
+        ]}
+      />
+    );
   }
 
   return (
@@ -149,9 +171,13 @@ function PartnerSalesAdminPage() {
             onClick={() =>
               syncMutation.mutate(refMonth, {
                 onSuccess: (r) =>
-                  toast.success(`${r.inserted_count} registro(s) sincronizado(s).`),
+                  toast.success(
+                    `${r.inserted_count} registro(s) sincronizado(s).`
+                  ),
                 onError: (e) =>
-                  toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+                  toast.error(
+                    isApiHttpError(e) ? e.message : getErrorMessage(e)
+                  )
               })
             }
           >
@@ -164,7 +190,11 @@ function PartnerSalesAdminPage() {
       <div className="dashboard-card grid gap-4 p-4 md:grid-cols-3">
         <div>
           <Label>Mês de referência (sync)</Label>
-          <Input type="date" value={refMonth} onChange={(e) => setRefMonth(e.target.value)} />
+          <Input
+            type="date"
+            value={refMonth}
+            onChange={(e) => setRefMonth(e.target.value)}
+          />
         </div>
         <div>
           <Label>Comissão padrão (%)</Label>
@@ -173,7 +203,9 @@ function PartnerSalesAdminPage() {
             step="0.1"
             value={commissionPct}
             onChange={(e) => setCommissionPct(e.target.value)}
-            placeholder={String(settingsQuery.data?.default_commission_percent ?? 10)}
+            placeholder={String(
+              settingsQuery.data?.default_commission_percent ?? 10
+            )}
           />
         </div>
         <div className="flex items-end">
@@ -183,7 +215,9 @@ function PartnerSalesAdminPage() {
               settingsMutation.mutate(Number(commissionPct), {
                 onSuccess: () => toast.success('Comissão padrão atualizada.'),
                 onError: (e) =>
-                  toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+                  toast.error(
+                    isApiHttpError(e) ? e.message : getErrorMessage(e)
+                  )
               })
             }
           >
@@ -192,14 +226,30 @@ function PartnerSalesAdminPage() {
         </div>
       </div>
 
-      <DataTable columns={columns} data={listQuery.data?.items ?? []} getRowId={(r) => r.id} />
+      <DataTable
+        columns={columns}
+        data={listQuery.data?.items ?? []}
+        getRowId={(r) => r.id}
+      />
       <DataTablePagination
         page={page}
         pageSize={pageSize}
         total={total}
         totalPages={totalPages}
-        onPageChange={(next) => navigate({ search: (p) => ({ ...p, page: next }) })}
-        onPageSizeChange={(next) => navigate({ search: (p) => ({ ...p, page: 1, pageSize: next }) })}
+        onPageChange={(next) =>
+          navigate({
+            search: (p: z.infer<typeof searchSchema>) => ({ ...p, page: next })
+          })
+        }
+        onPageSizeChange={(next) =>
+          navigate({
+            search: (p: z.infer<typeof searchSchema>) => ({
+              ...p,
+              page: 1,
+              pageSize: next
+            })
+          })
+        }
       />
     </div>
   );

@@ -1,6 +1,6 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
-@import 'shadcn/tailwind.css';
+@import './base-ui-variants.css';
 @import '@fontsource-variable/roboto';
 @import '@fontsource-variable/nunito-sans';
 
@@ -188,13 +188,13 @@
 
 @layer components {
   .dashboard-card {
-    @apply rounded-3xl border border-border/60 bg-card shadow-[0_10px_30px_-5px_rgba(0,0,0,0.04)];
+    @apply border-border/60 bg-card rounded-3xl border shadow-[0_10px_30px_-5px_rgba(0,0,0,0.04)];
   }
   .bento-card {
     @apply rounded-3xl border border-black/5 bg-white p-6 shadow-[0_12px_36px_-6px_rgba(0,0,0,0.04)] transition-all duration-200;
   }
   .bento-card-dark {
-    @apply rounded-3xl border border-white/5 bg-[#17181D] text-white p-6 shadow-[0_16px_40px_-8px_rgba(0,0,0,0.25)] transition-all duration-200;
+    @apply rounded-3xl border border-white/5 bg-[#17181D] p-6 text-white shadow-[0_16px_40px_-8px_rgba(0,0,0,0.25)] transition-all duration-200;
   }
   .bento-pill {
     @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold;

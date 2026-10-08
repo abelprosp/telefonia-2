@@ -25,13 +25,13 @@ services:
     ports: !override []
 
   minio:
-    image: quay.io/minio/minio:latest
+    image: ${MINIO_IMAGE:?Defina a imagem MinIO corrigida com digest sha256}
     container_name: minio.connect.luxus
     ports:
       - '127.0.0.1:19000:9000'
     environment:
-      MINIO_ROOT_USER: ${OBJECT_STORAGE_ACCESS_KEY_ID:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${OBJECT_STORAGE_SECRET_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Defina o usuario root do MinIO}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Defina a senha root do MinIO}
     volumes:
       - minio-data:/data
     command: server /data --console-address ":9001"
@@ -44,25 +44,27 @@ services:
     restart: on-failure
 
   minio-init:
-    image: quay.io/minio/mc:latest
+    image: ${MINIO_MC_IMAGE:?Defina a imagem mc com digest sha256}
     container_name: minio-init.connect.luxus
     depends_on:
       minio:
         condition: service_healthy
     environment:
-      MINIO_ROOT_USER: ${OBJECT_STORAGE_ACCESS_KEY_ID:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${OBJECT_STORAGE_SECRET_ACCESS_KEY:-minioadmin}
-    entrypoint: >
-      /bin/sh -c "
-      mc alias set local http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD;
-      mc mb local/luxus-connect --ignore-existing;
-      echo '[{\"AllowedOrigin\":[\"*\"],\"AllowedMethod\":[\"GET\",\"PUT\",\"POST\",\"DELETE\",\"HEAD\"],\"AllowedHeader\":[\"*\"],\"ExposeHeader\":[\"ETag\"],\"MaxAgeSeconds\":3000}]' > /tmp/cors.json;
-      mc cors set local/luxus-connect /tmp/cors.json || true;
-      exit 0;
-      "
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Defina o usuario root do MinIO}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Defina a senha root do MinIO}
+      OBJECT_STORAGE_ACCESS_KEY_ID: ${OBJECT_STORAGE_ACCESS_KEY_ID:?Defina a chave da aplicacao}
+      OBJECT_STORAGE_SECRET_ACCESS_KEY: ${OBJECT_STORAGE_SECRET_ACCESS_KEY:?Defina o segredo da aplicacao}
+      OBJECT_STORAGE_BUCKET_NAME: ${OBJECT_STORAGE_BUCKET_NAME:-luxus-connect}
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?Defina a origem HTTPS publica}
+    volumes:
+      - ./docker/minio/init.sh:/opt/connect/init.sh:ro
+    entrypoint: ['/bin/sh', '/opt/connect/init.sh']
     restart: 'no'
 
   keycloak:
+    image: ${KEYCLOAK_IMAGE:?Defina a imagem Keycloak com digest sha256}
+    volumes:
+      - ./docker/keycloak/luxus-realm.prod.json:/opt/keycloak/data/import/luxus-realm.json:ro
     entrypoint:
       - /opt/keycloak/bin/kc.sh
       - start
@@ -75,16 +77,18 @@ services:
         condition: service_healthy
         restart: true
     environment:
+      - PUBLIC_ORIGIN=${PUBLIC_ORIGIN:?Defina a origem HTTPS publica}
       - KC_HTTP_RELATIVE_PATH=/auth
       - KC_HTTP_ENABLED=true
+      - KC_SPI_REQUIRED_ACTION__UPDATE_PASSWORD__MAX_AUTH_AGE=0
       - KC_PROXY_HEADERS=xforwarded
-      - KC_HOSTNAME=https://telefonia.redobrai.online/auth
-      - KC_HOSTNAME_ADMIN=https://telefonia.redobrai.online/auth
-      - KC_HOSTNAME_URL=https://telefonia.redobrai.online/auth
-      - KC_HOSTNAME_ADMIN_URL=https://telefonia.redobrai.online/auth
-      - KC_HOSTNAME_STRICT=false
-    ports:
-      - !override '127.0.0.1:8083:8080'
+      - KC_HOSTNAME=${PUBLIC_ORIGIN:?Defina a origem HTTPS publica}/auth
+      - KC_HOSTNAME_ADMIN=${PUBLIC_ORIGIN:?Defina a origem HTTPS publica}/auth
+      - KC_HOSTNAME_URL=${PUBLIC_ORIGIN:?Defina a origem HTTPS publica}/auth
+      - KC_HOSTNAME_ADMIN_URL=${PUBLIC_ORIGIN:?Defina a origem HTTPS publica}/auth
+      - KC_HOSTNAME_STRICT=true
+    ports: !override
+      - '127.0.0.1:8083:8080'
     restart: on-failure
 
   connect-api:
@@ -95,15 +99,16 @@ services:
       - RABBITMQ_URL=amqp://${RMQ_USER}:${RMQ_PWD}@rabbitmq:5672
       - KEYCLOAK_REALM=luxus
       - KEYCLOAK_AUTH_SERVER_URL=http://keycloak:8080/auth
-      - KEYCLOAK_PUBLIC_AUTH_SERVER_URL=https://telefonia.redobrai.online/auth
+      - KEYCLOAK_PUBLIC_AUTH_SERVER_URL=${PUBLIC_ORIGIN:?Defina a origem HTTPS publica}/auth
       - KEYCLOAK_RESOURCE=connect-cli
       - KEYCLOAK_ADMIN_USERNAME=${KC_ADMIN_USERNAME:-admin}
       - KEYCLOAK_ADMIN_PASSWORD=${KC_ADMIN_PWD}
       - OBJECT_STORAGE_SERVICE_URL=http://minio:9000
-      - OBJECT_STORAGE_PUBLIC_URL=https://telefonia.redobrai.online
-      - OBJECT_STORAGE_ACCESS_KEY_ID=${OBJECT_STORAGE_ACCESS_KEY_ID:-minioadmin}
-      - OBJECT_STORAGE_SECRET_ACCESS_KEY=${OBJECT_STORAGE_SECRET_ACCESS_KEY:-minioadmin}
-      - CORS_ORIGINS=https://telefonia.redobrai.online
+      - OBJECT_STORAGE_PUBLIC_URL=${PUBLIC_ORIGIN:?Defina a origem HTTPS publica}
+      - OBJECT_STORAGE_ACCESS_KEY_ID=${OBJECT_STORAGE_ACCESS_KEY_ID:?Defina a chave da aplicacao}
+      - OBJECT_STORAGE_SECRET_ACCESS_KEY=${OBJECT_STORAGE_SECRET_ACCESS_KEY:?Defina o segredo da aplicacao}
+      - OBJECT_STORAGE_BUCKET_NAME=${OBJECT_STORAGE_BUCKET_NAME:-luxus-connect}
+      - CORS_ORIGINS=${PUBLIC_ORIGIN:?Defina a origem HTTPS publica}
       - SICREDI_ENABLED=${SICREDI_ENABLED:-false}
       - SICREDI_SANDBOX=${SICREDI_SANDBOX:-false}
       - SICREDI_API_KEY=${SICREDI_API_KEY:-}
@@ -116,7 +121,7 @@ services:
       - SICREDI_WEBHOOK_TOKEN=${SICREDI_WEBHOOK_TOKEN:-}
       - FINANCIAL_AGENT_API_KEY=${FINANCIAL_AGENT_API_KEY:-}
       - FINANCIAL_AGENT_ORG_ID=${FINANCIAL_AGENT_ORG_ID:-}
-      - FINANCIAL_AGENT_PUBLIC_URL=${FINANCIAL_AGENT_PUBLIC_URL:-https://telefonia.redobrai.online/api}
+      - FINANCIAL_AGENT_PUBLIC_URL=${FINANCIAL_AGENT_PUBLIC_URL:-${PUBLIC_ORIGIN:?Defina a origem HTTPS publica}/api}
       - ZAPSIGN_API_TOKEN=${ZAPSIGN_API_TOKEN:-}
       - ZAPSIGN_BASE_URL=${ZAPSIGN_BASE_URL:-}
       - ZAPSIGN_SANDBOX=${ZAPSIGN_SANDBOX:-false}
@@ -131,9 +136,8 @@ services:
       keycloak:
         condition: service_started
         restart: true
-      minio:
-        condition: service_healthy
-        restart: true
+      minio-init:
+        condition: service_completed_successfully
     restart: on-failure
     healthcheck:
       test: ['CMD-SHELL', 'wget -q -O - http://127.0.0.1:80/health >/dev/null']
@@ -141,18 +145,18 @@ services:
       timeout: 5s
       retries: 12
       start_period: 20s
-    ports:
-      - !override '127.0.0.1:8010:80'
+    ports: !override
+      - '127.0.0.1:8010:80'
 
   connect-web:
     build:
       context: ./src/Luxus.Connect.Web
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: https://telefonia.redobrai.online/api
-        VITE_AUTH_URL: https://telefonia.redobrai.online/auth
+        VITE_API_URL: ${PUBLIC_ORIGIN:?Defina a origem HTTPS publica}/api
+        VITE_AUTH_URL: ${PUBLIC_ORIGIN:?Defina a origem HTTPS publica}/auth
         VITE_CLIENT_ID: connect-cli
-        VITE_STORAGE_BUCKET_NAME: luxus-connect
+        VITE_STORAGE_BUCKET_NAME: ${OBJECT_STORAGE_BUCKET_NAME:-luxus-connect}
     ports:
       - '127.0.0.1:3005:80'
     healthcheck:

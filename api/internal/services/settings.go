@@ -81,6 +81,11 @@ func (s *Service) GetCurrentUserProfile(ctx context.Context) (*models.UserProfil
 }
 
 func (s *Service) UpdateCurrentUserProfile(ctx context.Context, input models.UpdateUserProfileInput) (*models.UserProfileResponse, error) {
+	// Password changes belong to Keycloak's account flow, which reauthenticates
+	// the user and applies the realm's password and MFA policies.
+	if input.NewPassword != nil || input.CurrentPassword != nil {
+		return nil, httputil.ValidationError(notifications.N("PASSWORD_ACCOUNT_FLOW_REQUIRED", "Altere sua senha na página de segurança da conta."))
+	}
 	u := auth.UserFromContext(ctx)
 	if u == nil || u.ID == "" {
 		return nil, httputil.ForbiddenError(notifications.N("UNAUTHORIZED", "Usuário não autenticado."))
@@ -117,16 +122,6 @@ func (s *Service) UpdateCurrentUserProfile(ctx context.Context, input models.Upd
 		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
 
-	if input.NewPassword != nil && strings.TrimSpace(*input.NewPassword) != "" {
-		newPass := strings.TrimSpace(*input.NewPassword)
-		if len(newPass) < 6 {
-			return nil, httputil.ValidationError(notifications.N("PASSWORD_TOO_SHORT", "Nova senha deve conter no mínimo 6 caracteres."))
-		}
-		if err := s.Keycloak.ResetPassword(ctx, u.ID, newPass, false); err != nil {
-			return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
-		}
-	}
-
 	return s.GetCurrentUserProfile(ctx)
 }
 
@@ -145,6 +140,15 @@ func (s *Service) GetOrganizationSettings(ctx context.Context) (*models.Organiza
 		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 	}
 	return settings, nil
+}
+
+// PublicOrganizationBranding exposes only the information needed before login.
+func (s *Service) PublicOrganizationBranding(ctx context.Context) (*models.PublicOrganizationBrandingResponse, error) {
+	settings, err := s.GetOrganizationSettings(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &models.PublicOrganizationBrandingResponse{Whitelabel: settings.Whitelabel}, nil
 }
 
 func (s *Service) UpdateCompanySettings(ctx context.Context, input models.UpdateCompanySettingsInput) (*models.OrganizationSettingsResponse, error) {

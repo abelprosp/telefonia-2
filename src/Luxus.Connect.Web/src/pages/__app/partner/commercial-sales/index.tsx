@@ -76,14 +76,21 @@ function PartnerCommercialSalesPage() {
 
   if (listQuery.isPending) {
     return (
-      <PageWrapper breadcrumbs={[{ label: 'Parceiro', to: '/partner' }, { label: 'Vendas' }]}>
+      <PageWrapper
+        breadcrumbs={[
+          { label: 'Parceiro', to: '/partner' },
+          { label: 'Vendas' }
+        ]}
+      >
         <ListPageSkeleton pageSize={pageSize} columns={SKELETON_COLUMNS} />
       </PageWrapper>
     );
   }
 
   return (
-    <PageWrapper breadcrumbs={[{ label: 'Parceiro', to: '/partner' }, { label: 'Vendas' }]}>
+    <PageWrapper
+      breadcrumbs={[{ label: 'Parceiro', to: '/partner' }, { label: 'Vendas' }]}
+    >
       <div className="flex flex-col gap-6 p-6">
         <ListPageHeader
           title="Minhas vendas"
@@ -97,14 +104,33 @@ function PartnerCommercialSalesPage() {
             </Link>
           }
         />
-        <DataTable columns={columns} data={listQuery.data?.items ?? []} getRowId={(r) => r.id} />
+        <DataTable
+          columns={columns}
+          data={listQuery.data?.items ?? []}
+          getRowId={(r) => r.id}
+        />
         <DataTablePagination
           page={page}
           pageSize={pageSize}
           total={total}
           totalPages={totalPages}
-          onPageChange={(next) => navigate({ search: (prev) => ({ ...prev, page: next }) })}
-          onPageSizeChange={(next) => navigate({ search: (prev) => ({ ...prev, pageSize: next, page: 1 }) })}
+          onPageChange={(next) =>
+            navigate({
+              search: (prev: z.infer<typeof searchSchema>) => ({
+                ...prev,
+                page: next
+              })
+            })
+          }
+          onPageSizeChange={(next) =>
+            navigate({
+              search: (prev: z.infer<typeof searchSchema>) => ({
+                ...prev,
+                pageSize: next,
+                page: 1
+              })
+            })
+          }
         />
       </div>
     </PageWrapper>

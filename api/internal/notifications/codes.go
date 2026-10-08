@@ -221,7 +221,7 @@ var (
 // ObjectStorage
 var (
 	ObjectStorageUnavailable = N("OBJECT_STORAGE_UNAVAILABLE", "Object storage is not configured.")
-	PresignedExpiresInvalid  = N("PRESIGNED_EXPIRES_IN_SECONDS_INVALID", "Expires in seconds must be between 60 and 604800.")
+	PresignedExpiresInvalid  = N("PRESIGNED_EXPIRES_IN_SECONDS_INVALID", "A validade deve estar entre 60 e 900 segundos.")
 	ObjectKeyInvalid         = N("OBJECT_KEY_INVALID", "Object key is invalid.")
 	TicketAttachmentRequired = N("TICKET_ATTACHMENT_REQUIRED", "Informe o arquivo ou a chave do anexo.")
 	TicketAttachmentNotFound = N("TICKET_ATTACHMENT_NOT_FOUND", "Anexo do ticket não encontrado.")

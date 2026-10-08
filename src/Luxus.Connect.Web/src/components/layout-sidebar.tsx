@@ -35,13 +35,14 @@ import {
 } from '@/components/ui/sidebar';
 import { performLogout } from '@/lib/auth-actions';
 import { useAuthRoles } from '@/lib/auth-roles';
+import { useApp } from '@/providers/app';
 import { useWhitelabel } from '@/providers/whitelabel-provider';
 
 type MenuItem = {
   title: string;
   url: string;
   icon: ReactNode;
-  items?: { title: string; url: string }[];
+  items?: { title: string; url: string; hash?: string }[];
 };
 
 const operationalMenuItems: MenuItem[] = [
@@ -102,9 +103,7 @@ const operationalMenuItems: MenuItem[] = [
       { title: 'Conciliação', url: '/reports/reconciliation' },
       { title: 'Histórico de auditoria', url: '/audit/events' },
       { title: 'Divergências', url: '/divergences' },
-      { title: 'Solicitações de parceiros', url: '/line-requests' },
-      { title: 'Resumo financeiro', url: '/finance' },
-      { title: 'Rentabilidade', url: '/finance' }
+      { title: 'Solicitações de parceiros', url: '/line-requests' }
     ]
   }
 ];
@@ -115,6 +114,8 @@ const financialMenuItem: MenuItem = {
   icon: <Wallet />,
   items: [
     { title: 'Visão geral', url: '/finance' },
+    { title: 'Resumo por cliente', url: '/finance', hash: 'financial-summary' },
+    { title: 'Rentabilidade', url: '/finance', hash: 'profitability' },
     { title: 'Contas a pagar', url: '/finance/payables' },
     { title: 'Contas a receber', url: '/finance/receivables' },
     { title: 'Faturas para envio', url: '/finance/customer-invoices' },
@@ -155,9 +156,18 @@ const partnerMenuItems: MenuItem[] = [
 function buildStaffMenu(
   canAccessOperations: boolean,
   canAccessFinance: boolean,
-  canManageUsers: boolean
+  canManageUsers: boolean,
+  commercialOnly: boolean
 ): MenuItem[] {
   const items: MenuItem[] = [];
+
+  if (commercialOnly) {
+    return [
+      operationalMenuItems[0],
+      { title: 'Clientes', url: '/customers', icon: <Users /> },
+      { title: 'Vendas', url: '/sales', icon: <ShoppingCart /> }
+    ];
+  }
 
   if (canAccessOperations) {
     items.push(...operationalMenuItems);
@@ -182,6 +192,13 @@ export const LayoutSidebar = ({ ...props }: ComponentProps<typeof Sidebar>) => {
   const auth = useAuth();
   const { user } = auth;
   const { settings: whitelabel } = useWhitelabel();
+  const { theme } = useApp();
+  const logoUrl =
+    theme === 'dark' ||
+    (theme === 'system' &&
+      window.matchMedia('(prefers-color-scheme: dark)').matches)
+      ? whitelabel.dark_logo_url || whitelabel.logo_url
+      : whitelabel.logo_url;
   const {
     isMaster,
     isPartnerOnly,
@@ -190,7 +207,10 @@ export const LayoutSidebar = ({ ...props }: ComponentProps<typeof Sidebar>) => {
     isViewer,
     canAccessOperations,
     canAccessFinance,
-    canManageUsers
+    canManageUsers,
+    isSales,
+    isEmployee,
+    isOperator
   } = useAuthRoles();
   const location = useLocation();
   const navigate = useNavigate();
@@ -202,8 +222,23 @@ export const LayoutSidebar = ({ ...props }: ComponentProps<typeof Sidebar>) => {
     if (isPartnerOnly) {
       return partnerMenuItems;
     }
-    return buildStaffMenu(canAccessOperations, canAccessFinance, canManageUsers);
-  }, [isCustomerPortal, isPartnerOnly, canAccessOperations, canAccessFinance, canManageUsers]);
+    return buildStaffMenu(
+      canAccessOperations,
+      canAccessFinance,
+      canManageUsers,
+      isSales && !isMaster && !isEmployee && !isOperator && !canAccessFinance
+    );
+  }, [
+    isCustomerPortal,
+    isPartnerOnly,
+    canAccessOperations,
+    canAccessFinance,
+    canManageUsers,
+    isSales,
+    isMaster,
+    isEmployee,
+    isOperator
+  ]);
 
   useEffect(() => {
     const path = location.pathname;
@@ -232,7 +267,10 @@ export const LayoutSidebar = ({ ...props }: ComponentProps<typeof Sidebar>) => {
     }
 
     if (isPartnerOnly) {
-      if (path.startsWith('/portal') || (!path.startsWith('/partner') && path !== '/settings')) {
+      if (
+        path.startsWith('/portal') ||
+        (!path.startsWith('/partner') && path !== '/settings')
+      ) {
         void navigate({ to: '/partner' });
       }
       return;
@@ -283,7 +321,7 @@ export const LayoutSidebar = ({ ...props }: ComponentProps<typeof Sidebar>) => {
       ? 'Portal do parceiro'
       : canAccessFinance && !canAccessOperations
         ? 'Financeiro'
-        : (whitelabel.app_slogan || 'Gestão de telefonia');
+        : whitelabel.app_slogan || 'Gestão de telefonia';
 
   const appDisplayName = whitelabel.app_name || 'Luxus.Connect';
 
@@ -297,10 +335,10 @@ export const LayoutSidebar = ({ ...props }: ComponentProps<typeof Sidebar>) => {
               className="hover:bg-transparent"
               render={<Link to={homeTo} />}
             >
-              <div className="bg-primary text-primary-foreground flex aspect-square size-9 items-center justify-center rounded-xl shadow-sm overflow-hidden">
-                {whitelabel.logo_url ? (
+              <div className="bg-primary text-primary-foreground flex aspect-square size-9 items-center justify-center overflow-hidden rounded-xl shadow-sm">
+                {logoUrl ? (
                   <img
-                    src={whitelabel.logo_url}
+                    src={logoUrl}
                     alt={appDisplayName}
                     className="size-full object-contain p-0.5"
                     onError={(e) => {
@@ -313,17 +351,23 @@ export const LayoutSidebar = ({ ...props }: ComponentProps<typeof Sidebar>) => {
                 )}
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate text-base font-semibold">{appDisplayName}</span>
-                <span className="text-muted-foreground truncate text-xs">{portalLabel}</span>
+                <span className="truncate text-base font-semibold">
+                  {appDisplayName}
+                </span>
+                <span className="text-muted-foreground truncate text-xs">
+                  {portalLabel}
+                </span>
               </div>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
 
-
       <SidebarContent className="gap-0">
-        <NavMain label={isPartnerOnly ? 'Parceiro' : 'Navegação'} items={menuItems} />
+        <NavMain
+          label={isPartnerOnly ? 'Parceiro' : 'Navegação'}
+          items={menuItems}
+        />
         {isMaster && !isPartnerOnly ? (
           <NavMain label="Cadastros rápidos" items={adminProductItems} />
         ) : null}
@@ -341,14 +385,16 @@ export const LayoutSidebar = ({ ...props }: ComponentProps<typeof Sidebar>) => {
         ) : null}
 
         {/* Card Inferior de Faturamento */}
-        {!isCustomerPortal ? (
+        {canAccessOperations && !isPartnerOnly ? (
           <div className="p-3">
-            <div className="flex flex-col gap-2 rounded-2xl border bg-muted/40 p-4 text-foreground shadow-xs">
+            <div className="bg-muted/40 text-foreground flex flex-col gap-2 rounded-2xl border p-4 shadow-xs">
               <div className="flex items-center gap-2">
                 <div className="bg-primary text-primary-foreground flex size-7 items-center justify-center rounded-lg">
                   <Sparkles className="size-3.5" />
                 </div>
-                <span className="text-xs font-bold tracking-tight uppercase">Ciclo Vigente</span>
+                <span className="text-xs font-bold tracking-tight uppercase">
+                  Faturas de operadoras
+                </span>
               </div>
               <p className="text-muted-foreground text-[11px] leading-snug">
                 Acompanhe e concilie faturas de operadoras em aberto.

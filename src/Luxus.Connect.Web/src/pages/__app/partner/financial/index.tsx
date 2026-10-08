@@ -20,7 +20,6 @@ import {
 } from '@/lib/financial-api';
 import { formatPhoneNumber } from '@/lib/format';
 
-
 const searchSchema = z.object({
   page: z.number().int().min(1).catch(1),
   pageSize: z.number().int().min(5).max(100).catch(10)
@@ -36,7 +35,10 @@ function PartnerFinancialPage() {
   const navigate = Route.useNavigate();
 
   const summaryQuery = usePartnerFinancialSummary();
-  const salesQuery = usePartnerSales({ page_index: page - 1, page_size: pageSize });
+  const salesQuery = usePartnerSales({
+    page_index: page - 1,
+    page_size: pageSize
+  });
 
   const columns = useMemo<ColumnDef<PartnerSale>[]>(
     () => [
@@ -44,12 +46,18 @@ function PartnerFinancialPage() {
       {
         accessorKey: 'phone_line_number',
         header: 'Linha',
-        cell: ({ row }) => formatPhoneNumber(row.original.phone_line_number) ?? row.original.phone_line_number
+        cell: ({ row }) =>
+          formatPhoneNumber(row.original.phone_line_number) ??
+          row.original.phone_line_number
       },
       {
         accessorKey: 'reference_month',
         header: 'Mês',
-        cell: ({ row }) => new Date(row.original.reference_month).toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' })
+        cell: ({ row }) =>
+          new Date(row.original.reference_month).toLocaleDateString('pt-BR', {
+            month: 'short',
+            year: 'numeric'
+          })
       },
       {
         accessorKey: 'gross_amount',
@@ -74,13 +82,21 @@ function PartnerFinancialPage() {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   if (summaryQuery.isPending || salesQuery.isPending) {
-    return <ListPageSkeleton pageSize={pageSize} columns={[{ header: 'A', cell: 'text' }, { header: 'B', cell: 'text' }]} />;
+    return (
+      <ListPageSkeleton
+        pageSize={pageSize}
+        columns={[
+          { header: 'A', cell: 'text' },
+          { header: 'B', cell: 'text' }
+        ]}
+      />
+    );
   }
 
   if (summaryQuery.error || salesQuery.error) {
     const err = summaryQuery.error ?? salesQuery.error!;
     return (
-      <div className="p-6 text-sm text-destructive">
+      <div className="text-destructive p-6 text-sm">
         {isApiHttpError(err) ? err.message : getErrorMessage(err)}
       </div>
     );
@@ -92,14 +108,32 @@ function PartnerFinancialPage() {
     <div className="flex flex-1 flex-col gap-6 p-6">
       <div>
         <h1 className="text-2xl font-semibold">Meu financeiro</h1>
-        <p className="text-muted-foreground text-sm">Vendas, comissões e recebíveis da sua carteira</p>
+        <p className="text-muted-foreground text-sm">
+          Vendas, comissões e recebíveis da sua carteira
+        </p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <DashboardMetricCard title="Vendas brutas" value={formatMoney(s.total_gross_sales)} icon={Wallet} />
-        <DashboardMetricCard title="Comissão provisionada" value={formatMoney(s.total_commission_accrued)} icon={Handshake} />
-        <DashboardMetricCard title="Comissão aprovada" value={formatMoney(s.total_commission_approved)} icon={TrendingUp} />
-        <DashboardMetricCard title="Comissão paga" value={formatMoney(s.total_commission_paid)} icon={Wallet} />
+        <DashboardMetricCard
+          title="Vendas brutas"
+          value={formatMoney(s.total_gross_sales)}
+          icon={Wallet}
+        />
+        <DashboardMetricCard
+          title="Comissão provisionada"
+          value={formatMoney(s.total_commission_accrued)}
+          icon={Handshake}
+        />
+        <DashboardMetricCard
+          title="Comissão aprovada"
+          value={formatMoney(s.total_commission_approved)}
+          icon={TrendingUp}
+        />
+        <DashboardMetricCard
+          title="Comissão paga"
+          value={formatMoney(s.total_commission_paid)}
+          icon={Wallet}
+        />
       </div>
 
       {summaryQuery.isPending ? (
@@ -115,14 +149,30 @@ function PartnerFinancialPage() {
         title="Histórico de vendas"
         description="Comissões calculadas sobre linhas da sua carteira"
       />
-      <DataTable columns={columns} data={salesQuery.data?.items ?? []} getRowId={(r) => r.id} />
+      <DataTable
+        columns={columns}
+        data={salesQuery.data?.items ?? []}
+        getRowId={(r) => r.id}
+      />
       <DataTablePagination
         page={page}
         pageSize={pageSize}
         total={total}
         totalPages={totalPages}
-        onPageChange={(next) => navigate({ search: (p) => ({ ...p, page: next }) })}
-        onPageSizeChange={(next) => navigate({ search: (p) => ({ ...p, page: 1, pageSize: next }) })}
+        onPageChange={(next) =>
+          navigate({
+            search: (p: z.infer<typeof searchSchema>) => ({ ...p, page: next })
+          })
+        }
+        onPageSizeChange={(next) =>
+          navigate({
+            search: (p: z.infer<typeof searchSchema>) => ({
+              ...p,
+              page: 1,
+              pageSize: next
+            })
+          })
+        }
       />
     </div>
   );

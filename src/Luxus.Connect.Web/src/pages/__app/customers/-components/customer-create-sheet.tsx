@@ -30,7 +30,12 @@ import {
   SheetTitle
 } from '@/components/ui/sheet';
 import { getErrorMessage, isApiHttpError } from '@/lib/api-error';
-import { emptyCustomerAddress, hasCustomerAddress, registrationDraft, registrationPayload } from '@/lib/customer-registration';
+import {
+  emptyCustomerAddress,
+  hasCustomerAddress,
+  registrationDraft,
+  registrationPayload
+} from '@/lib/customer-registration';
 import { invalidateDashboardCaches } from '@/lib/query-utils';
 
 import { CustomerRegistrationFields } from './customer-registration-fields';
@@ -40,7 +45,10 @@ const formSchema = z
     type: z.enum(['PF', 'PJ']),
     name: z.string().min(1, 'Informe o nome').max(256, 'Nome muito longo'),
     legal_name: z.string().optional(),
-    document: z.string().min(11, 'Documento inválido').max(20, 'Documento inválido'),
+    document: z
+      .string()
+      .min(11, 'Documento inválido')
+      .max(20, 'Documento inválido'),
     state_registration: z.string().optional(),
     birth_or_opening_date: z.string().optional(),
     responsible_salesperson_user_id: z
@@ -48,22 +56,35 @@ const formSchema = z
       .max(256, 'Identificador muito longo')
       .optional()
   })
-  .superRefine((data, ctx) => {
-    if (data.type === 'PJ' && !data.legal_name?.trim()) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Razão social é obrigatória para PJ',
-        path: ['legal_name']
-      });
+  .superRefine(
+    (
+      data: { type: string; legal_name?: string; document: string },
+      ctx: z.RefinementCtx
+    ) => {
+      if (data.type === 'PJ' && !data.legal_name?.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Razão social é obrigatória para PJ',
+          path: ['legal_name']
+        });
+      }
+      const digits = data.document.replace(/\D/g, '');
+      if (data.type === 'PF' && digits.length !== 11) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'CPF deve ter 11 dígitos',
+          path: ['document']
+        });
+      }
+      if (data.type === 'PJ' && digits.length !== 14) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'CNPJ deve ter 14 dígitos',
+          path: ['document']
+        });
+      }
     }
-    const digits = data.document.replace(/\D/g, '');
-    if (data.type === 'PF' && digits.length !== 11) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'CPF deve ter 11 dígitos', path: ['document'] });
-    }
-    if (data.type === 'PJ' && digits.length !== 14) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'CNPJ deve ter 14 dígitos', path: ['document'] });
-    }
-  });
+  );
 
 type FormValues = z.infer<typeof formSchema>;
 
@@ -90,7 +111,11 @@ export function CustomerCreateSheet({
   const [profile, setProfile] = useState(() => registrationDraft());
   const [address, setAddress] = useState(emptyCustomerAddress);
   const [billingEmail, setBillingEmail] = useState('');
-  const resetRegistration = () => { setProfile(registrationDraft()); setAddress(emptyCustomerAddress()); setBillingEmail(''); };
+  const resetRegistration = () => {
+    setProfile(registrationDraft());
+    setAddress(emptyCustomerAddress());
+    setBillingEmail('');
+  };
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -122,14 +147,21 @@ export function CustomerCreateSheet({
       data: {
         type: values.type,
         name: values.name.trim(),
-        legal_name: values.type === 'PJ' ? values.legal_name?.trim() || null : null,
+        legal_name:
+          values.type === 'PJ' ? values.legal_name?.trim() || null : null,
         document: values.document.replace(/\D/g, ''),
-        state_registration: values.type === 'PJ' ? values.state_registration?.trim() || null : null,
+        state_registration:
+          values.type === 'PJ'
+            ? values.state_registration?.trim() || null
+            : null,
         birth_or_opening_date: values.birth_or_opening_date?.trim() || null,
         responsible_salesperson_user_id:
           values.responsible_salesperson_user_id?.trim() || null,
         addresses: hasCustomerAddress(address) ? [address] : [],
-        ...{ profile: registrationPayload(profile, values.type === 'PJ'), billing_email: billingEmail.trim() }
+        ...{
+          profile: registrationPayload(profile, values.type === 'PJ'),
+          billing_email: billingEmail.trim()
+        }
       }
     });
   });
@@ -149,7 +181,8 @@ export function CustomerCreateSheet({
         <SheetHeader>
           <SheetTitle>Novo cliente</SheetTitle>
           <SheetDescription>
-            Preencha os dados do cliente, contatos e endereço. Os campos se ajustam ao tipo de pessoa.
+            Preencha os dados do cliente, contatos e endereço. Os campos se
+            ajustam ao tipo de pessoa.
           </SheetDescription>
         </SheetHeader>
 
@@ -169,7 +202,10 @@ export function CustomerCreateSheet({
                       form.setValue('state_registration', '');
                       form.setValue('birth_or_opening_date', '');
                       form.setValue('document', '');
-                      if (value === 'PJ') setProfile(registrationDraft(registrationPayload(profile, true)));
+                      if (value === 'PJ')
+                        setProfile(
+                          registrationDraft(registrationPayload(profile, true))
+                        );
                     }}
                   >
                     <SelectTrigger className="border-input bg-background rounded-xl border">
@@ -204,22 +240,24 @@ export function CustomerCreateSheet({
               )}
             />
 
-            {customerType === 'PJ' ? <Controller
-              control={form.control}
-              name="legal_name"
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel>Razão social</FieldLabel>
-                  <Input
-                    className="border-input bg-background rounded-xl border"
-                    {...field}
-                  />
-                  {fieldState.invalid ? (
-                    <FieldError errors={[fieldState.error]} />
-                  ) : null}
-                </Field>
-              )}
-            /> : null}
+            {customerType === 'PJ' ? (
+              <Controller
+                control={form.control}
+                name="legal_name"
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel>Razão social</FieldLabel>
+                    <Input
+                      className="border-input bg-background rounded-xl border"
+                      {...field}
+                    />
+                    {fieldState.invalid ? (
+                      <FieldError errors={[fieldState.error]} />
+                    ) : null}
+                  </Field>
+                )}
+              />
+            ) : null}
 
             <Controller
               control={form.control}
@@ -250,55 +288,72 @@ export function CustomerCreateSheet({
               )}
             />
 
-            {customerType === 'PJ' ? <Controller
-              control={form.control}
-              name="state_registration"
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel>Inscrição estadual</FieldLabel>
-                  <Input
-                    className="border-input bg-background rounded-xl border"
-                    {...field}
-                  />
-                  {fieldState.invalid ? (
-                    <FieldError errors={[fieldState.error]} />
-                  ) : null}
-                </Field>
-              )}
-            /> : null}
+            {customerType === 'PJ' ? (
+              <Controller
+                control={form.control}
+                name="state_registration"
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel>Inscrição estadual</FieldLabel>
+                    <Input
+                      className="border-input bg-background rounded-xl border"
+                      {...field}
+                    />
+                    {fieldState.invalid ? (
+                      <FieldError errors={[fieldState.error]} />
+                    ) : null}
+                  </Field>
+                )}
+              />
+            ) : null}
 
-            {customerType === 'PF' ? <Controller
-              control={form.control}
-              name="birth_or_opening_date"
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel>Data de nascimento</FieldLabel>
-                  <DatePicker
-                    className="border-input rounded-xl border"
-                    name={field.name}
-                    ref={field.ref}
-                    value={field.value}
-                    onBlur={field.onBlur}
-                    onChange={(date) =>
-                      field.onChange(date ? format(date, 'yyyy-MM-dd') : '')
-                    }
-                  />
-                  {fieldState.invalid ? (
-                    <FieldError errors={[fieldState.error]} />
-                  ) : null}
-                </Field>
-              )}
-            /> : <Controller
-              control={form.control}
-              name="birth_or_opening_date"
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel>Data de abertura</FieldLabel>
-                  <DatePicker className="border-input rounded-xl border" name={field.name} ref={field.ref} value={field.value} onBlur={field.onBlur} onChange={(date) => field.onChange(date ? format(date, 'yyyy-MM-dd') : '')} />
-                  {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
-                </Field>
-              )}
-            />}
+            {customerType === 'PF' ? (
+              <Controller
+                control={form.control}
+                name="birth_or_opening_date"
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel>Data de nascimento</FieldLabel>
+                    <DatePicker
+                      className="border-input rounded-xl border"
+                      name={field.name}
+                      ref={field.ref}
+                      value={field.value}
+                      onBlur={field.onBlur}
+                      onChange={(date) =>
+                        field.onChange(date ? format(date, 'yyyy-MM-dd') : '')
+                      }
+                    />
+                    {fieldState.invalid ? (
+                      <FieldError errors={[fieldState.error]} />
+                    ) : null}
+                  </Field>
+                )}
+              />
+            ) : (
+              <Controller
+                control={form.control}
+                name="birth_or_opening_date"
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel>Data de abertura</FieldLabel>
+                    <DatePicker
+                      className="border-input rounded-xl border"
+                      name={field.name}
+                      ref={field.ref}
+                      value={field.value}
+                      onBlur={field.onBlur}
+                      onChange={(date) =>
+                        field.onChange(date ? format(date, 'yyyy-MM-dd') : '')
+                      }
+                    />
+                    {fieldState.invalid ? (
+                      <FieldError errors={[fieldState.error]} />
+                    ) : null}
+                  </Field>
+                )}
+              />
+            )}
 
             <Controller
               control={form.control}
@@ -317,8 +372,16 @@ export function CustomerCreateSheet({
                 </Field>
               )}
             />
-            <CustomerRegistrationFields value={profile} onChange={setProfile} address={address} onAddressChange={setAddress}
-              billingEmail={billingEmail} onBillingEmailChange={setBillingEmail} isPj={customerType === 'PJ'} disabled={createMutation.isPending} />
+            <CustomerRegistrationFields
+              value={profile}
+              onChange={setProfile}
+              address={address}
+              onAddressChange={setAddress}
+              billingEmail={billingEmail}
+              onBillingEmailChange={setBillingEmail}
+              isPj={customerType === 'PJ'}
+              disabled={createMutation.isPending}
+            />
           </div>
 
           <SheetFooter className="mt-auto gap-2 border-t px-6 py-4 sm:justify-end">

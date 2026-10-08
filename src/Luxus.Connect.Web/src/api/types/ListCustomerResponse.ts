@@ -4,6 +4,7 @@
  */
 
 export type ListCustomerResponse = {
+  responsible_salesperson_name?: string | null;
   /**
    * @type string
    */

@@ -145,14 +145,12 @@ function PartnerPhoneLinesPage() {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   if (listQuery.isPending) {
-    return (
-      <ListPageSkeleton pageSize={pageSize} columns={SKELETON_COLUMNS} />
-    );
+    return <ListPageSkeleton pageSize={pageSize} columns={SKELETON_COLUMNS} />;
   }
 
   if (listQuery.error) {
     return (
-      <div className="p-6 text-sm text-destructive">
+      <div className="text-destructive p-6 text-sm">
         {isApiHttpError(listQuery.error)
           ? listQuery.error.message
           : getErrorMessage(listQuery.error)}
@@ -176,10 +174,21 @@ function PartnerPhoneLinesPage() {
         total={total}
         totalPages={totalPages}
         onPageChange={(next) =>
-          navigate({ search: (prev) => ({ ...prev, page: next }) })
+          navigate({
+            search: (prev: z.infer<typeof searchSchema>) => ({
+              ...prev,
+              page: next
+            })
+          })
         }
         onPageSizeChange={(next) =>
-          navigate({ search: (prev) => ({ ...prev, page: 1, pageSize: next }) })
+          navigate({
+            search: (prev: z.infer<typeof searchSchema>) => ({
+              ...prev,
+              page: 1,
+              pageSize: next
+            })
+          })
         }
       />
 
@@ -191,7 +200,9 @@ function PartnerPhoneLinesPage() {
           <SheetHeader>
             <SheetTitle>
               Solicitar{' '}
-              {requestTarget?.operation === 'activation' ? 'ativação' : 'desativação'}
+              {requestTarget?.operation === 'activation'
+                ? 'ativação'
+                : 'desativação'}
             </SheetTitle>
             <SheetDescription>
               A empresa receberá sua solicitação e poderá aprovar ou rejeitar a

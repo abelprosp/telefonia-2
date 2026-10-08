@@ -28,9 +28,12 @@ const formSchema = z.object({
   imei: z
     .string()
     .optional()
-    .refine((v) => !v || /^[0-9]{15}$/.test(v.replace(/\D/g, '')), {
-      message: 'IMEI deve ter 15 dígitos'
-    }),
+    .refine(
+      (v: string | undefined) => !v || /^[0-9]{15}$/.test(v.replace(/\D/g, '')),
+      {
+        message: 'IMEI deve ter 15 dígitos'
+      }
+    ),
   color: z.string().optional(),
   storage_capacity: z.string().optional(),
   unit_cost: z.string().optional(),
@@ -109,7 +112,8 @@ export function DeviceStockCreateSheet({
           onOpenChange(false);
           onSuccess?.();
         },
-        onError: (e) => toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+        onError: (e) =>
+          toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
       }
     );
   });
@@ -120,8 +124,8 @@ export function DeviceStockCreateSheet({
         <SheetHeader>
           <SheetTitle>Cadastrar aparelho</SheetTitle>
           <SheetDescription>
-            Registre aparelhos disponíveis para venda. O SKU é gerado automaticamente se não for
-            informado.
+            Registre aparelhos disponíveis para venda. O SKU é gerado
+            automaticamente se não for informado.
           </SheetDescription>
         </SheetHeader>
 
@@ -179,7 +183,11 @@ export function DeviceStockCreateSheet({
             render={({ field }) => (
               <Field>
                 <FieldLabel>IMEI (opcional)</FieldLabel>
-                <Input {...field} placeholder="15 dígitos" inputMode="numeric" />
+                <Input
+                  {...field}
+                  placeholder="15 dígitos"
+                  inputMode="numeric"
+                />
               </Field>
             )}
           />
@@ -190,7 +198,10 @@ export function DeviceStockCreateSheet({
             render={({ field, fieldState }) => (
               <Field data-invalid={fieldState.invalid}>
                 <FieldLabel>SKU (opcional)</FieldLabel>
-                <Input {...field} placeholder="Gerado automaticamente se vazio" />
+                <Input
+                  {...field}
+                  placeholder="Gerado automaticamente se vazio"
+                />
                 <FieldError>{fieldState.error?.message}</FieldError>
               </Field>
             )}
@@ -203,7 +214,11 @@ export function DeviceStockCreateSheet({
               render={({ field }) => (
                 <Field>
                   <FieldLabel>Custo (opcional)</FieldLabel>
-                  <Input {...field} placeholder="Ex.: 1.200,00" inputMode="decimal" />
+                  <Input
+                    {...field}
+                    placeholder="Ex.: 1.200,00"
+                    inputMode="decimal"
+                  />
                 </Field>
               )}
             />
@@ -213,7 +228,11 @@ export function DeviceStockCreateSheet({
               render={({ field }) => (
                 <Field>
                   <FieldLabel>Preço de venda (opcional)</FieldLabel>
-                  <Input {...field} placeholder="Ex.: 1.599,00" inputMode="decimal" />
+                  <Input
+                    {...field}
+                    placeholder="Ex.: 1.599,00"
+                    inputMode="decimal"
+                  />
                 </Field>
               )}
             />
@@ -225,13 +244,19 @@ export function DeviceStockCreateSheet({
             render={({ field }) => (
               <Field>
                 <FieldLabel>Observações</FieldLabel>
-                <Textarea {...field} rows={3} placeholder="Condição, acessórios, etc." />
+                <Textarea
+                  {...field}
+                  rows={3}
+                  placeholder="Condição, acessórios, etc."
+                />
               </Field>
             )}
           />
 
           <SheetFooter>
-            <SheetClose render={<Button type="button" variant="outline" />}>Cancelar</SheetClose>
+            <SheetClose render={<Button type="button" variant="outline" />}>
+              Cancelar
+            </SheetClose>
             <Button type="submit" disabled={createMutation.isPending}>
               Cadastrar
             </Button>

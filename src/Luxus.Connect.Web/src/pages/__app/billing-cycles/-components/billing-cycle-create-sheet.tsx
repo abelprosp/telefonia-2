@@ -44,7 +44,7 @@ const formSchema = z
     end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use a data completa')
   })
   .refine(
-    (d) => {
+    (d: { start_date: string; end_date: string }) => {
       const a = new Date(`${d.start_date}T12:00:00`);
       const b = new Date(`${d.end_date}T12:00:00`);
       return !Number.isNaN(a.getTime()) && !Number.isNaN(b.getTime()) && b >= a;

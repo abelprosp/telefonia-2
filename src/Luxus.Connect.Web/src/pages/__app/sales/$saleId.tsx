@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { getErrorMessage, isApiHttpError } from '@/lib/api-error';
+import { sanitizeContractHtml } from '@/lib/safe-html';
 import {
   formatLineItemType,
   formatMoney,
@@ -42,7 +43,13 @@ function SaleDetailPage() {
 
   if (saleQuery.isLoading) {
     return (
-      <PageWrapper breadcrumbs={[{ label: 'Início', to: '/' }, { label: 'Vendas', to: '/sales' }, { label: '…' }]}>
+      <PageWrapper
+        breadcrumbs={[
+          { label: 'Início', to: '/' },
+          { label: 'Vendas', to: '/sales' },
+          { label: '…' }
+        ]}
+      >
         <p className="text-muted-foreground p-6">Carregando…</p>
       </PageWrapper>
     );
@@ -51,7 +58,12 @@ function SaleDetailPage() {
   const sale = saleQuery.data;
   if (!sale) {
     return (
-      <PageWrapper breadcrumbs={[{ label: 'Início', to: '/' }, { label: 'Vendas', to: '/sales' }]}>
+      <PageWrapper
+        breadcrumbs={[
+          { label: 'Início', to: '/' },
+          { label: 'Vendas', to: '/sales' }
+        ]}
+      >
         <p className="p-6">Venda não encontrada.</p>
       </PageWrapper>
     );
@@ -63,7 +75,8 @@ function SaleDetailPage() {
         toast.success('Venda confirmada.');
         void saleQuery.refetch();
       },
-      onError: (e) => toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+      onError: (e) =>
+        toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
     });
   };
 
@@ -73,7 +86,8 @@ function SaleDetailPage() {
         toast.success('Venda cancelada.');
         void saleQuery.refetch();
       },
-      onError: (e) => toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+      onError: (e) =>
+        toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
     });
   };
 
@@ -92,7 +106,8 @@ function SaleDetailPage() {
           <div>
             <h1 className="text-2xl font-semibold">{sale.sale_number}</h1>
             <p className="text-muted-foreground">
-              {sale.customer_name} · {formatSaleStatus(sale.status)} · {formatMoney(sale.total_amount)}
+              {sale.customer_name} · {formatSaleStatus(sale.status)} ·{' '}
+              {formatMoney(sale.total_amount)}
             </p>
             {sale.paid_at ? (
               <p className="text-muted-foreground mt-1 text-sm">
@@ -106,21 +121,38 @@ function SaleDetailPage() {
           <div className="flex flex-wrap gap-2">
             {sale.status === 'draft' && (
               <>
-                <Button onClick={handleConfirm} disabled={confirmMutation.isPending || sale.items.length === 0}>
+                <Button
+                  onClick={handleConfirm}
+                  disabled={
+                    confirmMutation.isPending || sale.items.length === 0
+                  }
+                >
                   Confirmar venda
                 </Button>
-                <Button variant="outline" onClick={handleCancel} disabled={cancelMutation.isPending}>
+                <Button
+                  variant="outline"
+                  onClick={handleCancel}
+                  disabled={cancelMutation.isPending}
+                >
                   Cancelar
                 </Button>
               </>
             )}
             {canMarkPaid ? (
-              <Button variant="secondary" onClick={() => setPayOpen(true)} disabled={markPaidMutation.isPending}>
+              <Button
+                variant="secondary"
+                onClick={() => setPayOpen(true)}
+                disabled={markPaidMutation.isPending}
+              >
                 Dar baixa (pagamento presencial)
               </Button>
             ) : null}
             {sale.status === 'confirmed' && (
-              <Button variant="outline" onClick={handleCancel} disabled={cancelMutation.isPending}>
+              <Button
+                variant="outline"
+                onClick={handleCancel}
+                disabled={cancelMutation.isPending}
+              >
                 Cancelar venda
               </Button>
             )}
@@ -134,9 +166,13 @@ function SaleDetailPage() {
           <CardContent>
             <ul className="space-y-2 text-sm">
               {sale.items.map((item) => (
-                <li key={item.id} className="flex justify-between gap-4 border-b pb-2">
+                <li
+                  key={item.id}
+                  className="flex justify-between gap-4 border-b pb-2"
+                >
                   <span>
-                    <strong>{formatLineItemType(item.line_item_type)}</strong> — {item.description} (×
+                    <strong>{formatLineItemType(item.line_item_type)}</strong> —{' '}
+                    {item.description} (×
                     {item.quantity})
                   </span>
                   <span>{formatMoney(item.total_price)}</span>
@@ -153,18 +189,22 @@ function SaleDetailPage() {
             </CardHeader>
             <CardContent>
               <div
-                className="prose prose-sm max-w-none rounded-md border bg-white p-6 dark:prose-invert"
-                dangerouslySetInnerHTML={{ __html: sale.contract.rendered_html }}
+                className="prose prose-sm dark:prose-invert max-w-none rounded-md border bg-white p-6"
+                dangerouslySetInnerHTML={{
+                  __html: sanitizeContractHtml(sale.contract.rendered_html)
+                }}
               />
             </CardContent>
           </Card>
         )}
 
-        {sale.contract_template_name && !sale.contract?.rendered_html && sale.status === 'confirmed' && (
-          <p className="text-muted-foreground text-sm">
-            Contrato com status: {sale.contract?.status ?? 'pendente'}.
-          </p>
-        )}
+        {sale.contract_template_name &&
+          !sale.contract?.rendered_html &&
+          sale.status === 'confirmed' && (
+            <p className="text-muted-foreground text-sm">
+              Contrato com status: {sale.contract?.status ?? 'pendente'}.
+            </p>
+          )}
 
         <Link
           to="/sales"
@@ -188,22 +228,30 @@ function SaleDetailPage() {
             onClick={(e) => e.stopPropagation()}
           >
             <div>
-              <h2 className="text-base font-semibold">Registrar pagamento presencial</h2>
+              <h2 className="text-base font-semibold">
+                Registrar pagamento presencial
+              </h2>
               <p className="text-muted-foreground mt-2 text-sm">
-                Confirma a baixa desta venda no valor de {formatMoney(sale.total_amount)}? Use quando o
-                cliente pagar em dinheiro ou outra forma presencial.
+                Confirma a baixa desta venda no valor de{' '}
+                {formatMoney(sale.total_amount)}? Use quando o cliente pagar em
+                dinheiro ou outra forma presencial.
               </p>
             </div>
             <div className="space-y-2">
               <Label>Forma de pagamento</Label>
-              <Select value={payMethod} onValueChange={(v) => setPayMethod(v ?? 'cash')}>
+              <Select
+                value={payMethod}
+                onValueChange={(v) => setPayMethod(v ?? 'cash')}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="cash">Dinheiro</SelectItem>
                   <SelectItem value="pix_presencial">PIX presencial</SelectItem>
-                  <SelectItem value="card_presencial">Cartão presencial</SelectItem>
+                  <SelectItem value="card_presencial">
+                    Cartão presencial
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -217,7 +265,11 @@ function SaleDetailPage() {
               />
             </div>
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setPayOpen(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setPayOpen(false)}
+              >
                 Cancelar
               </Button>
               <Button
@@ -227,16 +279,22 @@ function SaleDetailPage() {
                   markPaidMutation.mutate(
                     {
                       id: saleId,
-                      payment_method: payMethod as 'cash' | 'pix_presencial' | 'card_presencial',
+                      payment_method: payMethod as
+                        'cash' | 'pix_presencial' | 'card_presencial',
                       ...(payNotes.trim() ? { notes: payNotes.trim() } : {})
                     },
                     {
                       onSuccess: () => {
                         setPayOpen(false);
-                        toast.success('Pagamento presencial registrado. Venda marcada como paga.');
+                        toast.success(
+                          'Pagamento presencial registrado. Venda marcada como paga.'
+                        );
                         void saleQuery.refetch();
                       },
-                      onError: (e) => toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+                      onError: (e) =>
+                        toast.error(
+                          isApiHttpError(e) ? e.message : getErrorMessage(e)
+                        )
                     }
                   )
                 }

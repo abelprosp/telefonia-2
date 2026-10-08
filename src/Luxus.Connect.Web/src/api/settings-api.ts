@@ -1,4 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from 'react-oidc-context';
+
 import { client } from '@/lib/client';
 
 export type UserProfile = {
@@ -113,7 +115,9 @@ export async function fetchUserProfile(): Promise<UserProfile> {
   return res.data;
 }
 
-export async function updateUserProfile(data: UpdateUserProfileInput): Promise<UserProfile> {
+export async function updateUserProfile(
+  data: UpdateUserProfileInput
+): Promise<UserProfile> {
   const res = await client<UserProfile, unknown, UpdateUserProfileInput>({
     url: '/v1/me',
     method: 'PATCH',
@@ -123,89 +127,21 @@ export async function updateUserProfile(data: UpdateUserProfileInput): Promise<U
 }
 
 export async function fetchOrganizationSettings(): Promise<OrganizationSettings> {
-  try {
-    const res = await client<OrganizationSettings>({
-      url: '/v1/organization-settings',
-      method: 'GET'
-    });
-    return {
-      ...res.data,
-      sicredi: res.data.sicredi ?? {
-        enabled: false,
-        sandbox: true,
-        api_key_set: false,
-        username: '',
-        password_set: false,
-        cooperativa: '',
-        posto: '',
-        codigo_beneficiario: '',
-        account_number: '',
-        webhook_token_set: false,
-        public_api_url: '',
-        configured: false
-      }
-    };
-  } catch {
-    return {
-      organization_id: 'default',
-      company: {
-        company_name: '',
-        trading_name: '',
-        cnpj: '',
-        state_registration: '',
-        email: '',
-        phone: '',
-        website: '',
-        zip_code: '',
-        street: '',
-        number: '',
-        complement: '',
-        neighborhood: '',
-        city: '',
-        state: ''
-      },
-      whitelabel: {
-        app_name: '',
-        app_slogan: '',
-        logo_url: '',
-        dark_logo_url: '',
-        favicon_url: '',
-        primary_color: '#0f766e',
-        support_email: '',
-        support_phone: '',
-        footer_text: ''
-      },
-      system: {
-        default_due_day: 10,
-        late_fee_percentage: 2,
-        interest_rate_monthly: 1,
-        days_before_due_reminder: 3,
-        days_after_due_reminder: 2,
-        auto_send_invoice_email: false,
-        auto_send_collection_reminder: false,
-        prorata_divisor: 30
-      },
-      sicredi: {
-        enabled: false,
-        sandbox: true,
-        api_key_set: false,
-        username: '',
-        password_set: false,
-        cooperativa: '',
-        posto: '',
-        codigo_beneficiario: '',
-        account_number: '',
-        webhook_token_set: false,
-        public_api_url: '',
-        configured: false
-      },
-      updated_at: new Date().toISOString()
-    };
-  }
+  const res = await client<OrganizationSettings>({
+    url: '/v1/organization-settings',
+    method: 'GET'
+  });
+  return res.data;
 }
 
-export async function updateCompanySettings(data: Partial<CompanySettings>): Promise<OrganizationSettings> {
-  const res = await client<OrganizationSettings, unknown, Partial<CompanySettings>>({
+export async function updateCompanySettings(
+  data: Partial<CompanySettings>
+): Promise<OrganizationSettings> {
+  const res = await client<
+    OrganizationSettings,
+    unknown,
+    Partial<CompanySettings>
+  >({
     url: '/v1/company-settings',
     method: 'PUT',
     data
@@ -213,8 +149,14 @@ export async function updateCompanySettings(data: Partial<CompanySettings>): Pro
   return res.data;
 }
 
-export async function updateWhitelabelSettings(data: Partial<WhitelabelSettings>): Promise<OrganizationSettings> {
-  const res = await client<OrganizationSettings, unknown, Partial<WhitelabelSettings>>({
+export async function updateWhitelabelSettings(
+  data: Partial<WhitelabelSettings>
+): Promise<OrganizationSettings> {
+  const res = await client<
+    OrganizationSettings,
+    unknown,
+    Partial<WhitelabelSettings>
+  >({
     url: '/v1/whitelabel-settings',
     method: 'PUT',
     data
@@ -222,8 +164,14 @@ export async function updateWhitelabelSettings(data: Partial<WhitelabelSettings>
   return res.data;
 }
 
-export async function updateSystemSettings(data: Partial<SystemSettings>): Promise<OrganizationSettings> {
-  const res = await client<OrganizationSettings, unknown, Partial<SystemSettings>>({
+export async function updateSystemSettings(
+  data: Partial<SystemSettings>
+): Promise<OrganizationSettings> {
+  const res = await client<
+    OrganizationSettings,
+    unknown,
+    Partial<SystemSettings>
+  >({
     url: '/v1/system-settings',
     method: 'PUT',
     data
@@ -234,7 +182,11 @@ export async function updateSystemSettings(data: Partial<SystemSettings>): Promi
 export async function updateSicrediSettings(
   data: UpdateSicrediSettingsInput
 ): Promise<OrganizationSettings> {
-  const res = await client<OrganizationSettings, unknown, UpdateSicrediSettingsInput>({
+  const res = await client<
+    OrganizationSettings,
+    unknown,
+    UpdateSicrediSettingsInput
+  >({
     url: '/v1/sicredi-settings',
     method: 'PUT',
     data
@@ -252,11 +204,28 @@ export function useUserProfileQuery() {
   });
 }
 
-export function useOrganizationSettingsQuery() {
+export function useOrganizationSettingsQuery(enabled = true) {
   return useQuery({
     queryKey: ['organization-settings'],
     queryFn: fetchOrganizationSettings,
+    enabled,
     staleTime: 1000 * 60 * 10, // 10 min
+    retry: 1
+  });
+}
+
+export function useOrganizationBrandingQuery() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ['organization-branding', user?.profile.sub ?? 'public'],
+    queryFn: async () => {
+      const res = await client<{ whitelabel: WhitelabelSettings }>({
+        url: '/v1/whitelabel-settings',
+        method: 'GET'
+      });
+      return res.data;
+    },
+    staleTime: 1000 * 60 * 10,
     retry: 1
   });
 }
@@ -283,10 +252,17 @@ export function useUpdateCompanySettingsMutation() {
 
 export function useUpdateWhitelabelSettingsMutation() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   return useMutation({
     mutationFn: updateWhitelabelSettings,
     onSuccess: (data) => {
       queryClient.setQueryData(['organization-settings'], data);
+      queryClient.setQueryData(
+        ['organization-branding', user?.profile.sub ?? 'public'],
+        {
+          whitelabel: data.whitelabel
+        }
+      );
     }
   });
 }

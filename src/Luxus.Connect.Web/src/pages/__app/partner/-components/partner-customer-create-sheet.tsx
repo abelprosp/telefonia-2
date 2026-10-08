@@ -40,15 +40,20 @@ const formSchema = z
     state_registration: z.string().optional(),
     birth_or_opening_date: z.string().optional()
   })
-  .superRefine((data, ctx) => {
-    if (data.type === 'PJ' && !data.legal_name?.trim()) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Razão social é obrigatória para PJ',
-        path: ['legal_name']
-      });
+  .superRefine(
+    (
+      data: { type: string; legal_name?: string; document: string },
+      ctx: z.RefinementCtx
+    ) => {
+      if (data.type === 'PJ' && !data.legal_name?.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Razão social é obrigatória para PJ',
+          path: ['legal_name']
+        });
+      }
     }
-  });
+  );
 
 type FormValues = z.infer<typeof formSchema>;
 
@@ -75,7 +80,8 @@ export function PartnerCustomerCreateSheet({
     defaultValues
   });
 
-  const customerType = useWatch({ control: form.control, name: 'type' }) ?? 'PJ';
+  const customerType =
+    useWatch({ control: form.control, name: 'type' }) ?? 'PJ';
 
   const createMutation = useCreatePartnerCustomer();
 

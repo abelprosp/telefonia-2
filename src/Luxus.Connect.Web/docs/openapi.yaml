@@ -3602,6 +3602,8 @@ components:
           type:
             - 'null'
             - string
+        responsible_salesperson_name:
+          type: [string, 'null']
     ListPhoneLineResponse:
       required:
         - id
@@ -3982,11 +3984,17 @@ components:
           type: boolean
     PresignedUrlModel:
       required:
+        - object_key
+        - bucket_name
         - url
         - http_method
         - expires_at_utc
       type: object
       properties:
+        object_key:
+          type: string
+        bucket_name:
+          type: string
         url:
           type: string
         http_method:

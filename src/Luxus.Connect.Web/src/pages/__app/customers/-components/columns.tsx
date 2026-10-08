@@ -15,13 +15,14 @@ import { formatCpfCnpj } from '@/lib/format';
 export function createCustomersColumns(opts: {
   onDeleteClick: (id: string) => void;
   deletePending: boolean;
+  canInactivate: boolean;
   listSearch: {
     page: number;
     pageSize: number;
     providerId: string | undefined;
   };
 }): ColumnDef<ListCustomerResponse>[] {
-  const { onDeleteClick, deletePending, listSearch } = opts;
+  const { onDeleteClick, deletePending, listSearch, canInactivate } = opts;
 
   return [
     {
@@ -43,8 +44,12 @@ export function createCustomersColumns(opts: {
         if (!id) {
           return <span className="text-muted-foreground">—</span>;
         }
-        const short = id.length > 14 ? `${id.slice(0, 8)}…${id.slice(-4)}` : id;
-        return <span title={id}>{short}</span>;
+        return (
+          <span>
+            {row.original.responsible_salesperson_name ||
+              'Vendedor indisponível'}
+          </span>
+        );
       }
     },
     {
@@ -85,6 +90,7 @@ export function createCustomersColumns(opts: {
               <TooltipTrigger
                 render={
                   <Button
+                    aria-label={`Abrir cliente ${c.name}`}
                     nativeButton={false}
                     variant="ghost"
                     size="sm"
@@ -112,14 +118,15 @@ export function createCustomersColumns(opts: {
                     variant="ghost"
                     size="sm"
                     className="text-destructive hover:text-destructive"
-                    disabled={deletePending}
+                    disabled={deletePending || !canInactivate || !c.active}
+                    aria-label={`Inativar cliente ${c.name}`}
                     onClick={() => onDeleteClick(c.id)}
                   >
                     <Trash2 className="size-4" />
                   </Button>
                 }
               />
-              <TooltipContent>Excluir</TooltipContent>
+              <TooltipContent>Inativar</TooltipContent>
             </Tooltip>
           </div>
         );

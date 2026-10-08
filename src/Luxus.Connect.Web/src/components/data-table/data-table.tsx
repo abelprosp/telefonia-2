@@ -61,6 +61,14 @@ export function DataTable<TData, TValue>({
 
   return (
     <div className="overflow-hidden rounded-md border">
+      {sorting.length > 0 && (
+        <p
+          role="status"
+          className="text-muted-foreground border-b px-3 py-2 text-xs"
+        >
+          Ordenação aplicada aos registros desta página.
+        </p>
+      )}
       <Table>
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (

@@ -11,57 +11,57 @@
 import { Route as rootRouteImport } from './pages/__root'
 import { Route as _appLayoutRouteImport } from './pages/__app/layout'
 import { Route as _appIndexRouteImport } from './pages/__app/index'
-import { Route as _appUsersIndexRouteImport } from './pages/__app/users/index'
-import { Route as _appTicketsIndexRouteImport } from './pages/__app/tickets/index'
-import { Route as _appStockIndexRouteImport } from './pages/__app/stock/index'
-import { Route as _appSettingsIndexRouteImport } from './pages/__app/settings/index'
-import { Route as _appSalesIndexRouteImport } from './pages/__app/sales/index'
-import { Route as _appProvidersIndexRouteImport } from './pages/__app/providers/index'
-import { Route as _appProcessingMonthsIndexRouteImport } from './pages/__app/processing-months/index'
-import { Route as _appPortalIndexRouteImport } from './pages/__app/portal/index'
-import { Route as _appPhoneLinesIndexRouteImport } from './pages/__app/phone-lines/index'
-import { Route as _appPartnerIndexRouteImport } from './pages/__app/partner/index'
-import { Route as _appLineRequestsIndexRouteImport } from './pages/__app/line-requests/index'
-import { Route as _appInvoicesIndexRouteImport } from './pages/__app/invoices/index'
-import { Route as _appFinanceIndexRouteImport } from './pages/__app/finance/index'
-import { Route as _appExceedanceTermsIndexRouteImport } from './pages/__app/exceedance-terms/index'
-import { Route as _appDivergencesIndexRouteImport } from './pages/__app/divergences/index'
-import { Route as _appCustomersIndexRouteImport } from './pages/__app/customers/index'
-import { Route as _appContractTemplatesIndexRouteImport } from './pages/__app/contract-templates/index'
-import { Route as _appBillingCyclesIndexRouteImport } from './pages/__app/billing-cycles/index'
 import { Route as _appApprovalsIndexRouteImport } from './pages/__app/approvals/index'
-import { Route as _appTicketsTicketIdRouteImport } from './pages/__app/tickets/$ticketId'
-import { Route as _appStockPhoneLineIdRouteImport } from './pages/__app/stock/$phoneLineId'
-import { Route as _appSalesSaleIdRouteImport } from './pages/__app/sales/$saleId'
-import { Route as _appProvidersProviderIdRouteImport } from './pages/__app/providers/$providerId'
-import { Route as _appProcessingMonthsProcessingMonthIdRouteImport } from './pages/__app/processing-months/$processingMonthId'
-import { Route as _appPhoneLinesPhoneLineIdRouteImport } from './pages/__app/phone-lines/$phoneLineId'
-import { Route as _appInvoicesInvoiceIdRouteImport } from './pages/__app/invoices/$invoiceId'
-import { Route as _appCustomersCustomerIdRouteImport } from './pages/__app/customers/$customerId'
+import { Route as _appBillingCyclesIndexRouteImport } from './pages/__app/billing-cycles/index'
 import { Route as _appBillingCyclesCycleIdRouteImport } from './pages/__app/billing-cycles/$cycleId'
-import { Route as _appStockDevicesIndexRouteImport } from './pages/__app/stock/devices/index'
-import { Route as _appSalesNewIndexRouteImport } from './pages/__app/sales/new/index'
-import { Route as _appReportsTransitionPendingIndexRouteImport } from './pages/__app/reports/transition-pending/index'
-import { Route as _appReportsReconciliationIndexRouteImport } from './pages/__app/reports/reconciliation/index'
-import { Route as _appReportsLineConsumptionIndexRouteImport } from './pages/__app/reports/line-consumption/index'
-import { Route as _appPartnerRequestsIndexRouteImport } from './pages/__app/partner/requests/index'
-import { Route as _appPartnerPhoneLinesIndexRouteImport } from './pages/__app/partner/phone-lines/index'
-import { Route as _appPartnerFinancialIndexRouteImport } from './pages/__app/partner/financial/index'
-import { Route as _appPartnerCustomersIndexRouteImport } from './pages/__app/partner/customers/index'
-import { Route as _appPartnerCommercialSalesIndexRouteImport } from './pages/__app/partner/commercial-sales/index'
-import { Route as _appFinanceReceivablesIndexRouteImport } from './pages/__app/finance/receivables/index'
-import { Route as _appFinancePayablesIndexRouteImport } from './pages/__app/finance/payables/index'
-import { Route as _appFinancePartnerSalesIndexRouteImport } from './pages/__app/finance/partner-sales/index'
-import { Route as _appFinanceInvoiceLayoutTemplatesIndexRouteImport } from './pages/__app/finance/invoice-layout-templates/index'
-import { Route as _appFinanceInvoiceEmailTemplatesIndexRouteImport } from './pages/__app/finance/invoice-email-templates/index'
-import { Route as _appFinanceFinancialAgentIndexRouteImport } from './pages/__app/finance/financial-agent/index'
-import { Route as _appFinanceCustomerInvoicesIndexRouteImport } from './pages/__app/finance/customer-invoices/index'
-import { Route as _appFinanceCollectionsIndexRouteImport } from './pages/__app/finance/collections/index'
+import { Route as _appContractTemplatesIndexRouteImport } from './pages/__app/contract-templates/index'
+import { Route as _appCustomersIndexRouteImport } from './pages/__app/customers/index'
+import { Route as _appCustomersCustomerIdRouteImport } from './pages/__app/customers/$customerId'
+import { Route as _appDivergencesIndexRouteImport } from './pages/__app/divergences/index'
+import { Route as _appExceedanceTermsIndexRouteImport } from './pages/__app/exceedance-terms/index'
+import { Route as _appFinanceIndexRouteImport } from './pages/__app/finance/index'
+import { Route as _appInvoicesIndexRouteImport } from './pages/__app/invoices/index'
+import { Route as _appInvoicesInvoiceIdRouteImport } from './pages/__app/invoices/$invoiceId'
+import { Route as _appLineRequestsIndexRouteImport } from './pages/__app/line-requests/index'
+import { Route as _appPartnerIndexRouteImport } from './pages/__app/partner/index'
+import { Route as _appPhoneLinesIndexRouteImport } from './pages/__app/phone-lines/index'
+import { Route as _appPhoneLinesPhoneLineIdRouteImport } from './pages/__app/phone-lines/$phoneLineId'
+import { Route as _appPortalIndexRouteImport } from './pages/__app/portal/index'
+import { Route as _appProcessingMonthsIndexRouteImport } from './pages/__app/processing-months/index'
+import { Route as _appProcessingMonthsProcessingMonthIdRouteImport } from './pages/__app/processing-months/$processingMonthId'
+import { Route as _appProvidersIndexRouteImport } from './pages/__app/providers/index'
+import { Route as _appProvidersProviderIdRouteImport } from './pages/__app/providers/$providerId'
+import { Route as _appSalesIndexRouteImport } from './pages/__app/sales/index'
+import { Route as _appSalesSaleIdRouteImport } from './pages/__app/sales/$saleId'
+import { Route as _appSettingsIndexRouteImport } from './pages/__app/settings/index'
+import { Route as _appStockIndexRouteImport } from './pages/__app/stock/index'
+import { Route as _appStockPhoneLineIdRouteImport } from './pages/__app/stock/$phoneLineId'
+import { Route as _appTicketsIndexRouteImport } from './pages/__app/tickets/index'
+import { Route as _appTicketsTicketIdRouteImport } from './pages/__app/tickets/$ticketId'
+import { Route as _appUsersIndexRouteImport } from './pages/__app/users/index'
 import { Route as _appAuditEventsIndexRouteImport } from './pages/__app/audit/events/index'
-import { Route as _appPartnerCommercialSalesSaleIdRouteImport } from './pages/__app/partner/commercial-sales/$saleId'
-import { Route as _appFinanceInvoiceLayoutTemplatesIdRouteImport } from './pages/__app/finance/invoice-layout-templates/$id'
-import { Route as _appFinanceCustomerInvoicesBulkGenerateRouteImport } from './pages/__app/finance/customer-invoices/bulk-generate'
+import { Route as _appFinanceCollectionsIndexRouteImport } from './pages/__app/finance/collections/index'
+import { Route as _appFinanceCustomerInvoicesIndexRouteImport } from './pages/__app/finance/customer-invoices/index'
 import { Route as _appFinanceCustomerInvoicesIdRouteImport } from './pages/__app/finance/customer-invoices/$id'
+import { Route as _appFinanceCustomerInvoicesBulkGenerateRouteImport } from './pages/__app/finance/customer-invoices/bulk-generate'
+import { Route as _appFinanceFinancialAgentIndexRouteImport } from './pages/__app/finance/financial-agent/index'
+import { Route as _appFinanceInvoiceEmailTemplatesIndexRouteImport } from './pages/__app/finance/invoice-email-templates/index'
+import { Route as _appFinanceInvoiceLayoutTemplatesIndexRouteImport } from './pages/__app/finance/invoice-layout-templates/index'
+import { Route as _appFinanceInvoiceLayoutTemplatesIdRouteImport } from './pages/__app/finance/invoice-layout-templates/$id'
+import { Route as _appFinancePartnerSalesIndexRouteImport } from './pages/__app/finance/partner-sales/index'
+import { Route as _appFinancePayablesIndexRouteImport } from './pages/__app/finance/payables/index'
+import { Route as _appFinanceReceivablesIndexRouteImport } from './pages/__app/finance/receivables/index'
+import { Route as _appPartnerCommercialSalesIndexRouteImport } from './pages/__app/partner/commercial-sales/index'
+import { Route as _appPartnerCommercialSalesSaleIdRouteImport } from './pages/__app/partner/commercial-sales/$saleId'
+import { Route as _appPartnerCustomersIndexRouteImport } from './pages/__app/partner/customers/index'
+import { Route as _appPartnerFinancialIndexRouteImport } from './pages/__app/partner/financial/index'
+import { Route as _appPartnerPhoneLinesIndexRouteImport } from './pages/__app/partner/phone-lines/index'
+import { Route as _appPartnerRequestsIndexRouteImport } from './pages/__app/partner/requests/index'
+import { Route as _appReportsLineConsumptionIndexRouteImport } from './pages/__app/reports/line-consumption/index'
+import { Route as _appReportsReconciliationIndexRouteImport } from './pages/__app/reports/reconciliation/index'
+import { Route as _appReportsTransitionPendingIndexRouteImport } from './pages/__app/reports/transition-pending/index'
+import { Route as _appSalesNewIndexRouteImport } from './pages/__app/sales/new/index'
+import { Route as _appStockDevicesIndexRouteImport } from './pages/__app/stock/devices/index'
 import { Route as _appPartnerCommercialSalesNewIndexRouteImport } from './pages/__app/partner/commercial-sales/new/index'
 
 const _appLayoutRoute = _appLayoutRouteImport.update({
@@ -73,144 +73,14 @@ const _appIndexRoute = _appIndexRouteImport.update({
   path: '/',
   getParentRoute: () => _appLayoutRoute,
 } as any)
-const _appUsersIndexRoute = _appUsersIndexRouteImport.update({
-  id: '/users/',
-  path: '/users/',
-  getParentRoute: () => _appLayoutRoute,
-} as any)
-const _appTicketsIndexRoute = _appTicketsIndexRouteImport.update({
-  id: '/tickets/',
-  path: '/tickets/',
-  getParentRoute: () => _appLayoutRoute,
-} as any)
-const _appStockIndexRoute = _appStockIndexRouteImport.update({
-  id: '/stock/',
-  path: '/stock/',
-  getParentRoute: () => _appLayoutRoute,
-} as any)
-const _appSettingsIndexRoute = _appSettingsIndexRouteImport.update({
-  id: '/settings/',
-  path: '/settings/',
-  getParentRoute: () => _appLayoutRoute,
-} as any)
-const _appSalesIndexRoute = _appSalesIndexRouteImport.update({
-  id: '/sales/',
-  path: '/sales/',
-  getParentRoute: () => _appLayoutRoute,
-} as any)
-const _appProvidersIndexRoute = _appProvidersIndexRouteImport.update({
-  id: '/providers/',
-  path: '/providers/',
-  getParentRoute: () => _appLayoutRoute,
-} as any)
-const _appProcessingMonthsIndexRoute =
-  _appProcessingMonthsIndexRouteImport.update({
-    id: '/processing-months/',
-    path: '/processing-months/',
-    getParentRoute: () => _appLayoutRoute,
-  } as any)
-const _appPortalIndexRoute = _appPortalIndexRouteImport.update({
-  id: '/portal/',
-  path: '/portal/',
-  getParentRoute: () => _appLayoutRoute,
-} as any)
-const _appPhoneLinesIndexRoute = _appPhoneLinesIndexRouteImport.update({
-  id: '/phone-lines/',
-  path: '/phone-lines/',
-  getParentRoute: () => _appLayoutRoute,
-} as any)
-const _appPartnerIndexRoute = _appPartnerIndexRouteImport.update({
-  id: '/partner/',
-  path: '/partner/',
-  getParentRoute: () => _appLayoutRoute,
-} as any)
-const _appLineRequestsIndexRoute = _appLineRequestsIndexRouteImport.update({
-  id: '/line-requests/',
-  path: '/line-requests/',
-  getParentRoute: () => _appLayoutRoute,
-} as any)
-const _appInvoicesIndexRoute = _appInvoicesIndexRouteImport.update({
-  id: '/invoices/',
-  path: '/invoices/',
-  getParentRoute: () => _appLayoutRoute,
-} as any)
-const _appFinanceIndexRoute = _appFinanceIndexRouteImport.update({
-  id: '/finance/',
-  path: '/finance/',
-  getParentRoute: () => _appLayoutRoute,
-} as any)
-const _appExceedanceTermsIndexRoute =
-  _appExceedanceTermsIndexRouteImport.update({
-    id: '/exceedance-terms/',
-    path: '/exceedance-terms/',
-    getParentRoute: () => _appLayoutRoute,
-  } as any)
-const _appDivergencesIndexRoute = _appDivergencesIndexRouteImport.update({
-  id: '/divergences/',
-  path: '/divergences/',
-  getParentRoute: () => _appLayoutRoute,
-} as any)
-const _appCustomersIndexRoute = _appCustomersIndexRouteImport.update({
-  id: '/customers/',
-  path: '/customers/',
-  getParentRoute: () => _appLayoutRoute,
-} as any)
-const _appContractTemplatesIndexRoute =
-  _appContractTemplatesIndexRouteImport.update({
-    id: '/contract-templates/',
-    path: '/contract-templates/',
-    getParentRoute: () => _appLayoutRoute,
-  } as any)
-const _appBillingCyclesIndexRoute = _appBillingCyclesIndexRouteImport.update({
-  id: '/billing-cycles/',
-  path: '/billing-cycles/',
-  getParentRoute: () => _appLayoutRoute,
-} as any)
 const _appApprovalsIndexRoute = _appApprovalsIndexRouteImport.update({
   id: '/approvals/',
   path: '/approvals/',
   getParentRoute: () => _appLayoutRoute,
 } as any)
-const _appTicketsTicketIdRoute = _appTicketsTicketIdRouteImport.update({
-  id: '/tickets/$ticketId',
-  path: '/tickets/$ticketId',
-  getParentRoute: () => _appLayoutRoute,
-} as any)
-const _appStockPhoneLineIdRoute = _appStockPhoneLineIdRouteImport.update({
-  id: '/stock/$phoneLineId',
-  path: '/stock/$phoneLineId',
-  getParentRoute: () => _appLayoutRoute,
-} as any)
-const _appSalesSaleIdRoute = _appSalesSaleIdRouteImport.update({
-  id: '/sales/$saleId',
-  path: '/sales/$saleId',
-  getParentRoute: () => _appLayoutRoute,
-} as any)
-const _appProvidersProviderIdRoute = _appProvidersProviderIdRouteImport.update({
-  id: '/providers/$providerId',
-  path: '/providers/$providerId',
-  getParentRoute: () => _appLayoutRoute,
-} as any)
-const _appProcessingMonthsProcessingMonthIdRoute =
-  _appProcessingMonthsProcessingMonthIdRouteImport.update({
-    id: '/processing-months/$processingMonthId',
-    path: '/processing-months/$processingMonthId',
-    getParentRoute: () => _appLayoutRoute,
-  } as any)
-const _appPhoneLinesPhoneLineIdRoute =
-  _appPhoneLinesPhoneLineIdRouteImport.update({
-    id: '/phone-lines/$phoneLineId',
-    path: '/phone-lines/$phoneLineId',
-    getParentRoute: () => _appLayoutRoute,
-  } as any)
-const _appInvoicesInvoiceIdRoute = _appInvoicesInvoiceIdRouteImport.update({
-  id: '/invoices/$invoiceId',
-  path: '/invoices/$invoiceId',
-  getParentRoute: () => _appLayoutRoute,
-} as any)
-const _appCustomersCustomerIdRoute = _appCustomersCustomerIdRouteImport.update({
-  id: '/customers/$customerId',
-  path: '/customers/$customerId',
+const _appBillingCyclesIndexRoute = _appBillingCyclesIndexRouteImport.update({
+  id: '/billing-cycles/',
+  path: '/billing-cycles/',
   getParentRoute: () => _appLayoutRoute,
 } as any)
 const _appBillingCyclesCycleIdRoute =
@@ -219,98 +89,145 @@ const _appBillingCyclesCycleIdRoute =
     path: '/billing-cycles/$cycleId',
     getParentRoute: () => _appLayoutRoute,
   } as any)
-const _appStockDevicesIndexRoute = _appStockDevicesIndexRouteImport.update({
-  id: '/stock/devices/',
-  path: '/stock/devices/',
+const _appContractTemplatesIndexRoute =
+  _appContractTemplatesIndexRouteImport.update({
+    id: '/contract-templates/',
+    path: '/contract-templates/',
+    getParentRoute: () => _appLayoutRoute,
+  } as any)
+const _appCustomersIndexRoute = _appCustomersIndexRouteImport.update({
+  id: '/customers/',
+  path: '/customers/',
   getParentRoute: () => _appLayoutRoute,
 } as any)
-const _appSalesNewIndexRoute = _appSalesNewIndexRouteImport.update({
-  id: '/sales/new/',
-  path: '/sales/new/',
+const _appCustomersCustomerIdRoute = _appCustomersCustomerIdRouteImport.update({
+  id: '/customers/$customerId',
+  path: '/customers/$customerId',
   getParentRoute: () => _appLayoutRoute,
 } as any)
-const _appReportsTransitionPendingIndexRoute =
-  _appReportsTransitionPendingIndexRouteImport.update({
-    id: '/reports/transition-pending/',
-    path: '/reports/transition-pending/',
+const _appDivergencesIndexRoute = _appDivergencesIndexRouteImport.update({
+  id: '/divergences/',
+  path: '/divergences/',
+  getParentRoute: () => _appLayoutRoute,
+} as any)
+const _appExceedanceTermsIndexRoute =
+  _appExceedanceTermsIndexRouteImport.update({
+    id: '/exceedance-terms/',
+    path: '/exceedance-terms/',
     getParentRoute: () => _appLayoutRoute,
   } as any)
-const _appReportsReconciliationIndexRoute =
-  _appReportsReconciliationIndexRouteImport.update({
-    id: '/reports/reconciliation/',
-    path: '/reports/reconciliation/',
+const _appFinanceIndexRoute = _appFinanceIndexRouteImport.update({
+  id: '/finance/',
+  path: '/finance/',
+  getParentRoute: () => _appLayoutRoute,
+} as any)
+const _appInvoicesIndexRoute = _appInvoicesIndexRouteImport.update({
+  id: '/invoices/',
+  path: '/invoices/',
+  getParentRoute: () => _appLayoutRoute,
+} as any)
+const _appInvoicesInvoiceIdRoute = _appInvoicesInvoiceIdRouteImport.update({
+  id: '/invoices/$invoiceId',
+  path: '/invoices/$invoiceId',
+  getParentRoute: () => _appLayoutRoute,
+} as any)
+const _appLineRequestsIndexRoute = _appLineRequestsIndexRouteImport.update({
+  id: '/line-requests/',
+  path: '/line-requests/',
+  getParentRoute: () => _appLayoutRoute,
+} as any)
+const _appPartnerIndexRoute = _appPartnerIndexRouteImport.update({
+  id: '/partner/',
+  path: '/partner/',
+  getParentRoute: () => _appLayoutRoute,
+} as any)
+const _appPhoneLinesIndexRoute = _appPhoneLinesIndexRouteImport.update({
+  id: '/phone-lines/',
+  path: '/phone-lines/',
+  getParentRoute: () => _appLayoutRoute,
+} as any)
+const _appPhoneLinesPhoneLineIdRoute =
+  _appPhoneLinesPhoneLineIdRouteImport.update({
+    id: '/phone-lines/$phoneLineId',
+    path: '/phone-lines/$phoneLineId',
     getParentRoute: () => _appLayoutRoute,
   } as any)
-const _appReportsLineConsumptionIndexRoute =
-  _appReportsLineConsumptionIndexRouteImport.update({
-    id: '/reports/line-consumption/',
-    path: '/reports/line-consumption/',
+const _appPortalIndexRoute = _appPortalIndexRouteImport.update({
+  id: '/portal/',
+  path: '/portal/',
+  getParentRoute: () => _appLayoutRoute,
+} as any)
+const _appProcessingMonthsIndexRoute =
+  _appProcessingMonthsIndexRouteImport.update({
+    id: '/processing-months/',
+    path: '/processing-months/',
     getParentRoute: () => _appLayoutRoute,
   } as any)
-const _appPartnerRequestsIndexRoute =
-  _appPartnerRequestsIndexRouteImport.update({
-    id: '/partner/requests/',
-    path: '/partner/requests/',
+const _appProcessingMonthsProcessingMonthIdRoute =
+  _appProcessingMonthsProcessingMonthIdRouteImport.update({
+    id: '/processing-months/$processingMonthId',
+    path: '/processing-months/$processingMonthId',
     getParentRoute: () => _appLayoutRoute,
   } as any)
-const _appPartnerPhoneLinesIndexRoute =
-  _appPartnerPhoneLinesIndexRouteImport.update({
-    id: '/partner/phone-lines/',
-    path: '/partner/phone-lines/',
-    getParentRoute: () => _appLayoutRoute,
-  } as any)
-const _appPartnerFinancialIndexRoute =
-  _appPartnerFinancialIndexRouteImport.update({
-    id: '/partner/financial/',
-    path: '/partner/financial/',
-    getParentRoute: () => _appLayoutRoute,
-  } as any)
-const _appPartnerCustomersIndexRoute =
-  _appPartnerCustomersIndexRouteImport.update({
-    id: '/partner/customers/',
-    path: '/partner/customers/',
-    getParentRoute: () => _appLayoutRoute,
-  } as any)
-const _appPartnerCommercialSalesIndexRoute =
-  _appPartnerCommercialSalesIndexRouteImport.update({
-    id: '/partner/commercial-sales/',
-    path: '/partner/commercial-sales/',
-    getParentRoute: () => _appLayoutRoute,
-  } as any)
-const _appFinanceReceivablesIndexRoute =
-  _appFinanceReceivablesIndexRouteImport.update({
-    id: '/finance/receivables/',
-    path: '/finance/receivables/',
-    getParentRoute: () => _appLayoutRoute,
-  } as any)
-const _appFinancePayablesIndexRoute =
-  _appFinancePayablesIndexRouteImport.update({
-    id: '/finance/payables/',
-    path: '/finance/payables/',
-    getParentRoute: () => _appLayoutRoute,
-  } as any)
-const _appFinancePartnerSalesIndexRoute =
-  _appFinancePartnerSalesIndexRouteImport.update({
-    id: '/finance/partner-sales/',
-    path: '/finance/partner-sales/',
-    getParentRoute: () => _appLayoutRoute,
-  } as any)
-const _appFinanceInvoiceLayoutTemplatesIndexRoute =
-  _appFinanceInvoiceLayoutTemplatesIndexRouteImport.update({
-    id: '/finance/invoice-layout-templates/',
-    path: '/finance/invoice-layout-templates/',
-    getParentRoute: () => _appLayoutRoute,
-  } as any)
-const _appFinanceInvoiceEmailTemplatesIndexRoute =
-  _appFinanceInvoiceEmailTemplatesIndexRouteImport.update({
-    id: '/finance/invoice-email-templates/',
-    path: '/finance/invoice-email-templates/',
-    getParentRoute: () => _appLayoutRoute,
-  } as any)
-const _appFinanceFinancialAgentIndexRoute =
-  _appFinanceFinancialAgentIndexRouteImport.update({
-    id: '/finance/financial-agent/',
-    path: '/finance/financial-agent/',
+const _appProvidersIndexRoute = _appProvidersIndexRouteImport.update({
+  id: '/providers/',
+  path: '/providers/',
+  getParentRoute: () => _appLayoutRoute,
+} as any)
+const _appProvidersProviderIdRoute = _appProvidersProviderIdRouteImport.update({
+  id: '/providers/$providerId',
+  path: '/providers/$providerId',
+  getParentRoute: () => _appLayoutRoute,
+} as any)
+const _appSalesIndexRoute = _appSalesIndexRouteImport.update({
+  id: '/sales/',
+  path: '/sales/',
+  getParentRoute: () => _appLayoutRoute,
+} as any)
+const _appSalesSaleIdRoute = _appSalesSaleIdRouteImport.update({
+  id: '/sales/$saleId',
+  path: '/sales/$saleId',
+  getParentRoute: () => _appLayoutRoute,
+} as any)
+const _appSettingsIndexRoute = _appSettingsIndexRouteImport.update({
+  id: '/settings/',
+  path: '/settings/',
+  getParentRoute: () => _appLayoutRoute,
+} as any)
+const _appStockIndexRoute = _appStockIndexRouteImport.update({
+  id: '/stock/',
+  path: '/stock/',
+  getParentRoute: () => _appLayoutRoute,
+} as any)
+const _appStockPhoneLineIdRoute = _appStockPhoneLineIdRouteImport.update({
+  id: '/stock/$phoneLineId',
+  path: '/stock/$phoneLineId',
+  getParentRoute: () => _appLayoutRoute,
+} as any)
+const _appTicketsIndexRoute = _appTicketsIndexRouteImport.update({
+  id: '/tickets/',
+  path: '/tickets/',
+  getParentRoute: () => _appLayoutRoute,
+} as any)
+const _appTicketsTicketIdRoute = _appTicketsTicketIdRouteImport.update({
+  id: '/tickets/$ticketId',
+  path: '/tickets/$ticketId',
+  getParentRoute: () => _appLayoutRoute,
+} as any)
+const _appUsersIndexRoute = _appUsersIndexRouteImport.update({
+  id: '/users/',
+  path: '/users/',
+  getParentRoute: () => _appLayoutRoute,
+} as any)
+const _appAuditEventsIndexRoute = _appAuditEventsIndexRouteImport.update({
+  id: '/audit/events/',
+  path: '/audit/events/',
+  getParentRoute: () => _appLayoutRoute,
+} as any)
+const _appFinanceCollectionsIndexRoute =
+  _appFinanceCollectionsIndexRouteImport.update({
+    id: '/finance/collections/',
+    path: '/finance/collections/',
     getParentRoute: () => _appLayoutRoute,
   } as any)
 const _appFinanceCustomerInvoicesIndexRoute =
@@ -319,27 +236,10 @@ const _appFinanceCustomerInvoicesIndexRoute =
     path: '/finance/customer-invoices/',
     getParentRoute: () => _appLayoutRoute,
   } as any)
-const _appFinanceCollectionsIndexRoute =
-  _appFinanceCollectionsIndexRouteImport.update({
-    id: '/finance/collections/',
-    path: '/finance/collections/',
-    getParentRoute: () => _appLayoutRoute,
-  } as any)
-const _appAuditEventsIndexRoute = _appAuditEventsIndexRouteImport.update({
-  id: '/audit/events/',
-  path: '/audit/events/',
-  getParentRoute: () => _appLayoutRoute,
-} as any)
-const _appPartnerCommercialSalesSaleIdRoute =
-  _appPartnerCommercialSalesSaleIdRouteImport.update({
-    id: '/partner/commercial-sales/$saleId',
-    path: '/partner/commercial-sales/$saleId',
-    getParentRoute: () => _appLayoutRoute,
-  } as any)
-const _appFinanceInvoiceLayoutTemplatesIdRoute =
-  _appFinanceInvoiceLayoutTemplatesIdRouteImport.update({
-    id: '/finance/invoice-layout-templates/$id',
-    path: '/finance/invoice-layout-templates/$id',
+const _appFinanceCustomerInvoicesIdRoute =
+  _appFinanceCustomerInvoicesIdRouteImport.update({
+    id: '/finance/customer-invoices/$id',
+    path: '/finance/customer-invoices/$id',
     getParentRoute: () => _appLayoutRoute,
   } as any)
 const _appFinanceCustomerInvoicesBulkGenerateRoute =
@@ -348,12 +248,112 @@ const _appFinanceCustomerInvoicesBulkGenerateRoute =
     path: '/finance/customer-invoices/bulk-generate',
     getParentRoute: () => _appLayoutRoute,
   } as any)
-const _appFinanceCustomerInvoicesIdRoute =
-  _appFinanceCustomerInvoicesIdRouteImport.update({
-    id: '/finance/customer-invoices/$id',
-    path: '/finance/customer-invoices/$id',
+const _appFinanceFinancialAgentIndexRoute =
+  _appFinanceFinancialAgentIndexRouteImport.update({
+    id: '/finance/financial-agent/',
+    path: '/finance/financial-agent/',
     getParentRoute: () => _appLayoutRoute,
   } as any)
+const _appFinanceInvoiceEmailTemplatesIndexRoute =
+  _appFinanceInvoiceEmailTemplatesIndexRouteImport.update({
+    id: '/finance/invoice-email-templates/',
+    path: '/finance/invoice-email-templates/',
+    getParentRoute: () => _appLayoutRoute,
+  } as any)
+const _appFinanceInvoiceLayoutTemplatesIndexRoute =
+  _appFinanceInvoiceLayoutTemplatesIndexRouteImport.update({
+    id: '/finance/invoice-layout-templates/',
+    path: '/finance/invoice-layout-templates/',
+    getParentRoute: () => _appLayoutRoute,
+  } as any)
+const _appFinanceInvoiceLayoutTemplatesIdRoute =
+  _appFinanceInvoiceLayoutTemplatesIdRouteImport.update({
+    id: '/finance/invoice-layout-templates/$id',
+    path: '/finance/invoice-layout-templates/$id',
+    getParentRoute: () => _appLayoutRoute,
+  } as any)
+const _appFinancePartnerSalesIndexRoute =
+  _appFinancePartnerSalesIndexRouteImport.update({
+    id: '/finance/partner-sales/',
+    path: '/finance/partner-sales/',
+    getParentRoute: () => _appLayoutRoute,
+  } as any)
+const _appFinancePayablesIndexRoute =
+  _appFinancePayablesIndexRouteImport.update({
+    id: '/finance/payables/',
+    path: '/finance/payables/',
+    getParentRoute: () => _appLayoutRoute,
+  } as any)
+const _appFinanceReceivablesIndexRoute =
+  _appFinanceReceivablesIndexRouteImport.update({
+    id: '/finance/receivables/',
+    path: '/finance/receivables/',
+    getParentRoute: () => _appLayoutRoute,
+  } as any)
+const _appPartnerCommercialSalesIndexRoute =
+  _appPartnerCommercialSalesIndexRouteImport.update({
+    id: '/partner/commercial-sales/',
+    path: '/partner/commercial-sales/',
+    getParentRoute: () => _appLayoutRoute,
+  } as any)
+const _appPartnerCommercialSalesSaleIdRoute =
+  _appPartnerCommercialSalesSaleIdRouteImport.update({
+    id: '/partner/commercial-sales/$saleId',
+    path: '/partner/commercial-sales/$saleId',
+    getParentRoute: () => _appLayoutRoute,
+  } as any)
+const _appPartnerCustomersIndexRoute =
+  _appPartnerCustomersIndexRouteImport.update({
+    id: '/partner/customers/',
+    path: '/partner/customers/',
+    getParentRoute: () => _appLayoutRoute,
+  } as any)
+const _appPartnerFinancialIndexRoute =
+  _appPartnerFinancialIndexRouteImport.update({
+    id: '/partner/financial/',
+    path: '/partner/financial/',
+    getParentRoute: () => _appLayoutRoute,
+  } as any)
+const _appPartnerPhoneLinesIndexRoute =
+  _appPartnerPhoneLinesIndexRouteImport.update({
+    id: '/partner/phone-lines/',
+    path: '/partner/phone-lines/',
+    getParentRoute: () => _appLayoutRoute,
+  } as any)
+const _appPartnerRequestsIndexRoute =
+  _appPartnerRequestsIndexRouteImport.update({
+    id: '/partner/requests/',
+    path: '/partner/requests/',
+    getParentRoute: () => _appLayoutRoute,
+  } as any)
+const _appReportsLineConsumptionIndexRoute =
+  _appReportsLineConsumptionIndexRouteImport.update({
+    id: '/reports/line-consumption/',
+    path: '/reports/line-consumption/',
+    getParentRoute: () => _appLayoutRoute,
+  } as any)
+const _appReportsReconciliationIndexRoute =
+  _appReportsReconciliationIndexRouteImport.update({
+    id: '/reports/reconciliation/',
+    path: '/reports/reconciliation/',
+    getParentRoute: () => _appLayoutRoute,
+  } as any)
+const _appReportsTransitionPendingIndexRoute =
+  _appReportsTransitionPendingIndexRouteImport.update({
+    id: '/reports/transition-pending/',
+    path: '/reports/transition-pending/',
+    getParentRoute: () => _appLayoutRoute,
+  } as any)
+const _appSalesNewIndexRoute = _appSalesNewIndexRouteImport.update({
+  id: '/sales/new/',
+  path: '/sales/new/',
+  getParentRoute: () => _appLayoutRoute,
+} as any)
+const _appStockDevicesIndexRoute = _appStockDevicesIndexRouteImport.update({
+  id: '/stock/devices/',
+  path: '/stock/devices/',
+  getParentRoute: () => _appLayoutRoute,
+} as any)
 const _appPartnerCommercialSalesNewIndexRoute =
   _appPartnerCommercialSalesNewIndexRouteImport.update({
     id: '/partner/commercial-sales/new/',
@@ -717,123 +717,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof _appIndexRouteImport
       parentRoute: typeof _appLayoutRoute
     }
-    '/__app/users/': {
-      id: '/__app/users/'
-      path: '/users'
-      fullPath: '/users/'
-      preLoaderRoute: typeof _appUsersIndexRouteImport
-      parentRoute: typeof _appLayoutRoute
-    }
-    '/__app/tickets/': {
-      id: '/__app/tickets/'
-      path: '/tickets'
-      fullPath: '/tickets/'
-      preLoaderRoute: typeof _appTicketsIndexRouteImport
-      parentRoute: typeof _appLayoutRoute
-    }
-    '/__app/stock/': {
-      id: '/__app/stock/'
-      path: '/stock'
-      fullPath: '/stock/'
-      preLoaderRoute: typeof _appStockIndexRouteImport
-      parentRoute: typeof _appLayoutRoute
-    }
-    '/__app/settings/': {
-      id: '/__app/settings/'
-      path: '/settings'
-      fullPath: '/settings/'
-      preLoaderRoute: typeof _appSettingsIndexRouteImport
-      parentRoute: typeof _appLayoutRoute
-    }
-    '/__app/sales/': {
-      id: '/__app/sales/'
-      path: '/sales'
-      fullPath: '/sales/'
-      preLoaderRoute: typeof _appSalesIndexRouteImport
-      parentRoute: typeof _appLayoutRoute
-    }
-    '/__app/providers/': {
-      id: '/__app/providers/'
-      path: '/providers'
-      fullPath: '/providers/'
-      preLoaderRoute: typeof _appProvidersIndexRouteImport
-      parentRoute: typeof _appLayoutRoute
-    }
-    '/__app/processing-months/': {
-      id: '/__app/processing-months/'
-      path: '/processing-months'
-      fullPath: '/processing-months/'
-      preLoaderRoute: typeof _appProcessingMonthsIndexRouteImport
-      parentRoute: typeof _appLayoutRoute
-    }
-    '/__app/portal/': {
-      id: '/__app/portal/'
-      path: '/portal'
-      fullPath: '/portal/'
-      preLoaderRoute: typeof _appPortalIndexRouteImport
-      parentRoute: typeof _appLayoutRoute
-    }
-    '/__app/phone-lines/': {
-      id: '/__app/phone-lines/'
-      path: '/phone-lines'
-      fullPath: '/phone-lines/'
-      preLoaderRoute: typeof _appPhoneLinesIndexRouteImport
-      parentRoute: typeof _appLayoutRoute
-    }
-    '/__app/partner/': {
-      id: '/__app/partner/'
-      path: '/partner'
-      fullPath: '/partner/'
-      preLoaderRoute: typeof _appPartnerIndexRouteImport
-      parentRoute: typeof _appLayoutRoute
-    }
-    '/__app/line-requests/': {
-      id: '/__app/line-requests/'
-      path: '/line-requests'
-      fullPath: '/line-requests/'
-      preLoaderRoute: typeof _appLineRequestsIndexRouteImport
-      parentRoute: typeof _appLayoutRoute
-    }
-    '/__app/invoices/': {
-      id: '/__app/invoices/'
-      path: '/invoices'
-      fullPath: '/invoices/'
-      preLoaderRoute: typeof _appInvoicesIndexRouteImport
-      parentRoute: typeof _appLayoutRoute
-    }
-    '/__app/finance/': {
-      id: '/__app/finance/'
-      path: '/finance'
-      fullPath: '/finance/'
-      preLoaderRoute: typeof _appFinanceIndexRouteImport
-      parentRoute: typeof _appLayoutRoute
-    }
-    '/__app/exceedance-terms/': {
-      id: '/__app/exceedance-terms/'
-      path: '/exceedance-terms'
-      fullPath: '/exceedance-terms/'
-      preLoaderRoute: typeof _appExceedanceTermsIndexRouteImport
-      parentRoute: typeof _appLayoutRoute
-    }
-    '/__app/divergences/': {
-      id: '/__app/divergences/'
-      path: '/divergences'
-      fullPath: '/divergences/'
-      preLoaderRoute: typeof _appDivergencesIndexRouteImport
-      parentRoute: typeof _appLayoutRoute
-    }
-    '/__app/customers/': {
-      id: '/__app/customers/'
-      path: '/customers'
-      fullPath: '/customers/'
-      preLoaderRoute: typeof _appCustomersIndexRouteImport
-      parentRoute: typeof _appLayoutRoute
-    }
-    '/__app/contract-templates/': {
-      id: '/__app/contract-templates/'
-      path: '/contract-templates'
-      fullPath: '/contract-templates/'
-      preLoaderRoute: typeof _appContractTemplatesIndexRouteImport
+    '/__app/approvals/': {
+      id: '/__app/approvals/'
+      path: '/approvals'
+      fullPath: '/approvals/'
+      preLoaderRoute: typeof _appApprovalsIndexRouteImport
       parentRoute: typeof _appLayoutRoute
     }
     '/__app/billing-cycles/': {
@@ -843,60 +731,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof _appBillingCyclesIndexRouteImport
       parentRoute: typeof _appLayoutRoute
     }
-    '/__app/approvals/': {
-      id: '/__app/approvals/'
-      path: '/approvals'
-      fullPath: '/approvals/'
-      preLoaderRoute: typeof _appApprovalsIndexRouteImport
+    '/__app/billing-cycles/$cycleId': {
+      id: '/__app/billing-cycles/$cycleId'
+      path: '/billing-cycles/$cycleId'
+      fullPath: '/billing-cycles/$cycleId'
+      preLoaderRoute: typeof _appBillingCyclesCycleIdRouteImport
       parentRoute: typeof _appLayoutRoute
     }
-    '/__app/tickets/$ticketId': {
-      id: '/__app/tickets/$ticketId'
-      path: '/tickets/$ticketId'
-      fullPath: '/tickets/$ticketId'
-      preLoaderRoute: typeof _appTicketsTicketIdRouteImport
+    '/__app/contract-templates/': {
+      id: '/__app/contract-templates/'
+      path: '/contract-templates'
+      fullPath: '/contract-templates/'
+      preLoaderRoute: typeof _appContractTemplatesIndexRouteImport
       parentRoute: typeof _appLayoutRoute
     }
-    '/__app/stock/$phoneLineId': {
-      id: '/__app/stock/$phoneLineId'
-      path: '/stock/$phoneLineId'
-      fullPath: '/stock/$phoneLineId'
-      preLoaderRoute: typeof _appStockPhoneLineIdRouteImport
-      parentRoute: typeof _appLayoutRoute
-    }
-    '/__app/sales/$saleId': {
-      id: '/__app/sales/$saleId'
-      path: '/sales/$saleId'
-      fullPath: '/sales/$saleId'
-      preLoaderRoute: typeof _appSalesSaleIdRouteImport
-      parentRoute: typeof _appLayoutRoute
-    }
-    '/__app/providers/$providerId': {
-      id: '/__app/providers/$providerId'
-      path: '/providers/$providerId'
-      fullPath: '/providers/$providerId'
-      preLoaderRoute: typeof _appProvidersProviderIdRouteImport
-      parentRoute: typeof _appLayoutRoute
-    }
-    '/__app/processing-months/$processingMonthId': {
-      id: '/__app/processing-months/$processingMonthId'
-      path: '/processing-months/$processingMonthId'
-      fullPath: '/processing-months/$processingMonthId'
-      preLoaderRoute: typeof _appProcessingMonthsProcessingMonthIdRouteImport
-      parentRoute: typeof _appLayoutRoute
-    }
-    '/__app/phone-lines/$phoneLineId': {
-      id: '/__app/phone-lines/$phoneLineId'
-      path: '/phone-lines/$phoneLineId'
-      fullPath: '/phone-lines/$phoneLineId'
-      preLoaderRoute: typeof _appPhoneLinesPhoneLineIdRouteImport
-      parentRoute: typeof _appLayoutRoute
-    }
-    '/__app/invoices/$invoiceId': {
-      id: '/__app/invoices/$invoiceId'
-      path: '/invoices/$invoiceId'
-      fullPath: '/invoices/$invoiceId'
-      preLoaderRoute: typeof _appInvoicesInvoiceIdRouteImport
+    '/__app/customers/': {
+      id: '/__app/customers/'
+      path: '/customers'
+      fullPath: '/customers/'
+      preLoaderRoute: typeof _appCustomersIndexRouteImport
       parentRoute: typeof _appLayoutRoute
     }
     '/__app/customers/$customerId': {
@@ -906,137 +759,158 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof _appCustomersCustomerIdRouteImport
       parentRoute: typeof _appLayoutRoute
     }
-    '/__app/billing-cycles/$cycleId': {
-      id: '/__app/billing-cycles/$cycleId'
-      path: '/billing-cycles/$cycleId'
-      fullPath: '/billing-cycles/$cycleId'
-      preLoaderRoute: typeof _appBillingCyclesCycleIdRouteImport
+    '/__app/divergences/': {
+      id: '/__app/divergences/'
+      path: '/divergences'
+      fullPath: '/divergences/'
+      preLoaderRoute: typeof _appDivergencesIndexRouteImport
       parentRoute: typeof _appLayoutRoute
     }
-    '/__app/stock/devices/': {
-      id: '/__app/stock/devices/'
-      path: '/stock/devices'
-      fullPath: '/stock/devices/'
-      preLoaderRoute: typeof _appStockDevicesIndexRouteImport
+    '/__app/exceedance-terms/': {
+      id: '/__app/exceedance-terms/'
+      path: '/exceedance-terms'
+      fullPath: '/exceedance-terms/'
+      preLoaderRoute: typeof _appExceedanceTermsIndexRouteImport
       parentRoute: typeof _appLayoutRoute
     }
-    '/__app/sales/new/': {
-      id: '/__app/sales/new/'
-      path: '/sales/new'
-      fullPath: '/sales/new/'
-      preLoaderRoute: typeof _appSalesNewIndexRouteImport
+    '/__app/finance/': {
+      id: '/__app/finance/'
+      path: '/finance'
+      fullPath: '/finance/'
+      preLoaderRoute: typeof _appFinanceIndexRouteImport
       parentRoute: typeof _appLayoutRoute
     }
-    '/__app/reports/transition-pending/': {
-      id: '/__app/reports/transition-pending/'
-      path: '/reports/transition-pending'
-      fullPath: '/reports/transition-pending/'
-      preLoaderRoute: typeof _appReportsTransitionPendingIndexRouteImport
+    '/__app/invoices/': {
+      id: '/__app/invoices/'
+      path: '/invoices'
+      fullPath: '/invoices/'
+      preLoaderRoute: typeof _appInvoicesIndexRouteImport
       parentRoute: typeof _appLayoutRoute
     }
-    '/__app/reports/reconciliation/': {
-      id: '/__app/reports/reconciliation/'
-      path: '/reports/reconciliation'
-      fullPath: '/reports/reconciliation/'
-      preLoaderRoute: typeof _appReportsReconciliationIndexRouteImport
+    '/__app/invoices/$invoiceId': {
+      id: '/__app/invoices/$invoiceId'
+      path: '/invoices/$invoiceId'
+      fullPath: '/invoices/$invoiceId'
+      preLoaderRoute: typeof _appInvoicesInvoiceIdRouteImport
       parentRoute: typeof _appLayoutRoute
     }
-    '/__app/reports/line-consumption/': {
-      id: '/__app/reports/line-consumption/'
-      path: '/reports/line-consumption'
-      fullPath: '/reports/line-consumption/'
-      preLoaderRoute: typeof _appReportsLineConsumptionIndexRouteImport
+    '/__app/line-requests/': {
+      id: '/__app/line-requests/'
+      path: '/line-requests'
+      fullPath: '/line-requests/'
+      preLoaderRoute: typeof _appLineRequestsIndexRouteImport
       parentRoute: typeof _appLayoutRoute
     }
-    '/__app/partner/requests/': {
-      id: '/__app/partner/requests/'
-      path: '/partner/requests'
-      fullPath: '/partner/requests/'
-      preLoaderRoute: typeof _appPartnerRequestsIndexRouteImport
+    '/__app/partner/': {
+      id: '/__app/partner/'
+      path: '/partner'
+      fullPath: '/partner/'
+      preLoaderRoute: typeof _appPartnerIndexRouteImport
       parentRoute: typeof _appLayoutRoute
     }
-    '/__app/partner/phone-lines/': {
-      id: '/__app/partner/phone-lines/'
-      path: '/partner/phone-lines'
-      fullPath: '/partner/phone-lines/'
-      preLoaderRoute: typeof _appPartnerPhoneLinesIndexRouteImport
+    '/__app/phone-lines/': {
+      id: '/__app/phone-lines/'
+      path: '/phone-lines'
+      fullPath: '/phone-lines/'
+      preLoaderRoute: typeof _appPhoneLinesIndexRouteImport
       parentRoute: typeof _appLayoutRoute
     }
-    '/__app/partner/financial/': {
-      id: '/__app/partner/financial/'
-      path: '/partner/financial'
-      fullPath: '/partner/financial/'
-      preLoaderRoute: typeof _appPartnerFinancialIndexRouteImport
+    '/__app/phone-lines/$phoneLineId': {
+      id: '/__app/phone-lines/$phoneLineId'
+      path: '/phone-lines/$phoneLineId'
+      fullPath: '/phone-lines/$phoneLineId'
+      preLoaderRoute: typeof _appPhoneLinesPhoneLineIdRouteImport
       parentRoute: typeof _appLayoutRoute
     }
-    '/__app/partner/customers/': {
-      id: '/__app/partner/customers/'
-      path: '/partner/customers'
-      fullPath: '/partner/customers/'
-      preLoaderRoute: typeof _appPartnerCustomersIndexRouteImport
+    '/__app/portal/': {
+      id: '/__app/portal/'
+      path: '/portal'
+      fullPath: '/portal/'
+      preLoaderRoute: typeof _appPortalIndexRouteImport
       parentRoute: typeof _appLayoutRoute
     }
-    '/__app/partner/commercial-sales/': {
-      id: '/__app/partner/commercial-sales/'
-      path: '/partner/commercial-sales'
-      fullPath: '/partner/commercial-sales/'
-      preLoaderRoute: typeof _appPartnerCommercialSalesIndexRouteImport
+    '/__app/processing-months/': {
+      id: '/__app/processing-months/'
+      path: '/processing-months'
+      fullPath: '/processing-months/'
+      preLoaderRoute: typeof _appProcessingMonthsIndexRouteImport
       parentRoute: typeof _appLayoutRoute
     }
-    '/__app/finance/receivables/': {
-      id: '/__app/finance/receivables/'
-      path: '/finance/receivables'
-      fullPath: '/finance/receivables/'
-      preLoaderRoute: typeof _appFinanceReceivablesIndexRouteImport
+    '/__app/processing-months/$processingMonthId': {
+      id: '/__app/processing-months/$processingMonthId'
+      path: '/processing-months/$processingMonthId'
+      fullPath: '/processing-months/$processingMonthId'
+      preLoaderRoute: typeof _appProcessingMonthsProcessingMonthIdRouteImport
       parentRoute: typeof _appLayoutRoute
     }
-    '/__app/finance/payables/': {
-      id: '/__app/finance/payables/'
-      path: '/finance/payables'
-      fullPath: '/finance/payables/'
-      preLoaderRoute: typeof _appFinancePayablesIndexRouteImport
+    '/__app/providers/': {
+      id: '/__app/providers/'
+      path: '/providers'
+      fullPath: '/providers/'
+      preLoaderRoute: typeof _appProvidersIndexRouteImport
       parentRoute: typeof _appLayoutRoute
     }
-    '/__app/finance/partner-sales/': {
-      id: '/__app/finance/partner-sales/'
-      path: '/finance/partner-sales'
-      fullPath: '/finance/partner-sales/'
-      preLoaderRoute: typeof _appFinancePartnerSalesIndexRouteImport
+    '/__app/providers/$providerId': {
+      id: '/__app/providers/$providerId'
+      path: '/providers/$providerId'
+      fullPath: '/providers/$providerId'
+      preLoaderRoute: typeof _appProvidersProviderIdRouteImport
       parentRoute: typeof _appLayoutRoute
     }
-    '/__app/finance/invoice-layout-templates/': {
-      id: '/__app/finance/invoice-layout-templates/'
-      path: '/finance/invoice-layout-templates'
-      fullPath: '/finance/invoice-layout-templates/'
-      preLoaderRoute: typeof _appFinanceInvoiceLayoutTemplatesIndexRouteImport
+    '/__app/sales/': {
+      id: '/__app/sales/'
+      path: '/sales'
+      fullPath: '/sales/'
+      preLoaderRoute: typeof _appSalesIndexRouteImport
       parentRoute: typeof _appLayoutRoute
     }
-    '/__app/finance/invoice-email-templates/': {
-      id: '/__app/finance/invoice-email-templates/'
-      path: '/finance/invoice-email-templates'
-      fullPath: '/finance/invoice-email-templates/'
-      preLoaderRoute: typeof _appFinanceInvoiceEmailTemplatesIndexRouteImport
+    '/__app/sales/$saleId': {
+      id: '/__app/sales/$saleId'
+      path: '/sales/$saleId'
+      fullPath: '/sales/$saleId'
+      preLoaderRoute: typeof _appSalesSaleIdRouteImport
       parentRoute: typeof _appLayoutRoute
     }
-    '/__app/finance/financial-agent/': {
-      id: '/__app/finance/financial-agent/'
-      path: '/finance/financial-agent'
-      fullPath: '/finance/financial-agent/'
-      preLoaderRoute: typeof _appFinanceFinancialAgentIndexRouteImport
+    '/__app/settings/': {
+      id: '/__app/settings/'
+      path: '/settings'
+      fullPath: '/settings/'
+      preLoaderRoute: typeof _appSettingsIndexRouteImport
       parentRoute: typeof _appLayoutRoute
     }
-    '/__app/finance/customer-invoices/': {
-      id: '/__app/finance/customer-invoices/'
-      path: '/finance/customer-invoices'
-      fullPath: '/finance/customer-invoices/'
-      preLoaderRoute: typeof _appFinanceCustomerInvoicesIndexRouteImport
+    '/__app/stock/': {
+      id: '/__app/stock/'
+      path: '/stock'
+      fullPath: '/stock/'
+      preLoaderRoute: typeof _appStockIndexRouteImport
       parentRoute: typeof _appLayoutRoute
     }
-    '/__app/finance/collections/': {
-      id: '/__app/finance/collections/'
-      path: '/finance/collections'
-      fullPath: '/finance/collections/'
-      preLoaderRoute: typeof _appFinanceCollectionsIndexRouteImport
+    '/__app/stock/$phoneLineId': {
+      id: '/__app/stock/$phoneLineId'
+      path: '/stock/$phoneLineId'
+      fullPath: '/stock/$phoneLineId'
+      preLoaderRoute: typeof _appStockPhoneLineIdRouteImport
+      parentRoute: typeof _appLayoutRoute
+    }
+    '/__app/tickets/': {
+      id: '/__app/tickets/'
+      path: '/tickets'
+      fullPath: '/tickets/'
+      preLoaderRoute: typeof _appTicketsIndexRouteImport
+      parentRoute: typeof _appLayoutRoute
+    }
+    '/__app/tickets/$ticketId': {
+      id: '/__app/tickets/$ticketId'
+      path: '/tickets/$ticketId'
+      fullPath: '/tickets/$ticketId'
+      preLoaderRoute: typeof _appTicketsTicketIdRouteImport
+      parentRoute: typeof _appLayoutRoute
+    }
+    '/__app/users/': {
+      id: '/__app/users/'
+      path: '/users'
+      fullPath: '/users/'
+      preLoaderRoute: typeof _appUsersIndexRouteImport
       parentRoute: typeof _appLayoutRoute
     }
     '/__app/audit/events/': {
@@ -1046,18 +920,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof _appAuditEventsIndexRouteImport
       parentRoute: typeof _appLayoutRoute
     }
-    '/__app/partner/commercial-sales/$saleId': {
-      id: '/__app/partner/commercial-sales/$saleId'
-      path: '/partner/commercial-sales/$saleId'
-      fullPath: '/partner/commercial-sales/$saleId'
-      preLoaderRoute: typeof _appPartnerCommercialSalesSaleIdRouteImport
+    '/__app/finance/collections/': {
+      id: '/__app/finance/collections/'
+      path: '/finance/collections'
+      fullPath: '/finance/collections/'
+      preLoaderRoute: typeof _appFinanceCollectionsIndexRouteImport
       parentRoute: typeof _appLayoutRoute
     }
-    '/__app/finance/invoice-layout-templates/$id': {
-      id: '/__app/finance/invoice-layout-templates/$id'
-      path: '/finance/invoice-layout-templates/$id'
-      fullPath: '/finance/invoice-layout-templates/$id'
-      preLoaderRoute: typeof _appFinanceInvoiceLayoutTemplatesIdRouteImport
+    '/__app/finance/customer-invoices/': {
+      id: '/__app/finance/customer-invoices/'
+      path: '/finance/customer-invoices'
+      fullPath: '/finance/customer-invoices/'
+      preLoaderRoute: typeof _appFinanceCustomerInvoicesIndexRouteImport
+      parentRoute: typeof _appLayoutRoute
+    }
+    '/__app/finance/customer-invoices/$id': {
+      id: '/__app/finance/customer-invoices/$id'
+      path: '/finance/customer-invoices/$id'
+      fullPath: '/finance/customer-invoices/$id'
+      preLoaderRoute: typeof _appFinanceCustomerInvoicesIdRouteImport
       parentRoute: typeof _appLayoutRoute
     }
     '/__app/finance/customer-invoices/bulk-generate': {
@@ -1067,11 +948,130 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof _appFinanceCustomerInvoicesBulkGenerateRouteImport
       parentRoute: typeof _appLayoutRoute
     }
-    '/__app/finance/customer-invoices/$id': {
-      id: '/__app/finance/customer-invoices/$id'
-      path: '/finance/customer-invoices/$id'
-      fullPath: '/finance/customer-invoices/$id'
-      preLoaderRoute: typeof _appFinanceCustomerInvoicesIdRouteImport
+    '/__app/finance/financial-agent/': {
+      id: '/__app/finance/financial-agent/'
+      path: '/finance/financial-agent'
+      fullPath: '/finance/financial-agent/'
+      preLoaderRoute: typeof _appFinanceFinancialAgentIndexRouteImport
+      parentRoute: typeof _appLayoutRoute
+    }
+    '/__app/finance/invoice-email-templates/': {
+      id: '/__app/finance/invoice-email-templates/'
+      path: '/finance/invoice-email-templates'
+      fullPath: '/finance/invoice-email-templates/'
+      preLoaderRoute: typeof _appFinanceInvoiceEmailTemplatesIndexRouteImport
+      parentRoute: typeof _appLayoutRoute
+    }
+    '/__app/finance/invoice-layout-templates/': {
+      id: '/__app/finance/invoice-layout-templates/'
+      path: '/finance/invoice-layout-templates'
+      fullPath: '/finance/invoice-layout-templates/'
+      preLoaderRoute: typeof _appFinanceInvoiceLayoutTemplatesIndexRouteImport
+      parentRoute: typeof _appLayoutRoute
+    }
+    '/__app/finance/invoice-layout-templates/$id': {
+      id: '/__app/finance/invoice-layout-templates/$id'
+      path: '/finance/invoice-layout-templates/$id'
+      fullPath: '/finance/invoice-layout-templates/$id'
+      preLoaderRoute: typeof _appFinanceInvoiceLayoutTemplatesIdRouteImport
+      parentRoute: typeof _appLayoutRoute
+    }
+    '/__app/finance/partner-sales/': {
+      id: '/__app/finance/partner-sales/'
+      path: '/finance/partner-sales'
+      fullPath: '/finance/partner-sales/'
+      preLoaderRoute: typeof _appFinancePartnerSalesIndexRouteImport
+      parentRoute: typeof _appLayoutRoute
+    }
+    '/__app/finance/payables/': {
+      id: '/__app/finance/payables/'
+      path: '/finance/payables'
+      fullPath: '/finance/payables/'
+      preLoaderRoute: typeof _appFinancePayablesIndexRouteImport
+      parentRoute: typeof _appLayoutRoute
+    }
+    '/__app/finance/receivables/': {
+      id: '/__app/finance/receivables/'
+      path: '/finance/receivables'
+      fullPath: '/finance/receivables/'
+      preLoaderRoute: typeof _appFinanceReceivablesIndexRouteImport
+      parentRoute: typeof _appLayoutRoute
+    }
+    '/__app/partner/commercial-sales/': {
+      id: '/__app/partner/commercial-sales/'
+      path: '/partner/commercial-sales'
+      fullPath: '/partner/commercial-sales/'
+      preLoaderRoute: typeof _appPartnerCommercialSalesIndexRouteImport
+      parentRoute: typeof _appLayoutRoute
+    }
+    '/__app/partner/commercial-sales/$saleId': {
+      id: '/__app/partner/commercial-sales/$saleId'
+      path: '/partner/commercial-sales/$saleId'
+      fullPath: '/partner/commercial-sales/$saleId'
+      preLoaderRoute: typeof _appPartnerCommercialSalesSaleIdRouteImport
+      parentRoute: typeof _appLayoutRoute
+    }
+    '/__app/partner/customers/': {
+      id: '/__app/partner/customers/'
+      path: '/partner/customers'
+      fullPath: '/partner/customers/'
+      preLoaderRoute: typeof _appPartnerCustomersIndexRouteImport
+      parentRoute: typeof _appLayoutRoute
+    }
+    '/__app/partner/financial/': {
+      id: '/__app/partner/financial/'
+      path: '/partner/financial'
+      fullPath: '/partner/financial/'
+      preLoaderRoute: typeof _appPartnerFinancialIndexRouteImport
+      parentRoute: typeof _appLayoutRoute
+    }
+    '/__app/partner/phone-lines/': {
+      id: '/__app/partner/phone-lines/'
+      path: '/partner/phone-lines'
+      fullPath: '/partner/phone-lines/'
+      preLoaderRoute: typeof _appPartnerPhoneLinesIndexRouteImport
+      parentRoute: typeof _appLayoutRoute
+    }
+    '/__app/partner/requests/': {
+      id: '/__app/partner/requests/'
+      path: '/partner/requests'
+      fullPath: '/partner/requests/'
+      preLoaderRoute: typeof _appPartnerRequestsIndexRouteImport
+      parentRoute: typeof _appLayoutRoute
+    }
+    '/__app/reports/line-consumption/': {
+      id: '/__app/reports/line-consumption/'
+      path: '/reports/line-consumption'
+      fullPath: '/reports/line-consumption/'
+      preLoaderRoute: typeof _appReportsLineConsumptionIndexRouteImport
+      parentRoute: typeof _appLayoutRoute
+    }
+    '/__app/reports/reconciliation/': {
+      id: '/__app/reports/reconciliation/'
+      path: '/reports/reconciliation'
+      fullPath: '/reports/reconciliation/'
+      preLoaderRoute: typeof _appReportsReconciliationIndexRouteImport
+      parentRoute: typeof _appLayoutRoute
+    }
+    '/__app/reports/transition-pending/': {
+      id: '/__app/reports/transition-pending/'
+      path: '/reports/transition-pending'
+      fullPath: '/reports/transition-pending/'
+      preLoaderRoute: typeof _appReportsTransitionPendingIndexRouteImport
+      parentRoute: typeof _appLayoutRoute
+    }
+    '/__app/sales/new/': {
+      id: '/__app/sales/new/'
+      path: '/sales/new'
+      fullPath: '/sales/new/'
+      preLoaderRoute: typeof _appSalesNewIndexRouteImport
+      parentRoute: typeof _appLayoutRoute
+    }
+    '/__app/stock/devices/': {
+      id: '/__app/stock/devices/'
+      path: '/stock/devices'
+      fullPath: '/stock/devices/'
+      preLoaderRoute: typeof _appStockDevicesIndexRouteImport
       parentRoute: typeof _appLayoutRoute
     }
     '/__app/partner/commercial-sales/new/': {

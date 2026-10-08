@@ -17,6 +17,7 @@ import (
 
 type AdminClient struct {
 	baseURL           string
+	publicURL         string
 	realm             string
 	adminUser         string
 	adminPass         string
@@ -33,6 +34,7 @@ type AdminClient struct {
 func NewAdminClient(cfg config.Config) *AdminClient {
 	return &AdminClient{
 		baseURL:      strings.TrimRight(cfg.KeycloakAuthServerURL, "/"),
+		publicURL:    strings.TrimRight(cfg.KeycloakPublicAuthServerURL, "/"),
 		realm:        cfg.KeycloakRealm,
 		adminUser:    cfg.KeycloakAdminUsername,
 		adminPass:    cfg.KeycloakAdminPassword,
@@ -46,10 +48,14 @@ func (c *AdminClient) Enabled() bool {
 }
 
 func (c *AdminClient) AccountSecurityURL() string {
-	if c.baseURL == "" || c.realm == "" {
+	base := c.publicURL
+	if base == "" {
+		base = c.baseURL
+	}
+	if base == "" || c.realm == "" {
 		return ""
 	}
-	return strings.TrimRight(c.baseURL, "/") + "/realms/" + c.realm + "/account/#/security/signingin"
+	return strings.TrimRight(base, "/") + "/realms/" + c.realm + "/account/#/security/signingin"
 }
 
 type UserRecord struct {

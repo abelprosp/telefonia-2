@@ -9,11 +9,7 @@ import { DataTable, DataTablePagination } from '@/components/data-table';
 import { ListPageHeader, ListPageSkeleton } from '@/components/list-page';
 import { PageWrapper } from '@/components/page-wrapper';
 import { Button } from '@/components/ui/button';
-import {
-  formatMoney,
-  formatSaleStatus,
-  useSales
-} from '@/lib/sales-api';
+import { formatMoney, formatSaleStatus, useSales } from '@/lib/sales-api';
 
 const searchSchema = z.object({
   page: z.number().int().min(1).catch(1),
@@ -83,14 +79,18 @@ function SalesListPage() {
 
   if (listQuery.isPending) {
     return (
-      <PageWrapper breadcrumbs={[{ label: 'Início', to: '/' }, { label: 'Vendas' }]}>
+      <PageWrapper
+        breadcrumbs={[{ label: 'Início', to: '/' }, { label: 'Vendas' }]}
+      >
         <ListPageSkeleton pageSize={pageSize} columns={SKELETON_COLUMNS} />
       </PageWrapper>
     );
   }
 
   return (
-    <PageWrapper breadcrumbs={[{ label: 'Início', to: '/' }, { label: 'Vendas' }]}>
+    <PageWrapper
+      breadcrumbs={[{ label: 'Início', to: '/' }, { label: 'Vendas' }]}
+    >
       <div className="flex flex-col gap-6 p-6">
         <ListPageHeader
           title="Vendas"
@@ -105,14 +105,33 @@ function SalesListPage() {
           }
         />
 
-        <DataTable columns={columns} data={listQuery.data?.items ?? []} getRowId={(r) => r.id} />
+        <DataTable
+          columns={columns}
+          data={listQuery.data?.items ?? []}
+          getRowId={(r) => r.id}
+        />
         <DataTablePagination
           page={page}
           pageSize={pageSize}
           total={total}
           totalPages={totalPages}
-          onPageChange={(next) => navigate({ search: (prev) => ({ ...prev, page: next }) })}
-          onPageSizeChange={(next) => navigate({ search: (prev) => ({ ...prev, pageSize: next, page: 1 }) })}
+          onPageChange={(next) =>
+            navigate({
+              search: (prev: z.infer<typeof searchSchema>) => ({
+                ...prev,
+                page: next
+              })
+            })
+          }
+          onPageSizeChange={(next) =>
+            navigate({
+              search: (prev: z.infer<typeof searchSchema>) => ({
+                ...prev,
+                pageSize: next,
+                page: 1
+              })
+            })
+          }
         />
       </div>
     </PageWrapper>

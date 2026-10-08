@@ -87,7 +87,9 @@ function ReceivablesPage() {
         header: 'Mês proc.',
         cell: ({ row }) =>
           row.original.processing_month_id ? (
-            <span className="text-sm">{row.original.processing_month_id.slice(0, 8)}…</span>
+            <span className="text-sm">
+              {row.original.processing_month_id.slice(0, 8)}…
+            </span>
           ) : (
             '—'
           )
@@ -95,7 +97,8 @@ function ReceivablesPage() {
       {
         accessorKey: 'due_date',
         header: 'Vencimento',
-        cell: ({ row }) => new Date(row.original.due_date).toLocaleDateString('pt-BR')
+        cell: ({ row }) =>
+          new Date(row.original.due_date).toLocaleDateString('pt-BR')
       },
       {
         accessorKey: 'amount',
@@ -132,7 +135,9 @@ function ReceivablesPage() {
                     });
                   },
                   onError: (e) =>
-                    toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+                    toast.error(
+                      isApiHttpError(e) ? e.message : getErrorMessage(e)
+                    )
                 }
               );
             }}
@@ -160,7 +165,9 @@ function ReceivablesPage() {
                   {
                     onSuccess: () => toast.success('Recebimento registrado.'),
                     onError: (e) =>
-                      toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+                      toast.error(
+                        isApiHttpError(e) ? e.message : getErrorMessage(e)
+                      )
                   }
                 );
               }}
@@ -179,7 +186,16 @@ function ReceivablesPage() {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   if (listQuery.isPending) {
-    return <ListPageSkeleton pageSize={pageSize} columns={[{ header: 'A', cell: 'text' }, { header: 'B', cell: 'text' }, { header: 'C', cell: 'text' }]} />;
+    return (
+      <ListPageSkeleton
+        pageSize={pageSize}
+        columns={[
+          { header: 'A', cell: 'text' },
+          { header: 'B', cell: 'text' },
+          { header: 'C', cell: 'text' }
+        ]}
+      />
+    );
   }
 
   return (
@@ -194,14 +210,30 @@ function ReceivablesPage() {
           </Button>
         }
       />
-      <DataTable columns={columns} data={listQuery.data?.items ?? []} getRowId={(r) => r.id} />
+      <DataTable
+        columns={columns}
+        data={listQuery.data?.items ?? []}
+        getRowId={(r) => r.id}
+      />
       <DataTablePagination
         page={page}
         pageSize={pageSize}
         total={total}
         totalPages={totalPages}
-        onPageChange={(next) => navigate({ search: (p) => ({ ...p, page: next }) })}
-        onPageSizeChange={(next) => navigate({ search: (p) => ({ ...p, page: 1, pageSize: next }) })}
+        onPageChange={(next) =>
+          navigate({
+            search: (p: z.infer<typeof searchSchema>) => ({ ...p, page: next })
+          })
+        }
+        onPageSizeChange={(next) =>
+          navigate({
+            search: (p: z.infer<typeof searchSchema>) => ({
+              ...p,
+              page: 1,
+              pageSize: next
+            })
+          })
+        }
       />
 
       <Sheet open={createOpen} onOpenChange={setCreateOpen}>
@@ -212,11 +244,20 @@ function ReceivablesPage() {
           <div className="space-y-3 px-4">
             <div>
               <Label>Cliente</Label>
-              <Select value={form.customer_id} onValueChange={(v) => setForm({ ...form, customer_id: v ?? '' })}>
-                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+              <Select
+                value={form.customer_id}
+                onValueChange={(v) =>
+                  setForm({ ...form, customer_id: v ?? '' })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
                 <SelectContent>
                   {(customersQuery.data?.items ?? []).map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -243,21 +284,43 @@ function ReceivablesPage() {
             </div>
             <div>
               <Label>Descrição</Label>
-              <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+              <Input
+                value={form.description}
+                onChange={(e) =>
+                  setForm({ ...form, description: e.target.value })
+                }
+              />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Emissão</Label>
-                <Input type="date" value={form.issue_date} onChange={(e) => setForm({ ...form, issue_date: e.target.value })} />
+                <Input
+                  type="date"
+                  value={form.issue_date}
+                  onChange={(e) =>
+                    setForm({ ...form, issue_date: e.target.value })
+                  }
+                />
               </div>
               <div>
                 <Label>Vencimento</Label>
-                <Input type="date" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} />
+                <Input
+                  type="date"
+                  value={form.due_date}
+                  onChange={(e) =>
+                    setForm({ ...form, due_date: e.target.value })
+                  }
+                />
               </div>
             </div>
             <div>
               <Label>Valor</Label>
-              <Input type="number" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
+              <Input
+                type="number"
+                step="0.01"
+                value={form.amount}
+                onChange={(e) => setForm({ ...form, amount: e.target.value })}
+              />
             </div>
           </div>
           <SheetFooter>
@@ -280,7 +343,9 @@ function ReceivablesPage() {
                       setCreateOpen(false);
                     },
                     onError: (e) =>
-                      toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+                      toast.error(
+                        isApiHttpError(e) ? e.message : getErrorMessage(e)
+                      )
                   }
                 )
               }

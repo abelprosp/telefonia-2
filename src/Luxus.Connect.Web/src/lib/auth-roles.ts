@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 
 import { useAuth } from 'react-oidc-context';
 
+import { env } from '@/env';
 import { decode } from '@/lib/jwt';
 import { type TokenPayload } from '@/types/auth';
 
@@ -45,9 +46,7 @@ function rolesFromAccessToken(token: string | undefined): string[] {
 
   const fromClaim = payload.roles ?? [];
   const fromRealm = payload.realm_access?.roles ?? [];
-  const fromClient = Object.values(payload.resource_access ?? {}).flatMap(
-    (entry) => entry.roles ?? []
-  );
+  const fromClient = payload.resource_access?.[env.VITE_CLIENT_ID]?.roles ?? [];
 
   return [
     ...new Set(
@@ -131,7 +130,11 @@ export function roleLabel(roles: Pick<AuthRoleState, 'profile'>) {
   return profileLabel(roles.profile);
 }
 
-export const PROFILE_OPTIONS: { value: UserProfile; label: string; description: string }[] = [
+export const PROFILE_OPTIONS: {
+  value: UserProfile;
+  label: string;
+  description: string;
+}[] = [
   {
     value: 'master',
     label: 'Master',
@@ -140,7 +143,8 @@ export const PROFILE_OPTIONS: { value: UserProfile; label: string; description: 
   {
     value: 'employee',
     label: 'Funcionário',
-    description: 'Operação: clientes, linhas, faturamento e vendas (sem financeiro)'
+    description:
+      'Operação: clientes, linhas, faturamento e vendas (sem financeiro)'
   },
   {
     value: 'operator',

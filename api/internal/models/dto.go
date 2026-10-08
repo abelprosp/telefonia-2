@@ -145,6 +145,7 @@ type UpdateCustomerInput struct {
 }
 
 type ListCustomerResponse struct {
+	ResponsibleSalespersonName   *string                      `json:"responsible_salesperson_name,omitempty"`
 	Profile                      *CustomerRegistrationProfile `json:"profile,omitempty"`
 	Addresses                    []CreateCustomerAddressInput `json:"addresses,omitempty"`
 	ID                           string                       `json:"id"`
@@ -320,18 +321,18 @@ type BulkCreateStockPhoneLineItemInput struct {
 
 type BulkCreateStockPhoneLinesInput struct {
 	// Shared attributes applied when item-level fields are omitted.
-	ProviderID            string                             `json:"provider_id"`
-	ProviderAccountNumber string                             `json:"provider_account_number"`
-	ProviderPlanID        string                             `json:"provider_plan_id"`
+	ProviderID            string                              `json:"provider_id"`
+	ProviderAccountNumber string                              `json:"provider_account_number"`
+	ProviderPlanID        string                              `json:"provider_plan_id"`
 	Lines                 []BulkCreateStockPhoneLineItemInput `json:"lines"`
 }
 
 type BulkCreateStockPhoneLineItemResult struct {
-	Index   int                       `json:"index"`
-	Number  string                    `json:"number"`
-	Status  string                    `json:"status"` // created | ignored | rejected
-	Reason  string                    `json:"reason,omitempty"`
-	Line    *GetPhoneLineResponse     `json:"line,omitempty"`
+	Index  int                   `json:"index"`
+	Number string                `json:"number"`
+	Status string                `json:"status"` // created | ignored | rejected
+	Reason string                `json:"reason,omitempty"`
+	Line   *GetPhoneLineResponse `json:"line,omitempty"`
 }
 
 type BulkCreateStockPhoneLinesResponse struct {
@@ -916,11 +917,11 @@ type RegisterFinancialPaymentInput struct {
 
 // ManualCashPaymentInput registers an in-person payment (cash / presencial).
 type ManualCashPaymentInput struct {
-	PaymentDate   *string `json:"payment_date,omitempty"`
+	PaymentDate   *string  `json:"payment_date,omitempty"`
 	Amount        *float64 `json:"amount,omitempty"`
-	PaymentMethod *string `json:"payment_method,omitempty"` // cash | pix_presencial | card_presencial
-	Notes         *string `json:"notes,omitempty"`
-	Reference     *string `json:"reference,omitempty"`
+	PaymentMethod *string  `json:"payment_method,omitempty"` // cash | pix_presencial | card_presencial
+	Notes         *string  `json:"notes,omitempty"`
+	Reference     *string  `json:"reference,omitempty"`
 }
 
 type ManualCashPaymentResponse struct {
@@ -1760,6 +1761,10 @@ type OrganizationSettingsResponse struct {
 	UpdatedBy      *string               `json:"updated_by,omitempty"`
 }
 
+type PublicOrganizationBrandingResponse struct {
+	Whitelabel WhitelabelSettingsDto `json:"whitelabel"`
+}
+
 type UpdateCompanySettingsInput struct {
 	CompanyName       *string `json:"company_name,omitempty"`
 	TradingName       *string `json:"trading_name,omitempty"`
@@ -2335,22 +2340,22 @@ type CommentDivergenceInput struct {
 }
 
 type LineConsumptionReportItem struct {
-	PhoneLineID          string   `json:"phone_line_id"`
-	PhoneNumber          string   `json:"phone_number"`
-	ProviderID           string   `json:"provider_id"`
-	ProviderName         string   `json:"provider_name"`
-	CustomerID           *string  `json:"customer_id,omitempty"`
-	CustomerName         *string  `json:"customer_name,omitempty"`
-	ProcessingMonthID    string   `json:"processing_month_id"`
-	ProcessingMonthName  string   `json:"processing_month_name"`
-	Year                 int      `json:"year"`
-	Month                int      `json:"month"`
-	Status               string   `json:"status"`
-	BaseCost             *float64 `json:"base_cost,omitempty"`
-	CostWithConsumption  *float64 `json:"cost_with_consumption,omitempty"`
-	InvoiceID            string   `json:"invoice_id"`
-	InvoiceNumber        *string  `json:"invoice_number,omitempty"`
-	InvoiceTotal         float64  `json:"invoice_total"`
+	PhoneLineID         string   `json:"phone_line_id"`
+	PhoneNumber         string   `json:"phone_number"`
+	ProviderID          string   `json:"provider_id"`
+	ProviderName        string   `json:"provider_name"`
+	CustomerID          *string  `json:"customer_id,omitempty"`
+	CustomerName        *string  `json:"customer_name,omitempty"`
+	ProcessingMonthID   string   `json:"processing_month_id"`
+	ProcessingMonthName string   `json:"processing_month_name"`
+	Year                int      `json:"year"`
+	Month               int      `json:"month"`
+	Status              string   `json:"status"`
+	BaseCost            *float64 `json:"base_cost,omitempty"`
+	CostWithConsumption *float64 `json:"cost_with_consumption,omitempty"`
+	InvoiceID           string   `json:"invoice_id"`
+	InvoiceNumber       *string  `json:"invoice_number,omitempty"`
+	InvoiceTotal        float64  `json:"invoice_total"`
 }
 
 type LineConsumptionReportResponse struct {
@@ -2360,18 +2365,18 @@ type LineConsumptionReportResponse struct {
 }
 
 type ReconciliationFindingResponse struct {
-	ID                string  `json:"id,omitempty"`
-	FindingType       string  `json:"finding_type"`
-	PhoneLineID       *string `json:"phone_line_id,omitempty"`
-	NormalizedNumber  string  `json:"normalized_number"`
-	InternalStatus    *string `json:"internal_status,omitempty"`
-	ExternalStatus    *string `json:"external_status,omitempty"`
-	CustomerID        *string `json:"customer_id,omitempty"`
-	CustomerName      *string `json:"customer_name,omitempty"`
-	ProviderName      *string `json:"provider_name,omitempty"`
-	ImportJobID       *string `json:"import_job_id,omitempty"`
-	IsInconclusive    bool    `json:"is_inconclusive"`
-	Evidence          string  `json:"evidence,omitempty"`
+	ID               string  `json:"id,omitempty"`
+	FindingType      string  `json:"finding_type"`
+	PhoneLineID      *string `json:"phone_line_id,omitempty"`
+	NormalizedNumber string  `json:"normalized_number"`
+	InternalStatus   *string `json:"internal_status,omitempty"`
+	ExternalStatus   *string `json:"external_status,omitempty"`
+	CustomerID       *string `json:"customer_id,omitempty"`
+	CustomerName     *string `json:"customer_name,omitempty"`
+	ProviderName     *string `json:"provider_name,omitempty"`
+	ImportJobID      *string `json:"import_job_id,omitempty"`
+	IsInconclusive   bool    `json:"is_inconclusive"`
+	Evidence         string  `json:"evidence,omitempty"`
 }
 
 type DomainAuditEventResponse struct {
@@ -2390,14 +2395,14 @@ type DomainAuditEventResponse struct {
 }
 
 type ExternalLineImportJobInput struct {
-	Source            string  `json:"source"`
-	ProviderID        *string `json:"provider_id,omitempty"`
-	StorageBucket     string  `json:"storage_bucket"`
-	StorageObjectKey  string  `json:"storage_object_key"`
-	FileName          *string `json:"file_name,omitempty"`
-	LayoutCode        string  `json:"layout_code"`
-	ReferencePeriod   *string `json:"reference_period,omitempty"`
-	IsPartialSource   bool    `json:"is_partial_source"`
+	Source           string  `json:"source"`
+	ProviderID       *string `json:"provider_id,omitempty"`
+	StorageBucket    string  `json:"storage_bucket"`
+	StorageObjectKey string  `json:"storage_object_key"`
+	FileName         *string `json:"file_name,omitempty"`
+	LayoutCode       string  `json:"layout_code"`
+	ReferencePeriod  *string `json:"reference_period,omitempty"`
+	IsPartialSource  bool    `json:"is_partial_source"`
 }
 
 type ExternalLineImportJobResponse struct {

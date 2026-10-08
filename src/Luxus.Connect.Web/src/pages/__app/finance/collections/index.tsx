@@ -28,7 +28,10 @@ export const Route = createFileRoute('/__app/finance/collections/')({
 function CollectionsPage() {
   const { page, pageSize } = Route.useSearch();
   const navigate = Route.useNavigate();
-  const listQuery = useOverdueReceivables({ page_index: page - 1, page_size: pageSize });
+  const listQuery = useOverdueReceivables({
+    page_index: page - 1,
+    page_size: pageSize
+  });
   const remindMutation = useSendCollectionReminder();
 
   const sendReminder = async (receivableId: string, level: number) => {
@@ -54,7 +57,8 @@ function CollectionsPage() {
     {
       accessorKey: 'due_date',
       header: 'Vencimento',
-      cell: ({ row }) => new Date(row.original.due_date).toLocaleDateString('pt-BR')
+      cell: ({ row }) =>
+        new Date(row.original.due_date).toLocaleDateString('pt-BR')
     },
     { accessorKey: 'billing_email', header: 'E-mail cobrança' },
     {
@@ -69,7 +73,9 @@ function CollectionsPage() {
           size="sm"
           variant="outline"
           disabled={!row.original.billing_email || remindMutation.isPending}
-          onClick={() => void sendReminder(row.original.id, row.original.reminders_sent + 1)}
+          onClick={() =>
+            void sendReminder(row.original.id, row.original.reminders_sent + 1)
+          }
         >
           <Mail className="mr-1 size-4" />
           Enviar cobrança
@@ -79,7 +85,15 @@ function CollectionsPage() {
   ];
 
   if (listQuery.isPending) {
-    return <ListPageSkeleton pageSize={pageSize} columns={[{ header: 'A', cell: 'text' }, { header: 'B', cell: 'text' }]} />;
+    return (
+      <ListPageSkeleton
+        pageSize={pageSize}
+        columns={[
+          { header: 'A', cell: 'text' },
+          { header: 'B', cell: 'text' }
+        ]}
+      />
+    );
   }
 
   const total = listQuery.data?.totalCount ?? 0;
@@ -91,15 +105,29 @@ function CollectionsPage() {
         title="Inadimplentes"
         description="Clientes com contas a receber vencidas — envie lembretes por e-mail"
       />
-      <DataTable columns={columns} data={listQuery.data?.items ?? []} getRowId={(r) => r.id} />
+      <DataTable
+        columns={columns}
+        data={listQuery.data?.items ?? []}
+        getRowId={(r) => r.id}
+      />
       <DataTablePagination
         page={page}
         pageSize={pageSize}
         total={total}
         totalPages={totalPages}
-        onPageChange={(p) => void navigate({ search: (s) => ({ ...s, page: p }) })}
+        onPageChange={(p) =>
+          void navigate({
+            search: (s: z.infer<typeof searchSchema>) => ({ ...s, page: p })
+          })
+        }
         onPageSizeChange={(ps) =>
-          void navigate({ search: (s) => ({ ...s, page: 1, pageSize: ps }) })
+          void navigate({
+            search: (s: z.infer<typeof searchSchema>) => ({
+              ...s,
+              page: 1,
+              pageSize: ps
+            })
+          })
         }
       />
     </div>

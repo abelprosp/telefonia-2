@@ -22,4 +22,6 @@ para a origem do Vite.
 
 ## shadcn/ui
 
-Configuração em `components.json`. Adicionar componentes: `npx shadcn@latest add <nome>`.
+Configuração em `components.json`. Os componentes Base UI e suas variantes CSS são mantidos localmente; o CLI shadcn não faz parte das dependências da aplicação.
+
+Veja [as correções e os passos de produção](../../docs/SECURITY_HARDENING.md). Para validar a sanitização dos contratos, execute `npm run test:security`.

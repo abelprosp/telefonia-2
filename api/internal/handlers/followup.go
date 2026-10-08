@@ -138,7 +138,7 @@ func (h *Handler) writeTicketAttachmentUploadURL(w http.ResponseWriter, r *http.
 		httputil.HandleServiceError(w, err)
 		return
 	}
-	result, err := h.Presigned.CreateUploadURL(r.Context(), models.CreatePresignedUploadURLInput{
+	result, err := h.Presigned.CreateAuthorizedUploadURL(r.Context(), models.CreatePresignedUploadURLInput{
 		BucketName:       input.BucketName,
 		ObjectKey:        key,
 		ContentType:      input.ContentType,
@@ -181,7 +181,7 @@ func (h *Handler) writeTicketAttachmentDownload(w http.ResponseWriter, r *http.R
 		httputil.WriteFail(w, http.StatusBadRequest, notifications.ImportStorageBucketRequired)
 		return
 	}
-	result, err := h.Presigned.CreateDownloadURL(r.Context(), models.CreatePresignedDownloadURLInput{
+	result, err := h.Presigned.CreateAuthorizedDownloadURL(r.Context(), models.CreatePresignedDownloadURLInput{
 		BucketName: bucket,
 		ObjectKey:  strings.TrimSpace(*msg.AttachmentKey),
 	})

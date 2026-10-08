@@ -1,5 +1,14 @@
 import { Link } from '@tanstack/react-router';
-import { ArrowDownCircle, ArrowUpCircle, FileText, Handshake, Layers, Mail, MessageCircle, Wallet } from 'lucide-react';
+import {
+  ArrowDownCircle,
+  ArrowUpCircle,
+  FileText,
+  Handshake,
+  Layers,
+  Mail,
+  MessageCircle,
+  Wallet
+} from 'lucide-react';
 
 import { DashboardMetricCard } from '../../-components/dashboard/dashboard-metric-card';
 
@@ -13,14 +22,15 @@ import {
   TableRow
 } from '@/components/ui/table';
 import { getErrorMessage, isApiHttpError } from '@/lib/api-error';
+import { useAuthRoles } from '@/lib/auth-roles';
 import { formatMoney, useFinancialSummary } from '@/lib/financial-api';
 import {
   useCustomerProfitabilityReport,
   useFinancialSummaryReport
 } from '@/lib/ops-api';
 
-
 export function FinanceDashboardView() {
+  const { canAccessOperations } = useAuthRoles();
   const summaryQuery = useFinancialSummary();
   const reportQuery = useFinancialSummaryReport();
   const profitabilityQuery = useCustomerProfitabilityReport();
@@ -149,9 +159,12 @@ export function FinanceDashboardView() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Financeiro</h1>
+        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+          Financeiro
+        </h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          Controle financeiro integrado ao faturamento e refaturamento da operação
+          Controle financeiro integrado ao faturamento e refaturamento da
+          operação
         </p>
       </div>
       <div>
@@ -164,16 +177,18 @@ export function FinanceDashboardView() {
           ))}
         </div>
       </div>
-      <div>
-        <h2 className="text-muted-foreground mb-3 text-xs font-semibold tracking-wide uppercase">
-          Faturamento e refaturamento
-        </h2>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {billingMetrics.map((m) => (
-            <DashboardMetricCard key={m.title} {...m} />
-          ))}
+      {canAccessOperations && (
+        <div>
+          <h2 className="text-muted-foreground mb-3 text-xs font-semibold tracking-wide uppercase">
+            Faturamento e refaturamento
+          </h2>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {billingMetrics.map((m) => (
+              <DashboardMetricCard key={m.title} {...m} />
+            ))}
+          </div>
         </div>
-      </div>
+      )}
       <div>
         <h2 className="text-muted-foreground mb-3 text-xs font-semibold tracking-wide uppercase">
           Envio de faturas e cobrança
@@ -240,35 +255,46 @@ export function FinanceDashboardView() {
           >
             Vendas de parceiros
           </Link>
-          <Link
-            to="/invoices"
-            search={{ page: 1, pageSize: 10, processingMonthId: undefined }}
-            className="text-primary text-sm font-medium hover:underline"
-          >
-            Faturas da operadora
-          </Link>
-          <Link
-            to="/processing-months"
-            search={{ page: 1, pageSize: 10 }}
-            className="text-primary text-sm font-medium hover:underline"
-          >
-            Meses de processamento
-          </Link>
+          {canAccessOperations && (
+            <>
+              <Link
+                to="/invoices"
+                search={{ page: 1, pageSize: 10, processingMonthId: undefined }}
+                className="text-primary text-sm font-medium hover:underline"
+              >
+                Faturas da operadora
+              </Link>
+              <Link
+                to="/processing-months"
+                search={{ page: 1, pageSize: 10 }}
+                className="text-primary text-sm font-medium hover:underline"
+              >
+                Meses de processamento
+              </Link>
+            </>
+          )}
         </div>
       </div>
 
-      <div className="dashboard-card overflow-hidden">
+      <div
+        id="financial-summary"
+        className="dashboard-card scroll-mt-20 overflow-hidden"
+      >
         <div className="border-b px-5 py-4">
-          <h3 className="text-lg font-semibold">Resumo financeiro por cliente</h3>
+          <h3 className="text-lg font-semibold">
+            Resumo financeiro por cliente
+          </h3>
           <p className="text-muted-foreground text-sm">
-            GET /v1/reports/financial-summary — receita, custo e margem.
+            Receita, custo e margem por cliente.
             {reportQuery.data
               ? ` Total margem ${formatMoney(reportQuery.data.total_margin)}.`
               : ''}
           </p>
         </div>
         {reportQuery.isPending ? (
-          <p className="text-muted-foreground p-5 text-sm">Carregando resumo…</p>
+          <p className="text-muted-foreground p-5 text-sm">
+            Carregando resumo…
+          </p>
         ) : (
           <Table>
             <TableHeader>
@@ -283,12 +309,19 @@ export function FinanceDashboardView() {
             <TableBody>
               {(reportQuery.data?.items ?? []).slice(0, 12).map((row) => (
                 <TableRow key={row.customer_id}>
-                  <TableCell className="font-medium">{row.customer_name}</TableCell>
+                  <TableCell className="font-medium">
+                    {row.customer_name}
+                  </TableCell>
                   <TableCell>{row.lines_count}</TableCell>
-                  <TableCell className="text-right">{formatMoney(row.total_gross_revenue)}</TableCell>
-                  <TableCell className="text-right">{formatMoney(row.total_operator_cost)}</TableCell>
                   <TableCell className="text-right">
-                    {formatMoney(row.gross_margin)} ({row.margin_percentage.toFixed(1)}%)
+                    {formatMoney(row.total_gross_revenue)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {formatMoney(row.total_operator_cost)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {formatMoney(row.gross_margin)} (
+                    {row.margin_percentage.toFixed(1)}%)
                   </TableCell>
                 </TableRow>
               ))}
@@ -297,13 +330,20 @@ export function FinanceDashboardView() {
         )}
       </div>
 
-      <div className="dashboard-card overflow-hidden">
+      <div
+        id="profitability"
+        className="dashboard-card scroll-mt-20 overflow-hidden"
+      >
         <div className="border-b px-5 py-4">
           <h3 className="text-lg font-semibold">Rentabilidade por cliente</h3>
-          <p className="text-muted-foreground text-sm">GET /v1/reports/customer-profitability</p>
+          <p className="text-muted-foreground text-sm">
+            Compare a receita e a margem dos clientes.
+          </p>
         </div>
         {profitabilityQuery.isPending ? (
-          <p className="text-muted-foreground p-5 text-sm">Carregando rentabilidade…</p>
+          <p className="text-muted-foreground p-5 text-sm">
+            Carregando rentabilidade…
+          </p>
         ) : (
           <Table>
             <TableHeader>
@@ -315,16 +355,23 @@ export function FinanceDashboardView() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {(profitabilityQuery.data?.items ?? []).slice(0, 12).map((row) => (
-                <TableRow key={row.customer_id}>
-                  <TableCell className="font-medium">{row.customer_name}</TableCell>
-                  <TableCell>{formatMoney(row.average_ticket)}</TableCell>
-                  <TableCell className="text-right">{formatMoney(row.gross_revenue)}</TableCell>
-                  <TableCell className="text-right">
-                    {formatMoney(row.margin)} ({row.margin_percentage.toFixed(1)}%)
-                  </TableCell>
-                </TableRow>
-              ))}
+              {(profitabilityQuery.data?.items ?? [])
+                .slice(0, 12)
+                .map((row) => (
+                  <TableRow key={row.customer_id}>
+                    <TableCell className="font-medium">
+                      {row.customer_name}
+                    </TableCell>
+                    <TableCell>{formatMoney(row.average_ticket)}</TableCell>
+                    <TableCell className="text-right">
+                      {formatMoney(row.gross_revenue)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {formatMoney(row.margin)} (
+                      {row.margin_percentage.toFixed(1)}%)
+                    </TableCell>
+                  </TableRow>
+                ))}
             </TableBody>
           </Table>
         )}

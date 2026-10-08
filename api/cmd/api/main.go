@@ -17,6 +17,7 @@ import (
 	"github.com/luxus-connect/telefonia/api/internal/config"
 	"github.com/luxus-connect/telefonia/api/internal/email"
 	"github.com/luxus-connect/telefonia/api/internal/handlers"
+	"github.com/luxus-connect/telefonia/api/internal/httputil"
 	"github.com/luxus-connect/telefonia/api/internal/importservice"
 	"github.com/luxus-connect/telefonia/api/internal/keycloak"
 	"github.com/luxus-connect/telefonia/api/internal/messaging"
@@ -34,6 +35,10 @@ func main() {
 	slog.SetDefault(logger)
 
 	cfg := config.Load()
+	if err := cfg.Validate(); err != nil {
+		logger.Error("invalid configuration", "error", err)
+		os.Exit(1)
+	}
 	storage.ConfigureMaxObjectBytes(cfg.ObjectStorageMaxObjectBytes)
 	storage.ConfigureMaxDiskObjectBytes(cfg.ObjectStorageMaxDiskObjectBytes)
 
@@ -147,7 +152,7 @@ func main() {
 		if err != nil {
 			logger.Warn("object storage unavailable", "error", err)
 		} else {
-			presigned = &services.PresignedService{Storage: s3Client}
+			presigned = &services.PresignedService{Storage: s3Client, BucketName: cfg.ObjectStorageBucketName}
 			processor := &importservice.Processor{Store: st, Storage: s3Client, Log: logger, SM: svc.StateMachine}
 			svc.Processor = processor
 
@@ -246,6 +251,8 @@ func main() {
 	r.Use(middleware.RealIP)
 	r.Use(observability.StructuredLoggerMiddleware(logger))
 	r.Use(middleware.Recoverer)
+	r.Use(middleware.ThrottleBacklog(64, 128, 5*time.Second))
+	r.Use(httputil.RequestBodyLimit(2 << 20))
 
 	if len(cfg.CORSOrigins) > 0 {
 		r.Use(cors.Handler(cors.Options{
@@ -260,12 +267,14 @@ func main() {
 
 	r.Get("/health", healthChecker.ReadinessHandler())
 	r.Get("/health/live", observability.LivenessHandler())
-	r.Get("/metrics/operations", observability.MetricsHandler())
+	r.With(authMW.Authenticate, authMW.RequireMaster).Get("/metrics/operations", observability.MetricsHandler())
 
 	h.RegisterRoutes(r, authMW.Authenticate, authMW.OptionalAuthenticate, authMW.RequireOperational, authMW.RequireFinancialAccess, authMW.RequireMaster, authMW.RequirePartner)
 
 	addr := fmt.Sprintf(":%s", cfg.Port)
-	server := &http.Server{Addr: addr, Handler: r, ReadHeaderTimeout: 10 * time.Second}
+	server := &http.Server{Addr: addr, Handler: r, ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout: 30 * time.Second, WriteTimeout: 5 * time.Minute, IdleTimeout: 60 * time.Second,
+		MaxHeaderBytes: 1 << 20}
 
 	go func() {
 		logger.Info("server starting", "addr", addr, "environment", cfg.Environment)

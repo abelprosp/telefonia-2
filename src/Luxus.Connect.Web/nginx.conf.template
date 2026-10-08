@@ -6,7 +6,7 @@ server {
 
     gzip on;
     gzip_types text/css application/javascript application/json image/svg+xml;
-    client_max_body_size 50M;
+    client_max_body_size 2M;
 
     location = /auth {
         return 301 /auth/;
@@ -66,7 +66,11 @@ server {
         add_header Cache-Control "public, immutable";
     }
 
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
     location / {
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; font-src 'self'; connect-src 'self' https:; frame-src 'self' https:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" always;
         try_files $uri $uri/ /index.html;
     }
 }

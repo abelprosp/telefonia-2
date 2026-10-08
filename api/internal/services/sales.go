@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"html"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -15,7 +16,14 @@ import (
 	"github.com/luxus-connect/telefonia/api/internal/notifications"
 	"github.com/luxus-connect/telefonia/api/internal/store"
 	"github.com/luxus-connect/telefonia/api/internal/zapsign"
+	"github.com/microcosm-cc/bluemonday"
 )
+
+var contractHTMLPolicy = bluemonday.UGCPolicy()
+
+func sanitizeContractHTML(body string) string {
+	return contractHTMLPolicy.Sanitize(body)
+}
 
 var validSaleLineItemTypes = map[string]struct{}{
 	"phone_line": {},
@@ -61,7 +69,7 @@ func (s *Service) CreateContractTemplate(ctx context.Context, input models.Creat
 	}
 	name := strings.TrimSpace(input.Name)
 	code := strings.ToLower(strings.TrimSpace(input.Code))
-	body := strings.TrimSpace(input.BodyTemplate)
+	body := sanitizeContractHTML(strings.TrimSpace(input.BodyTemplate))
 	if name == "" {
 		return nil, httputil.ValidationError(notifications.ContractTemplateNameRequired)
 	}
@@ -129,7 +137,7 @@ func (s *Service) UpdateContractTemplate(ctx context.Context, id string, input m
 		code = &c
 	}
 	if input.BodyTemplate != nil {
-		b := strings.TrimSpace(*input.BodyTemplate)
+		b := sanitizeContractHTML(strings.TrimSpace(*input.BodyTemplate))
 		body = &b
 	}
 	now := time.Now().UTC()
@@ -634,9 +642,12 @@ func renderContractTemplate(body string, customer *store.CustomerContractData, s
 	}
 	out := body
 	for k, v := range replacements {
+		if k != "{{sale.items_table}}" {
+			v = html.EscapeString(v)
+		}
 		out = strings.ReplaceAll(out, k, v)
 	}
-	return out
+	return sanitizeContractHTML(out)
 }
 
 func derefString(v *string, fallback string) string {
@@ -717,11 +728,7 @@ func buildItemsTableHTML(items []models.SaleLineItemResponse) string {
 }
 
 func htmlEscape(s string) string {
-	s = strings.ReplaceAll(s, "&", "&amp;")
-	s = strings.ReplaceAll(s, "<", "&lt;")
-	s = strings.ReplaceAll(s, ">", "&gt;")
-	s = strings.ReplaceAll(s, `"`, "&quot;")
-	return s
+	return html.EscapeString(s)
 }
 
 func salespersonDisplayName(u *auth.User) string {
@@ -776,6 +783,7 @@ func (s *Service) GenerateContractForCustomer(ctx context.Context, customerID st
 	}
 
 	var pdfURL *string = template.PdfBaseURL
+	renderedHTML = sanitizeContractHTML(renderedHTML)
 	var pdfKey *string = template.PdfStorageKey
 
 	if err := s.Store.SaveCustomerGeneratedContract(ctx, contractID, orgID, customerID, template.ID, sigMethod, pdfURL, pdfKey, &renderedHTML, now); err != nil {

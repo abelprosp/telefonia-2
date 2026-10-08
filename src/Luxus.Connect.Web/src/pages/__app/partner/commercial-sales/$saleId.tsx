@@ -5,6 +5,7 @@ import { PageWrapper } from '@/components/page-wrapper';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getErrorMessage, isApiHttpError } from '@/lib/api-error';
+import { sanitizeContractHtml } from '@/lib/safe-html';
 import {
   formatLineItemType,
   formatMoney,
@@ -14,9 +15,11 @@ import {
   usePartnerConfirmSale
 } from '@/lib/sales-api';
 
-export const Route = createFileRoute('/__app/partner/commercial-sales/$saleId')({
-  component: PartnerSaleDetailPage
-});
+export const Route = createFileRoute('/__app/partner/commercial-sales/$saleId')(
+  {
+    component: PartnerSaleDetailPage
+  }
+);
 
 function PartnerSaleDetailPage() {
   const { saleId } = Route.useParams();
@@ -28,8 +31,15 @@ function PartnerSaleDetailPage() {
 
   if (saleQuery.isLoading || !sale) {
     return (
-      <PageWrapper breadcrumbs={[{ label: 'Parceiro', to: '/partner' }, { label: 'Vendas', to: '/partner/commercial-sales' }]}>
-        <p className="p-6">{saleQuery.isLoading ? 'Carregando…' : 'Venda não encontrada.'}</p>
+      <PageWrapper
+        breadcrumbs={[
+          { label: 'Parceiro', to: '/partner' },
+          { label: 'Vendas', to: '/partner/commercial-sales' }
+        ]}
+      >
+        <p className="p-6">
+          {saleQuery.isLoading ? 'Carregando…' : 'Venda não encontrada.'}
+        </p>
       </PageWrapper>
     );
   }
@@ -47,7 +57,8 @@ function PartnerSaleDetailPage() {
           <div>
             <h1 className="text-2xl font-semibold">{sale.sale_number}</h1>
             <p className="text-muted-foreground">
-              {sale.customer_name} · {formatSaleStatus(sale.status)} · {formatMoney(sale.total_amount)}
+              {sale.customer_name} · {formatSaleStatus(sale.status)} ·{' '}
+              {formatMoney(sale.total_amount)}
             </p>
           </div>
           {sale.status === 'draft' && (
@@ -59,7 +70,10 @@ function PartnerSaleDetailPage() {
                       toast.success('Venda confirmada.');
                       void saleQuery.refetch();
                     },
-                    onError: (e) => toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+                    onError: (e) =>
+                      toast.error(
+                        isApiHttpError(e) ? e.message : getErrorMessage(e)
+                      )
                   })
                 }
                 disabled={confirmMutation.isPending || sale.items.length === 0}
@@ -104,7 +118,9 @@ function PartnerSaleDetailPage() {
             <CardContent>
               <div
                 className="prose prose-sm max-w-none rounded border bg-white p-4"
-                dangerouslySetInnerHTML={{ __html: sale.contract.rendered_html }}
+                dangerouslySetInnerHTML={{
+                  __html: sanitizeContractHtml(sale.contract.rendered_html)
+                }}
               />
             </CardContent>
           </Card>

@@ -2,8 +2,11 @@ package services
 
 import (
 	"context"
+	"path"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/luxus-connect/telefonia/api/internal/auth"
 	"github.com/luxus-connect/telefonia/api/internal/httputil"
@@ -15,11 +18,12 @@ import (
 const (
 	defaultPresignedExpires = 900
 	minPresignedExpires     = 60
-	maxPresignedExpires     = 604800
+	maxPresignedExpires     = 900
 )
 
 type PresignedService struct {
-	Storage ObjectStorage
+	Storage    ObjectStorage
+	BucketName string
 }
 
 type ObjectStorage interface {
@@ -31,13 +35,34 @@ func (p *PresignedService) CreateUploadURL(ctx context.Context, input models.Cre
 	if err := validateObjectStorage(input.BucketName, input.ObjectKey); err != nil {
 		return nil, err
 	}
+	if !auth.CanMutateOperational(ctx) && !auth.CanAccessFinancial(ctx) {
+		return nil, httputil.ForbiddenError(notifications.N("FORBIDDEN", "Use o envio de anexos do documento ou ticket autorizado."))
+	}
+	// Never sign a caller-selected existing key: every upload gets a new key.
+	input.ObjectKey = "uploads/" + uuid.NewString() + "/" + path.Base(input.ObjectKey)
+	key, err := tenantScopedObjectKey(ctx, input.ObjectKey)
+	if err != nil {
+		return nil, err
+	}
+	input.ObjectKey = key
+	return p.CreateAuthorizedUploadURL(ctx, input)
+}
+
+// CreateAuthorizedUploadURL is used only after resource-level authorization.
+func (p *PresignedService) CreateAuthorizedUploadURL(ctx context.Context, input models.CreatePresignedUploadURLInput) (*models.PresignedURLModel, error) {
+	if err := p.validateStorage(input.BucketName, input.ObjectKey); err != nil {
+		return nil, err
+	}
+	if err := validateObjectStorage(input.BucketName, input.ObjectKey); err != nil {
+		return nil, err
+	}
 	expires, err := resolveExpiration(input.ExpiresInSeconds)
 	if err != nil {
 		return nil, err
 	}
 	bucket := strings.TrimSpace(input.BucketName)
-	key, err := tenantScopedObjectKey(ctx, strings.TrimSpace(input.ObjectKey))
-	if err != nil {
+	key := strings.TrimSpace(input.ObjectKey)
+	if err := ensureTenantObjectKey(ctx, key); err != nil {
 		return nil, err
 	}
 	result, err := p.Storage.CreatePresignedUploadURL(ctx, bucket, key, expires, input.ContentType)
@@ -50,6 +75,17 @@ func (p *PresignedService) CreateUploadURL(ctx context.Context, input models.Cre
 }
 
 func (p *PresignedService) CreateDownloadURL(ctx context.Context, input models.CreatePresignedDownloadURLInput) (*models.PresignedURLModel, error) {
+	if !auth.CanMutateOperational(ctx) && !auth.CanAccessFinancial(ctx) {
+		return nil, httputil.ForbiddenError(notifications.N("FORBIDDEN", "Use o download do documento ou ticket autorizado."))
+	}
+	return p.CreateAuthorizedDownloadURL(ctx, input)
+}
+
+// CreateAuthorizedDownloadURL is used only after resource-level authorization.
+func (p *PresignedService) CreateAuthorizedDownloadURL(ctx context.Context, input models.CreatePresignedDownloadURLInput) (*models.PresignedURLModel, error) {
+	if err := p.validateStorage(input.BucketName, input.ObjectKey); err != nil {
+		return nil, err
+	}
 	if err := validateObjectStorage(input.BucketName, input.ObjectKey); err != nil {
 		return nil, err
 	}
@@ -96,8 +132,11 @@ func ensureTenantObjectKey(ctx context.Context, key string) error {
 	}
 	orgID := strings.TrimSpace(org.ID)
 	key = strings.TrimLeft(strings.TrimSpace(key), "/")
-	if strings.HasPrefix(key, orgID+"/") {
+	if strings.HasPrefix(key, orgID+"/") || strings.HasPrefix(key, "tickets/"+orgID+"/") {
 		return nil
+	}
+	if strings.HasPrefix(key, "tickets/") {
+		return httputil.ForbiddenError(notifications.N("STORAGE_TENANT_MISMATCH", "Anexo de ticket fora da organização autenticada."))
 	}
 	// Objetos legados sem prefixo de tenant: só a org Luxus pode acessar.
 	first := strings.SplitN(key, "/", 2)[0]
@@ -105,6 +144,16 @@ func ensureTenantObjectKey(ctx context.Context, key string) error {
 		return nil
 	}
 	return httputil.ForbiddenError(notifications.N("STORAGE_TENANT_MISMATCH", "Chave de armazenamento fora da organização autenticada."))
+}
+
+func (p *PresignedService) validateStorage(bucket, key string) error {
+	if p.Storage == nil {
+		return httputil.UnavailableError(notifications.ObjectStorageUnavailable)
+	}
+	if strings.TrimSpace(p.BucketName) == "" || strings.TrimSpace(bucket) != p.BucketName {
+		return httputil.ForbiddenError(notifications.N("STORAGE_BUCKET_INVALID", "Bucket não autorizado."))
+	}
+	return validateObjectStorage(bucket, key)
 }
 
 func looksLikeOrgID(v string) bool {

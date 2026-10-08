@@ -39,6 +39,9 @@ func decodeJSON(r *http.Request, v any) error {
 		}
 		return err
 	}
+	if err := dec.Decode(new(any)); !errors.Is(err, io.EOF) {
+		return errors.New("request must contain a single JSON value")
+	}
 	return nil
 }
 
@@ -86,10 +89,7 @@ func (h *Handler) RegisterRoutes(
 		// Optional auth resolves the tenant when a Bearer token is present.
 		r.Group(func(r chi.Router) {
 			r.Use(optionalAuth)
-			r.Get("/organization-settings", h.getOrganizationSettings)
-			r.Get("/company-settings", h.getOrganizationSettings)
-			r.Get("/whitelabel-settings", h.getOrganizationSettings)
-			r.Get("/system-settings", h.getOrganizationSettings)
+			r.Get("/whitelabel-settings", h.getPublicOrganizationBranding)
 		})
 
 		r.Group(func(r chi.Router) {
@@ -123,6 +123,7 @@ func (h *Handler) RegisterRoutes(
 		r.Group(func(r chi.Router) {
 
 			r.Use(auth, operational)
+			r.Use(connectauth.OperationalMutationGuard)
 
 			r.Get("/stats/dashboard", h.getDashboardStats)
 			r.Get("/stats/operational-dashboard", h.getOperationalDashboard)
@@ -342,8 +343,6 @@ func (h *Handler) RegisterRoutes(
 			r.Get("/cost-centers", h.listCostCenters)
 
 			r.Get("/reports/line-movements", h.getMovementReports)
-			r.Get("/reports/financial-summary", h.getFinancialSummaryReport)
-			r.Get("/reports/customer-profitability", h.getCustomerProfitabilityReport)
 			r.Get("/reports/line-consumption", h.listLineConsumptionReport)
 			r.Get("/reports/line-consumption/export", h.exportLineConsumptionReport)
 			r.Get("/audit/events", h.listDomainAuditEvents)
@@ -456,6 +455,8 @@ func (h *Handler) RegisterRoutes(
 		r.Group(func(r chi.Router) {
 
 			r.Use(auth, financial)
+			r.Get("/reports/financial-summary", h.getFinancialSummaryReport)
+			r.Get("/reports/customer-profitability", h.getCustomerProfitabilityReport)
 			r.Post("/provider-invoices/{id}/undo", h.undoProviderInvoice)
 
 			r.Get("/financial/summary", h.getFinancialSummary)
@@ -620,6 +621,9 @@ func (h *Handler) RegisterRoutes(
 		r.Group(func(r chi.Router) {
 
 			r.Use(auth, master)
+			r.Get("/organization-settings", h.getOrganizationSettings)
+			r.Get("/company-settings", h.getOrganizationSettings)
+			r.Get("/system-settings", h.getOrganizationSettings)
 
 			r.Put("/organization-settings/company", h.updateCompanySettings)
 			r.Put("/company-settings", h.updateCompanySettings)

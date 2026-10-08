@@ -3,7 +3,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
-import { ChevronLeft, FileStack, Link2, Loader2, Smartphone, Trash2 } from 'lucide-react';
+import {
+  ChevronLeft,
+  FileStack,
+  Link2,
+  Loader2,
+  Smartphone,
+  Trash2
+} from 'lucide-react';
 import { useForm, type Resolver } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -53,7 +60,13 @@ import {
   useCustomerDevices,
   useUnassignCustomerDevice
 } from '@/lib/customer-devices-api';
-import { emptyCustomerAddress, hasCustomerAddress, registrationDraft, registrationPayload, type RegisteredCustomer } from '@/lib/customer-registration';
+import {
+  emptyCustomerAddress,
+  hasCustomerAddress,
+  registrationDraft,
+  registrationPayload,
+  type RegisteredCustomer
+} from '@/lib/customer-registration';
 import { formatMoney } from '@/lib/financial-api';
 import {
   formatCpfCnpj,
@@ -70,8 +83,6 @@ import { CustomerAttachmentsView } from './customer-attachments-view';
 import { CustomerContractsSection } from './customer-contracts-section';
 import { CustomerRegistrationFields } from './customer-registration-fields';
 import { GenerateCustomerInvoiceSheet } from './generate-customer-invoice-sheet';
-
-
 
 type ListSearch = {
   page: number;
@@ -98,7 +109,7 @@ function buildSchema(isPj: boolean) {
   if (!isPj) {
     return obj;
   }
-  return obj.superRefine((data, ctx) => {
+  return obj.superRefine((data: FormValues, ctx: z.RefinementCtx) => {
     if (!data.legal_name.trim()) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -153,17 +164,27 @@ export function CustomerDetailView({
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const registeredCustomer = customer as RegisteredCustomer;
-  const [profile, setProfile] = useState(() => registrationDraft(registeredCustomer.profile));
-  const [address, setAddress] = useState(() => registeredCustomer.addresses?.[0] ?? emptyCustomerAddress());
-  const [billingEmail, setBillingEmail] = useState(registeredCustomer.billing_email ?? '');
-  const [birthOrOpeningDate, setBirthOrOpeningDate] = useState((customer.birth_or_opening_date ?? '').slice(0,10));
+  const [profile, setProfile] = useState(() =>
+    registrationDraft(registeredCustomer.profile)
+  );
+  const [address, setAddress] = useState(
+    () => registeredCustomer.addresses?.[0] ?? emptyCustomerAddress()
+  );
+  const [billingEmail, setBillingEmail] = useState(
+    registeredCustomer.billing_email ?? ''
+  );
+  const [birthOrOpeningDate, setBirthOrOpeningDate] = useState(
+    (customer.birth_or_opening_date ?? '').slice(0, 10)
+  );
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [linkLineOpen, setLinkLineOpen] = useState(false);
   const [linkDeviceOpen, setLinkDeviceOpen] = useState(false);
   const [generateInvoiceOpen, setGenerateInvoiceOpen] = useState(false);
   const [anonymizeConfirmOpen, setAnonymizeConfirmOpen] = useState(false);
   const [isReseller, setIsReseller] = useState(
-    Boolean((customer as ListCustomerResponse & { is_reseller?: boolean }).is_reseller)
+    Boolean(
+      (customer as ListCustomerResponse & { is_reseller?: boolean }).is_reseller
+    )
   );
   const customerExtra = customer as ListCustomerResponse & {
     is_reseller?: boolean;
@@ -173,7 +194,9 @@ export function CustomerDetailView({
   const [commercialActivation, setCommercialActivation] = useState(
     (customerExtra.commercial_activation_date ?? '').toString().slice(0, 10)
   );
-  const [luxusCnpj, setLuxusCnpj] = useState(customerExtra.contracted_luxus_cnpj ?? '');
+  const [luxusCnpj, setLuxusCnpj] = useState(
+    customerExtra.contracted_luxus_cnpj ?? ''
+  );
 
   const isPj = customer.type.trim().toUpperCase() === 'PJ';
   const schema = useMemo(() => buildSchema(isPj), [isPj]);
@@ -194,7 +217,7 @@ export function CustomerDetailView({
     setProfile(registrationDraft(next.profile));
     setAddress(next.addresses?.[0] ?? emptyCustomerAddress());
     setBillingEmail(next.billing_email ?? '');
-    setBirthOrOpeningDate((customer.birth_or_opening_date ?? '').slice(0,10));
+    setBirthOrOpeningDate((customer.birth_or_opening_date ?? '').slice(0, 10));
     form.reset({
       name: customer.name,
       legal_name: customer.legal_name ?? '',
@@ -203,7 +226,10 @@ export function CustomerDetailView({
         customer.responsible_salesperson_user_id ?? ''
     });
     setIsReseller(
-      Boolean((customer as ListCustomerResponse & { is_reseller?: boolean }).is_reseller)
+      Boolean(
+        (customer as ListCustomerResponse & { is_reseller?: boolean })
+          .is_reseller
+      )
     );
   }, [customer, form]);
 
@@ -289,11 +315,31 @@ export function CustomerDetailView({
         </div>
       </div>
 
-      {(registeredCustomer.profile?.show_ua || registeredCustomer.profile?.show_account || registeredCustomer.profile?.show_notes) && (
-        <aside className="bg-muted/40 space-y-2 rounded-xl border p-4 text-sm" aria-label="Informações de atendimento">
-          {registeredCustomer.profile.show_ua && registeredCustomer.profile.ua && <p><strong>UA:</strong> {registeredCustomer.profile.ua}</p>}
-          {registeredCustomer.profile.show_account && registeredCustomer.profile.account && <p><strong>Conta:</strong> {registeredCustomer.profile.account}</p>}
-          {registeredCustomer.profile.show_notes && registeredCustomer.profile.notes && <p className="whitespace-pre-wrap"><strong>Observação:</strong> {registeredCustomer.profile.notes}</p>}
+      {(registeredCustomer.profile?.show_ua ||
+        registeredCustomer.profile?.show_account ||
+        registeredCustomer.profile?.show_notes) && (
+        <aside
+          className="bg-muted/40 space-y-2 rounded-xl border p-4 text-sm"
+          aria-label="Informações de atendimento"
+        >
+          {registeredCustomer.profile.show_ua &&
+            registeredCustomer.profile.ua && (
+              <p>
+                <strong>UA:</strong> {registeredCustomer.profile.ua}
+              </p>
+            )}
+          {registeredCustomer.profile.show_account &&
+            registeredCustomer.profile.account && (
+              <p>
+                <strong>Conta:</strong> {registeredCustomer.profile.account}
+              </p>
+            )}
+          {registeredCustomer.profile.show_notes &&
+            registeredCustomer.profile.notes && (
+              <p className="whitespace-pre-wrap">
+                <strong>Observação:</strong> {registeredCustomer.profile.notes}
+              </p>
+            )}
         </aside>
       )}
       {!isActive ? (
@@ -312,7 +358,9 @@ export function CustomerDetailView({
             data: {
               name: v.name.trim(),
               legal_name: isPj ? v.legal_name.trim() : null,
-              state_registration: isPj ? v.state_registration.trim() || null : null,
+              state_registration: isPj
+                ? v.state_registration.trim() || null
+                : null,
               birth_or_opening_date: birthOrOpeningDate || null,
               responsible_salesperson_user_id:
                 v.responsible_salesperson_user_id.trim() || null,
@@ -320,8 +368,13 @@ export function CustomerDetailView({
               commercial_activation_date: commercialActivation || null,
               contracted_luxus_cnpj: isPj ? luxusCnpj || null : null,
               billing_email: billingEmail.trim(),
-              ...{ profile: registrationPayload(profile, isPj),
-                addresses: [...(hasCustomerAddress(address) ? [address] : []), ...(registeredCustomer.addresses?.slice(1) ?? [])] }
+              ...{
+                profile: registrationPayload(profile, isPj),
+                addresses: [
+                  ...(hasCustomerAddress(address) ? [address] : []),
+                  ...(registeredCustomer.addresses?.slice(1) ?? [])
+                ]
+              }
             }
           })
         )}
@@ -377,30 +430,45 @@ export function CustomerDetailView({
                     PJ Revendedor (processamento duplo)
                   </FieldLabel>
                   <p className="text-muted-foreground text-xs">
-                    Habilita o 2º processamento financeiro nas linhas: preço Luxus→Cliente e
-                    Cliente→Usuário final com composições independentes.
+                    Habilita o 2º processamento financeiro nas linhas: preço
+                    Luxus→Cliente e Cliente→Usuário final com composições
+                    independentes.
                   </p>
                 </Field>
               ) : null}
-              {isPj && <Field>
-                <FieldLabel htmlFor="customer-ie">
-                  Inscrição estadual (IE)
+              {isPj && (
+                <Field>
+                  <FieldLabel htmlFor="customer-ie">
+                    Inscrição estadual (IE)
+                  </FieldLabel>
+                  <Input
+                    id="customer-ie"
+                    disabled={!isActive}
+                    {...form.register('state_registration')}
+                  />
+                  <FieldError
+                    errors={[form.formState.errors.state_registration]}
+                  />
+                </Field>
+              )}
+              <Field>
+                <FieldLabel htmlFor="customer-birth-date">
+                  {isPj ? 'Data de abertura' : 'Data de nascimento'}
                 </FieldLabel>
                 <Input
-                  id="customer-ie"
+                  id="customer-birth-date"
+                  type="date"
+                  value={birthOrOpeningDate}
                   disabled={!isActive}
-                  {...form.register('state_registration')}
+                  onChange={(event) =>
+                    setBirthOrOpeningDate(event.target.value)
+                  }
                 />
-                <FieldError
-                  errors={[form.formState.errors.state_registration]}
-                />
-              </Field>}
-              <Field>
-                <FieldLabel htmlFor="customer-birth-date">{isPj ? 'Data de abertura' : 'Data de nascimento'}</FieldLabel>
-                <Input id="customer-birth-date" type="date" value={birthOrOpeningDate} disabled={!isActive} onChange={event => setBirthOrOpeningDate(event.target.value)} />
               </Field>
               <Field>
-                <FieldLabel htmlFor="customer-activation">Data de ativação comercial</FieldLabel>
+                <FieldLabel htmlFor="customer-activation">
+                  Data de ativação comercial
+                </FieldLabel>
                 <Input
                   id="customer-activation"
                   type="date"
@@ -409,16 +477,20 @@ export function CustomerDetailView({
                   onChange={(e) => setCommercialActivation(e.target.value)}
                 />
               </Field>
-              {isPj && <Field>
-                <FieldLabel htmlFor="customer-luxus-cnpj">CNPJ Luxus (contratada)</FieldLabel>
-                <Input
-                  id="customer-luxus-cnpj"
-                  disabled={!isActive}
-                  placeholder="Somente números"
-                  value={luxusCnpj}
-                  onChange={(e) => setLuxusCnpj(e.target.value)}
-                />
-              </Field>}
+              {isPj && (
+                <Field>
+                  <FieldLabel htmlFor="customer-luxus-cnpj">
+                    CNPJ Luxus (contratada)
+                  </FieldLabel>
+                  <Input
+                    id="customer-luxus-cnpj"
+                    disabled={!isActive}
+                    placeholder="Somente números"
+                    value={luxusCnpj}
+                    onChange={(e) => setLuxusCnpj(e.target.value)}
+                  />
+                </Field>
+              )}
               <Field>
                 <FieldLabel htmlFor="customer-salesperson">
                   Vendedor responsável (ID do usuário)
@@ -441,9 +513,20 @@ export function CustomerDetailView({
 
         <Separator />
 
-        <DetailSection title="Cadastro completo" description="Atendimento, contatos, endereço e observações. Dados de identidade e família aparecem somente para pessoa física.">
-          <CustomerRegistrationFields value={profile} onChange={setProfile} address={address} onAddressChange={setAddress}
-            billingEmail={billingEmail} onBillingEmailChange={setBillingEmail} isPj={isPj} disabled={!isActive || saveMutation.isPending} />
+        <DetailSection
+          title="Cadastro completo"
+          description="Atendimento, contatos, endereço e observações. Dados de identidade e família aparecem somente para pessoa física."
+        >
+          <CustomerRegistrationFields
+            value={profile}
+            onChange={setProfile}
+            address={address}
+            onAddressChange={setAddress}
+            billingEmail={billingEmail}
+            onBillingEmailChange={setBillingEmail}
+            isPj={isPj}
+            disabled={!isActive || saveMutation.isPending}
+          />
         </DetailSection>
         <Separator />
 
@@ -452,7 +535,9 @@ export function CustomerDetailView({
           description="Linhas, faturamento mensal, contratos gerados e anexos em um único painel."
         >
           {customer360Query.isPending ? (
-            <p className="text-muted-foreground text-sm">Carregando visão 360…</p>
+            <p className="text-muted-foreground text-sm">
+              Carregando visão 360…
+            </p>
           ) : customer360Query.isError ? (
             <p className="text-destructive text-sm">
               {isApiHttpError(customer360Query.error)
@@ -469,13 +554,19 @@ export function CustomerDetailView({
                 </dd>
               </div>
               <div>
-                <dt className="text-muted-foreground text-sm">Mensalidade consolidada</dt>
+                <dt className="text-muted-foreground text-sm">
+                  Mensalidade consolidada
+                </dt>
                 <dd className="mt-1 font-medium">
-                  {formatMoney(customer360Query.data?.total_monthly_amount ?? 0)}
+                  {formatMoney(
+                    customer360Query.data?.total_monthly_amount ?? 0
+                  )}
                 </dd>
               </div>
               <div>
-                <dt className="text-muted-foreground text-sm">Contratos gerados</dt>
+                <dt className="text-muted-foreground text-sm">
+                  Contratos gerados
+                </dt>
                 <dd className="mt-1 font-medium">
                   {customer360Query.data?.generated_contracts?.length ?? 0}
                 </dd>
@@ -512,7 +603,9 @@ export function CustomerDetailView({
                       URL.revokeObjectURL(url);
                       toast.success('Exportação LGPD baixada.');
                     } catch (e) {
-                      toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e));
+                      toast.error(
+                        isApiHttpError(e) ? e.message : getErrorMessage(e)
+                      );
                     }
                   })();
                 }}
@@ -547,7 +640,8 @@ export function CustomerDetailView({
                 toast.success('Cliente anonimizado.');
                 setAnonymizeConfirmOpen(false);
               },
-              onError: (e) => toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+              onError: (e) =>
+                toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
             });
           }}
         />
@@ -689,10 +783,11 @@ export function CustomerDetailView({
                         </TableCell>
                         <TableCell>{item.line_classification}</TableCell>
                         <TableCell>
-                          {(item as { monthly_amount?: number | null }).monthly_amount !=
-                          null
+                          {(item as { monthly_amount?: number | null })
+                            .monthly_amount != null
                             ? formatMoney(
-                                (item as { monthly_amount?: number }).monthly_amount!
+                                (item as { monthly_amount?: number })
+                                  .monthly_amount!
                               )
                             : '—'}
                         </TableCell>
@@ -703,7 +798,8 @@ export function CustomerDetailView({
                                 (item as { cost_with_consumption?: number })
                                   .cost_with_consumption!
                               )
-                            : (item as { base_cost?: number | null }).base_cost != null
+                            : (item as { base_cost?: number | null })
+                                  .base_cost != null
                               ? formatMoney(
                                   (item as { base_cost?: number }).base_cost!
                                 )
@@ -768,7 +864,9 @@ export function CustomerDetailView({
             </div>
           ) : null}
           {customerDevicesQuery.isPending ? (
-            <p className="text-muted-foreground text-sm">Carregando aparelhos...</p>
+            <p className="text-muted-foreground text-sm">
+              Carregando aparelhos...
+            </p>
           ) : customerDevicesQuery.isError ? (
             <p className="text-destructive text-sm">
               {isApiHttpError(customerDevicesQuery.error)
@@ -777,7 +875,9 @@ export function CustomerDetailView({
             </p>
           ) : (customerDevicesQuery.data?.items?.length ?? 0) === 0 ? (
             <div className="border-input rounded-md border border-dashed p-6 text-center text-sm">
-              <p className="text-muted-foreground">Nenhum aparelho vinculado.</p>
+              <p className="text-muted-foreground">
+                Nenhum aparelho vinculado.
+              </p>
               {isActive ? (
                 <Button
                   type="button"
@@ -810,11 +910,17 @@ export function CustomerDetailView({
                         <TableCell>
                           {item.brand} {item.model}
                         </TableCell>
-                        <TableCell>{formatMoney(item.monthly_amount)}</TableCell>
                         <TableCell>
-                          {new Date(item.start_date).toLocaleDateString('pt-BR')}
+                          {formatMoney(item.monthly_amount)}
                         </TableCell>
-                        <TableCell>{item.is_active ? 'Ativo' : 'Encerrado'}</TableCell>
+                        <TableCell>
+                          {new Date(item.start_date).toLocaleDateString(
+                            'pt-BR'
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {item.is_active ? 'Ativo' : 'Encerrado'}
+                        </TableCell>
                         <TableCell className="text-right">
                           {item.is_active ? (
                             <Button
@@ -825,12 +931,16 @@ export function CustomerDetailView({
                               onClick={() =>
                                 unassignDeviceMutation.mutate(item.id, {
                                   onSuccess: () => {
-                                    toast.success('Vínculo do aparelho encerrado.');
+                                    toast.success(
+                                      'Vínculo do aparelho encerrado.'
+                                    );
                                     void customerDevicesQuery.refetch();
                                   },
                                   onError: (e) =>
                                     toast.error(
-                                      isApiHttpError(e) ? e.message : getErrorMessage(e)
+                                      isApiHttpError(e)
+                                        ? e.message
+                                        : getErrorMessage(e)
                                     )
                                 })
                               }
@@ -857,7 +967,10 @@ export function CustomerDetailView({
               description="Gere fatura avulsa com boleto Sicredi (código de barras + PIX), sem depender da fatura importada da operadora."
             >
               <div className="flex flex-wrap items-center justify-end gap-3 rounded-lg border p-4">
-                <Button type="button" onClick={() => setGenerateInvoiceOpen(true)}>
+                <Button
+                  type="button"
+                  onClick={() => setGenerateInvoiceOpen(true)}
+                >
                   <FileStack className="mr-2 size-4" />
                   Gerar fatura
                 </Button>
