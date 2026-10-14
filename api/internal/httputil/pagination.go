@@ -16,6 +16,7 @@ type PageSearch struct {
 const (
 	defaultPageSize = 20
 	maxPageSize     = 100
+	maxPageIndex    = 10000
 )
 
 func ParsePagination(r *http.Request) PageSearch {
@@ -23,6 +24,9 @@ func ParsePagination(r *http.Request) PageSearch {
 	size, _ := strconv.Atoi(r.URL.Query().Get("page_size"))
 	if idx < 0 {
 		idx = 0
+	}
+	if idx > maxPageIndex {
+		idx = maxPageIndex
 	}
 	if size <= 0 {
 		size = defaultPageSize

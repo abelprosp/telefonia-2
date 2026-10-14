@@ -153,6 +153,8 @@ func main() {
 			logger.Warn("object storage unavailable", "error", err)
 		} else {
 			presigned = &services.PresignedService{Storage: s3Client, BucketName: cfg.ObjectStorageBucketName}
+			svc.IntakeStorage = s3Client
+			svc.IntakeBucket = cfg.ObjectStorageBucketName
 			processor := &importservice.Processor{Store: st, Storage: s3Client, Log: logger, SM: svc.StateMachine}
 			svc.Processor = processor
 
@@ -176,6 +178,8 @@ func main() {
 	}
 
 	h := &handlers.Handler{
+		IntakeKey:           cfg.IntakeAPIKey,
+		IntakeOrg:           cfg.IntakeOrgID,
 		Svc:                 svc,
 		Presigned:           presigned,
 		AgentKey:            cfg.FinancialAgentAPIKey,
@@ -252,13 +256,13 @@ func main() {
 	r.Use(observability.StructuredLoggerMiddleware(logger))
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.ThrottleBacklog(64, 128, 5*time.Second))
-	r.Use(httputil.RequestBodyLimit(2 << 20))
+	r.Use(httputil.CustomerIntakeBodyLimit(2 << 20))
 
 	if len(cfg.CORSOrigins) > 0 {
 		r.Use(cors.Handler(cors.Options{
 			AllowedOrigins:   cfg.CORSOrigins,
 			AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"},
-			AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Correlation-ID", "X-Request-ID", "X-Agent-Key"},
+			AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Correlation-ID", "X-Request-ID", "X-Agent-Key", "X-API-Key"},
 			ExposedHeaders:   []string{"X-Correlation-ID", "X-Request-ID"},
 			AllowCredentials: true,
 			MaxAge:           300,

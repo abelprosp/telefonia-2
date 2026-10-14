@@ -2,6 +2,7 @@ package billingcalc
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/luxus-connect/telefonia/api/internal/precision"
 )
@@ -39,16 +40,10 @@ func ApportionGlobalDiscount(globalDiscount float64, targets []ApportionmentTarg
 	}
 
 	var totalAmount float64
-	var maxIdx int
-	var maxAmount float64
 
-	for i, t := range targets {
+	for _, t := range targets {
 		if t.Amount > 0 {
 			totalAmount = precision.SumCents(totalAmount, t.Amount)
-			if t.Amount > maxAmount {
-				maxAmount = t.Amount
-				maxIdx = i
-			}
 		}
 	}
 
@@ -88,14 +83,45 @@ func ApportionGlobalDiscount(globalDiscount float64, targets []ApportionmentTarg
 		totalAllocated = precision.SumCents(totalAllocated, discountItem)
 	}
 
-	// Ajuste do resíduo de centavos no item de maior valor
-	remainder := precision.Round2(globalDiscount - totalAllocated)
-	if remainder != 0 && maxAmount > 0 {
-		adjustedDiscount := precision.SumCents(results[maxIdx].AllocatedDiscount, remainder)
-		if adjustedDiscount <= results[maxIdx].OriginalAmount && adjustedDiscount >= 0 {
-			results[maxIdx].AllocatedDiscount = adjustedDiscount
-			results[maxIdx].FinalAmount = precision.Round2(results[maxIdx].OriginalAmount - adjustedDiscount)
+	// Ajuste do resíduo de centavos para garantir que Sum(AllocatedDiscount) == globalDiscount.
+	// Distribui o que sobra (ou retira o excesso) em itens com folga, priorizando os de maior valor.
+	order := make([]int, 0, len(results))
+	for i := range results {
+		if results[i].OriginalAmount > 0 {
+			order = append(order, i)
 		}
+	}
+	sort.Slice(order, func(a, b int) bool {
+		return results[order[a]].OriginalAmount > results[order[b]].OriginalAmount
+	})
+	for _, i := range order {
+		remainder := precision.Round2(globalDiscount - totalAllocated)
+		if remainder == 0 {
+			break
+		}
+		var delta float64
+		if remainder > 0 {
+			headroom := precision.Round2(results[i].OriginalAmount - results[i].AllocatedDiscount)
+			if headroom <= 0 {
+				continue
+			}
+			delta = remainder
+			if delta > headroom {
+				delta = headroom
+			}
+		} else {
+			capacity := results[i].AllocatedDiscount
+			if capacity <= 0 {
+				continue
+			}
+			delta = remainder
+			if -delta > capacity {
+				delta = -capacity
+			}
+		}
+		results[i].AllocatedDiscount = precision.Round2(results[i].AllocatedDiscount + delta)
+		results[i].FinalAmount = precision.Round2(results[i].OriginalAmount - results[i].AllocatedDiscount)
+		totalAllocated = precision.SumCents(totalAllocated, delta)
 	}
 
 	return results, nil

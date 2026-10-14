@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"encoding/json"
+	"io"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -29,8 +31,30 @@ func (h *Handler) getCustomer(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) createCustomer(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		intakeDecodeError(w, err)
+		return
+	}
+	var envelope map[string]json.RawMessage
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		intakeDecodeError(w, err)
+		return
+	}
+	_, hasClient := envelope["client"]
+	_, hasSale := envelope["sale"]
+	if hasClient || hasSale {
+		var input models.CustomerIntakeInput
+		if err := decodeStrictBytes(body, &input); err != nil {
+			intakeDecodeError(w, err)
+			return
+		}
+		h.importCustomerSale(w, r, input)
+		return
+	}
 	var input models.CreateCustomerInput
-	if err := decodeJSON(r, &input); err != nil {
+	if err := decodeStrictBytes(body, &input); err != nil {
 		httputil.WriteFail(w, http.StatusBadRequest, notifications.N("REQUEST_VALIDATION", "Invalid request body"))
 		return
 	}

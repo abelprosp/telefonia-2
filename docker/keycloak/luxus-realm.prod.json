@@ -16,7 +16,13 @@
       },
       {
         "name": "user",
-        "description": "Utilizador padrão"
+        "description": "Utilizador padrão",
+        "composite": true,
+        "composites": {
+          "client": {
+            "account": ["manage-account", "view-profile"]
+          }
+        }
       },
       {
         "name": "partner",

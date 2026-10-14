@@ -23,14 +23,13 @@ cat > /tmp/application-policy.json <<EOF
  {"Effect":"Allow","Action":["s3:GetObject","s3:PutObject"],"Resource":["arn:aws:s3:::$bucket/*"]}
 ]}
 EOF
-mc admin policy create local connect-storage /tmp/application-policy.json
+if mc admin policy info local connect-storage >/dev/null 2>&1; then
+  mc admin policy update local connect-storage /tmp/application-policy.json 2>/dev/null \
+    || echo 'Policy connect-storage already exists'
+else
+  mc admin policy create local connect-storage /tmp/application-policy.json
+fi
 mc admin user add local "$OBJECT_STORAGE_ACCESS_KEY_ID" "$OBJECT_STORAGE_SECRET_ACCESS_KEY" >/dev/null
 mc admin policy attach local connect-storage --user "$OBJECT_STORAGE_ACCESS_KEY_ID"
-cat > /tmp/cors.xml <<EOF
-<CORSConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><CORSRule>
-<AllowedOrigin>$PUBLIC_ORIGIN</AllowedOrigin>
-<AllowedMethod>GET</AllowedMethod><AllowedMethod>PUT</AllowedMethod><AllowedMethod>HEAD</AllowedMethod>
-<AllowedHeader>*</AllowedHeader><ExposeHeader>ETag</ExposeHeader><MaxAgeSeconds>300</MaxAgeSeconds>
-</CORSRule></CORSConfiguration>
-EOF
-mc cors set "local/$bucket" /tmp/cors.xml
+# CORS is configured on the MinIO server using MINIO_API_CORS_ALLOW_ORIGIN.
+# The community server does not implement the per-bucket SetBucketCors API.

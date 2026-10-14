@@ -24,15 +24,11 @@ export const useGetNotifications = () => {
   return useQuery<NotificationListResponse>({
     queryKey: ['inapp-notifications'],
     queryFn: async () => {
-      try {
-        const { data } = await client<NotificationListResponse>({
-          url: '/v1/inapp-notifications',
-          method: 'GET'
-        });
-        return data;
-      } catch {
-        return { items: [], unread_count: 0, total_count: 0 };
-      }
+      const { data } = await client<NotificationListResponse>({
+        url: '/v1/inapp-notifications',
+        method: 'GET'
+      });
+      return data;
     },
     refetchInterval: 30000 // Atualiza a cada 30 segundos
   });

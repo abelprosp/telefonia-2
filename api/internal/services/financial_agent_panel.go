@@ -74,7 +74,13 @@ func (s *Service) UpdateFinancialAgentSettings(ctx context.Context, input models
 		row.Enabled = *input.Enabled
 	}
 	if input.EvolutionAPIURL != nil {
-		row.EvolutionAPIURL = strings.TrimRight(strings.TrimSpace(*input.EvolutionAPIURL), "/")
+		raw := strings.TrimRight(strings.TrimSpace(*input.EvolutionAPIURL), "/")
+		if raw != "" {
+			if err := httputil.ValidatePublicHTTPSWebhookURL(raw); err != nil {
+				return nil, httputil.ValidationError(notifications.N("FINANCIAL_AGENT_EVOLUTION_URL_INVALID", "URL da Evolution API inválida: "+err.Error()))
+			}
+		}
+		row.EvolutionAPIURL = raw
 	}
 	if input.EvolutionAPIKey != nil {
 		row.EvolutionAPIKey = strings.TrimSpace(*input.EvolutionAPIKey)
@@ -87,7 +93,13 @@ func (s *Service) UpdateFinancialAgentSettings(ctx context.Context, input models
 		row.EvolutionInstance = inst
 	}
 	if input.N8nWebhookURL != nil {
-		row.N8nWebhookURL = strings.TrimSpace(*input.N8nWebhookURL)
+		raw := strings.TrimSpace(*input.N8nWebhookURL)
+		if raw != "" {
+			if err := httputil.ValidatePublicHTTPSWebhookURL(raw); err != nil {
+				return nil, httputil.ValidationError(notifications.N("FINANCIAL_AGENT_N8N_URL_INVALID", "URL do webhook n8n inválida: "+err.Error()))
+			}
+		}
+		row.N8nWebhookURL = raw
 	}
 	if u := auth.UserFromContext(ctx); u != nil {
 		row.UpdatedBy = &u.ID

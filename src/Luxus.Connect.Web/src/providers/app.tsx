@@ -3,6 +3,7 @@ import {
   type ReactNode,
   useContext,
   useEffect,
+  useLayoutEffect,
   useState
 } from 'react';
 
@@ -18,7 +19,12 @@ import {
 import { queryClient } from '@/lib/query-client';
 import { getItem, setItem } from '@/lib/storage';
 import { WhitelabelProvider } from '@/providers/whitelabel-provider';
-import { type Theme } from '@/types/app';
+import { ThemeSchema, type Theme } from '@/types/app';
+
+const readStoredTheme = (key: string, fallback: Theme): Theme => {
+  const parsed = ThemeSchema.safeParse(getItem<string>(key));
+  return parsed.success ? parsed.data : fallback;
+};
 
 type AppProviderProps = {
   children: ReactNode;
@@ -46,11 +52,14 @@ export const AppProvider = ({
 }: AppProviderProps) => {
   const { signinRedirect, user } = useAuth();
 
-  // Regista o token antes dos filhos dispararem queries (useEffect corre depois dos filhos).
-  registerAuthTokenGetter(() => user?.access_token ?? null);
+  // Regista o token antes de os filhos dispararem queries. Um layout effect corre
+  // antes dos useEffect dos filhos, evitando a primeira chamada sem Authorization.
+  useLayoutEffect(() => {
+    return registerAuthTokenGetter(() => user?.access_token ?? null);
+  }, [user?.access_token]);
 
-  const [theme, setTheme] = useState<Theme>(
-    () => getItem(`${storageKey}.theme`, defaultTheme)!
+  const [theme, setTheme] = useState<Theme>(() =>
+    readStoredTheme(`${storageKey}.theme`, defaultTheme)
   );
 
   useEffect(() => {
@@ -88,10 +97,6 @@ export const AppProvider = ({
     });
     return unregister;
   }, [signinRedirect]);
-
-  useEffect(() => {
-    return registerAuthTokenGetter(() => user?.access_token ?? null);
-  }, [user?.access_token]);
 
   const value = {
     theme,

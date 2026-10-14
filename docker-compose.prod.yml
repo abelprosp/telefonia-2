@@ -5,16 +5,20 @@
 
 services:
   rabbitmq:
+    image: ${RABBITMQ_IMAGE:?Defina a imagem RabbitMQ com digest sha256}
     ports: !override []
     healthcheck:
-      test: rabbitmq-diagnostics -q ping
+      test: ['CMD-SHELL', 'rabbitmq-diagnostics -q check_running && rabbitmq-diagnostics -q check_port_connectivity']
       interval: 1s
       retries: 20
 
   postgres:
+    image: ${POSTGRES_IMAGE:?Defina a imagem Postgres com digest sha256}
     ports: !override []
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-luxus_connect_dev}
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d luxus_connect_dev']
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB:-luxus_connect_dev}']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -32,6 +36,7 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Defina o usuario root do MinIO}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Defina a senha root do MinIO}
+      MINIO_API_CORS_ALLOW_ORIGIN: ${PUBLIC_ORIGIN:?Defina a origem HTTPS publica}
     volumes:
       - minio-data:/data
     command: server /data --console-address ":9001"
@@ -93,9 +98,11 @@ services:
 
   connect-api:
     environment:
+      - TELEFONIA_INTAKE_API_KEY=${TELEFONIA_INTAKE_API_KEY:-}
+      - TELEFONIA_INTAKE_ORG_ID=${TELEFONIA_INTAKE_ORG_ID:-}
       - ENVIRONMENT=Production
       - PORT=80
-      - DATABASE_URL=Host=postgres;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};Database=luxus_connect_dev;
+      - DATABASE_URL=Host=postgres;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};Database=${POSTGRES_DB:-luxus_connect_dev};
       - RABBITMQ_URL=amqp://${RMQ_USER}:${RMQ_PWD}@rabbitmq:5672
       - KEYCLOAK_REALM=luxus
       - KEYCLOAK_AUTH_SERVER_URL=http://keycloak:8080/auth
@@ -131,7 +138,7 @@ services:
         condition: service_healthy
         restart: true
       rabbitmq:
-        condition: service_started
+        condition: service_healthy
         restart: true
       keycloak:
         condition: service_started

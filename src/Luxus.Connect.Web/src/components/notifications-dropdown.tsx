@@ -26,7 +26,7 @@ import {
 } from '@/lib/notifications-api';
 
 export const NotificationsDropdown = () => {
-  const { data } = useGetNotifications();
+  const { data, isError } = useGetNotifications();
   const markReadMutation = useMarkNotificationRead();
   const markAllReadMutation = useMarkAllNotificationsRead();
 
@@ -99,7 +99,19 @@ export const NotificationsDropdown = () => {
         </div>
 
         <DropdownMenuGroup className="max-h-80 overflow-y-auto p-1 divide-y divide-border/40">
-          {notifications.length === 0 ? (
+          {isError ? (
+            <div className="flex flex-col items-center justify-center p-6 text-center">
+              <div className="bg-destructive/10 flex size-10 items-center justify-center rounded-full text-destructive mb-2">
+                <AlertTriangle className="size-5" />
+              </div>
+              <p className="text-sm font-semibold text-foreground">
+                Não foi possível carregar
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Verifique a conexão e tente novamente.
+              </p>
+            </div>
+          ) : notifications.length === 0 ? (
             <div className="flex flex-col items-center justify-center p-6 text-center">
               <div className="bg-muted flex size-10 items-center justify-center rounded-full text-muted-foreground mb-2">
                 <Sparkles className="size-5" />
@@ -142,18 +154,35 @@ export const NotificationsDropdown = () => {
 
                   {notif.action_url ? (
                     <div className="mt-2">
-                      <Link
-                        to={notif.action_url}
-                        onClick={() => {
-                          if (!notif.is_read) {
-                            markReadMutation.mutate(notif.id);
-                          }
-                        }}
-                        className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline"
-                      >
-                        <span>{notif.action_label || 'Ver detalhes'}</span>
-                        <ExternalLink className="size-3" />
-                      </Link>
+                      {notif.action_url.startsWith('/') ? (
+                        <Link
+                          to={notif.action_url}
+                          onClick={() => {
+                            if (!notif.is_read) {
+                              markReadMutation.mutate(notif.id);
+                            }
+                          }}
+                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline"
+                        >
+                          <span>{notif.action_label || 'Ver detalhes'}</span>
+                          <ExternalLink className="size-3" />
+                        </Link>
+                      ) : (
+                        <a
+                          href={notif.action_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={() => {
+                            if (!notif.is_read) {
+                              markReadMutation.mutate(notif.id);
+                            }
+                          }}
+                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline"
+                        >
+                          <span>{notif.action_label || 'Ver detalhes'}</span>
+                          <ExternalLink className="size-3" />
+                        </a>
+                      )}
                     </div>
                   ) : null}
                 </div>

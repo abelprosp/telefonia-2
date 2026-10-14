@@ -16,7 +16,13 @@
       },
       {
         "name": "user",
-        "description": "Utilizador padrão"
+        "description": "Utilizador padrão",
+        "composite": true,
+        "composites": {
+          "client": {
+            "account": ["manage-account", "view-profile"]
+          }
+        }
       },
       {
         "name": "partner",
@@ -348,7 +354,7 @@
       "enabled": true,
       "publicClient": true,
       "standardFlowEnabled": true,
-      "directAccessGrantsEnabled": true,
+      "directAccessGrantsEnabled": false,
       "implicitFlowEnabled": false,
       "serviceAccountsEnabled": false,
       "redirectUris": [
@@ -357,8 +363,7 @@
         "http://localhost:3005/*",
         "http://localhost:3001/*",
         "http://localhost:8002/*",
-        "http://127.0.0.1:5173/*",
-        "https://telefonia.redobrai.online/*"
+        "http://127.0.0.1:5173/*"
       ],
       "webOrigins": [
         "http://localhost:5173",
@@ -366,14 +371,13 @@
         "http://localhost:3005",
         "http://localhost:3001",
         "http://localhost:8002",
-        "http://127.0.0.1:5173",
-        "https://telefonia.redobrai.online",
-        "+"
+        "http://127.0.0.1:5173"
       ],
       "protocol": "openid-connect",
       "fullScopeAllowed": true,
       "attributes": {
-        "client.use.lightweight.access.token.enabled": "false"
+        "client.use.lightweight.access.token.enabled": "false",
+        "pkce.code.challenge.method": "S256"
       },
       "defaultClientScopes": [
         "openid",

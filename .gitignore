@@ -216,6 +216,7 @@ docker/build-secrets/nuget.credentials.config
 .env
 .env.local
 .npmrc
+.npm-cache/
 .tanstack
 .vite
 

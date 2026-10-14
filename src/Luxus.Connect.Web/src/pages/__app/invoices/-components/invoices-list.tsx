@@ -135,6 +135,11 @@ export function InvoicesList() {
   const [pollingImportId, setPollingImportId] = useState<string | null>(persisted.importId);
 
   const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Mantém o último importProgress acessível ao polling sem reiniciá-lo a cada mudança.
+  const importProgressRef = useRef(importProgress);
+  useEffect(() => {
+    importProgressRef.current = importProgress;
+  }, [importProgress]);
   const queryClient = useQueryClient();
 
   // ─── Invalidate the invoices list (predicate-based to bypass object equality) ───
@@ -247,7 +252,7 @@ export function InvoicesList() {
   // Resume or start polling whenever pollingImportId changes
   useEffect(() => {
     if (!pollingImportId) return;
-    const fileName = importProgress.fileName;
+    const fileName = importProgressRef.current.fileName;
     startPolling(pollingImportId, fileName);
     return () => stopPolling();
     // eslint-disable-next-line react-hooks/exhaustive-deps

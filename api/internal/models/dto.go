@@ -1109,6 +1109,7 @@ type ListSaleResponse struct {
 
 type GetSaleResponse struct {
 	ListSaleResponse
+	Intake   *CustomerIntakeRecord      `json:"intake,omitempty"`
 	Items    []SaleLineItemResponse     `json:"items"`
 	Contract *GeneratedContractResponse `json:"contract"`
 }

@@ -14,7 +14,7 @@ if [ -z "$KC_CONTAINER" ]; then
 fi
 
 ADMIN_USER="${KC_ADMIN_USERNAME:-admin}"
-ADMIN_PASS="${KC_ADMIN_PWD:-admin}"
+ADMIN_PASS="${KC_ADMIN_PWD:?Defina KC_ADMIN_PWD}"
 REALM="${KEYCLOAK_REALM:-luxus}"
 CLIENT_ID="${KEYCLOAK_RESOURCE:-connect-cli}"
 

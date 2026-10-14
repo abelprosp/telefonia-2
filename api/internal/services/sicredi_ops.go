@@ -218,15 +218,18 @@ func (s *Service) GetSicrediStatus(ctx context.Context) (*models.SicrediIntegrat
 
 func (s *Service) HandleSicrediWebhook(ctx context.Context, r *http.Request) error {
 	authHeader := strings.TrimSpace(r.Header.Get("Authorization"))
-	tokenOK := false
+	// globalTokenOK: the process-wide SICREDI_WEBHOOK_TOKEN, valid for any org.
+	// tokenOrgIDs: organizations whose per-org webhook token matches the request.
+	globalTokenOK := false
+	var tokenOrgIDs []string
 	if s.Sicredi != nil && s.Sicredi.Enabled() {
 		cfg := s.Sicredi.Config()
 		token := strings.TrimSpace(cfg.WebhookToken)
 		if token != "" && (secureTokenEqual(authHeader, "Bearer "+token) || secureTokenEqual(authHeader, token)) {
-			tokenOK = true
+			globalTokenOK = true
 		}
 	}
-	if !tokenOK {
+	if !globalTokenOK {
 		rawToken := strings.TrimPrefix(authHeader, "Bearer ")
 		rawToken = strings.TrimSpace(rawToken)
 		if rawToken == "" {
@@ -236,9 +239,9 @@ func (s *Service) HandleSicrediWebhook(ctx context.Context, r *http.Request) err
 		if err != nil {
 			return httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
 		}
-		tokenOK = len(ids) > 0
+		tokenOrgIDs = ids
 	}
-	if !tokenOK {
+	if !globalTokenOK && len(tokenOrgIDs) == 0 {
 		return httputil.BusinessError(notifications.N("SICREDI_WEBHOOK_UNAUTHORIZED", "Token de webhook inválido."))
 	}
 
@@ -259,6 +262,10 @@ func (s *Service) HandleSicrediWebhook(ctx context.Context, r *http.Request) err
 
 	var orgID *string
 	if doc, _ := s.findWebhookBillingDocument(ctx, nossoNumero, idEmpresa); doc != nil {
+		// A per-org token may only act on documents owned by that same org.
+		if !globalTokenOK && !containsString(tokenOrgIDs, doc.OrganizationID) {
+			return httputil.BusinessError(notifications.N("SICREDI_WEBHOOK_UNAUTHORIZED", "Token de webhook não autorizado para esta organização."))
+		}
 		orgID = &doc.OrganizationID
 	}
 
@@ -300,6 +307,15 @@ func (s *Service) HandleSicrediWebhook(ctx context.Context, r *http.Request) err
 	}
 	_ = s.Store.MarkSicrediWebhookEventProcessed(ctx, eventID, errMsg, time.Now().UTC())
 	return nil
+}
+
+func containsString(list []string, v string) bool {
+	for _, item := range list {
+		if item == v {
+			return true
+		}
+	}
+	return false
 }
 
 func secureTokenEqual(got, expected string) bool {

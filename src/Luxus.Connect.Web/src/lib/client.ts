@@ -13,6 +13,9 @@ import { isAxiosError, toApiHttpError } from './api-error';
 let getAccessTokenFromAuth: () => string | null = () => null;
 let onUnauthorized: (() => void) | undefined;
 
+/** Synchronous access to the current OIDC token (used by route guards). */
+export const getCurrentAccessToken = () => getAccessTokenFromAuth();
+
 export const registerAuthTokenGetter = (getter: () => string | null) => {
   getAccessTokenFromAuth = getter;
   return () => {
@@ -133,7 +136,8 @@ api.interceptors.response.use(
       console.warn(
         `[API ${response.status}] ${response.config.method?.toUpperCase()} ${response.config.url}:`,
         apiErr.message,
-        response.data
+        // Never log the raw response body in production (may contain PII).
+        import.meta.env.DEV ? response.data : undefined
       );
       throw apiErr;
     }

@@ -1,5 +1,4 @@
 {
-  "dotnet.defaultSolution": "Luxus.Connect.slnx",
   "editor.formatOnSave": true,
   "editor.codeActionsOnSave": {
     "source.sortImports": "explicit",

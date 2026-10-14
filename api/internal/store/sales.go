@@ -13,18 +13,18 @@ import (
 )
 
 type CustomerContractData struct {
-	Name      string
-	LegalName *string
-	Document  string
-	Type      string
-	Street    string
-	Number    string
+	Name         string
+	LegalName    *string
+	Document     string
+	Type         string
+	Street       string
+	Number       string
 	Neighborhood string
 	Complement   *string
-	City      string
-	State     string
-	ZipCode   string
-	Country   string
+	City         string
+	State        string
+	ZipCode      string
+	Country      string
 }
 
 func (s *Store) ListContractTemplates(ctx context.Context, orgID string, activeOnly bool, page httputil.PageSearch) ([]models.ListContractTemplateResponse, int64, error) {
@@ -271,6 +271,10 @@ func (s *Store) GetSaleInOrg(ctx context.Context, orgID, id string, salespersonU
 		return nil, err
 	}
 	sale.Contract = contract
+	sale.Intake, err = s.GetSaleIntake(ctx, orgID, id)
+	if err != nil {
+		return nil, err
+	}
 	return &sale, nil
 }
 

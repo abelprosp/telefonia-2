@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import client from '@/lib/client';
+import type { CustomerIntake } from '@/lib/customer-intake-api';
 import { parseTotalCount } from '@/lib/query-utils';
 
 export type SignerConfig = {
@@ -86,6 +87,7 @@ export type Sale = {
 };
 
 export type SaleDetail = Sale & {
+  intake?: CustomerIntake | null;
   items: SaleLineItem[];
   contract?: GeneratedContract | null;
 };
@@ -109,9 +111,15 @@ export type CreateSaleInput = {
 type Paged<T> = { items: T[]; total_count: number | string };
 type PageParams = { page_index?: number; page_size?: number };
 
-async function pagedGet<T>(url: string, params?: PageParams & Record<string, unknown>) {
+async function pagedGet<T>(
+  url: string,
+  params?: PageParams & Record<string, unknown>
+) {
   const { data } = await client<Paged<T>>({ url, method: 'GET', params });
-  return { items: data.items ?? [], totalCount: parseTotalCount(data.total_count) };
+  return {
+    items: data.items ?? [],
+    totalCount: parseTotalCount(data.total_count)
+  };
 }
 
 export const salesKeys = {
@@ -120,7 +128,8 @@ export const salesKeys = {
   detail: (id: string) => ['sales', 'detail', id] as const,
   templates: ['contract-templates'] as const,
   template: (id: string) => ['contract-templates', id] as const,
-  partnerList: (params: Record<string, unknown>) => ['partner-commercial-sales', params] as const,
+  partnerList: (params: Record<string, unknown>) =>
+    ['partner-commercial-sales', params] as const,
   partnerDetail: (id: string) => ['partner-commercial-sales', id] as const
 };
 
@@ -171,7 +180,10 @@ export function useSale(id: string) {
   return useQuery({
     queryKey: salesKeys.detail(id),
     queryFn: async () => {
-      const { data } = await client<SaleDetail>({ url: `/v1/sales/${id}`, method: 'GET' });
+      const { data } = await client<SaleDetail>({
+        url: `/v1/sales/${id}`,
+        method: 'GET'
+      });
       return data;
     },
     enabled: Boolean(id)
@@ -182,7 +194,11 @@ export function useCreateSale() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: CreateSaleInput) => {
-      const { data } = await client<SaleDetail>({ url: '/v1/sales', method: 'POST', data: input });
+      const { data } = await client<SaleDetail>({
+        url: '/v1/sales',
+        method: 'POST',
+        data: input
+      });
       return data;
     },
     onSuccess: () => {
@@ -195,7 +211,10 @@ export function useConfirmSale() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { data } = await client<SaleDetail>({ url: `/v1/sales/${id}/confirm`, method: 'POST' });
+      const { data } = await client<SaleDetail>({
+        url: `/v1/sales/${id}/confirm`,
+        method: 'POST'
+      });
       return data;
     },
     onSuccess: (_data, id) => {
@@ -209,7 +228,10 @@ export function useCancelSale() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { data } = await client<SaleDetail>({ url: `/v1/sales/${id}/cancel`, method: 'POST' });
+      const { data } = await client<SaleDetail>({
+        url: `/v1/sales/${id}/cancel`,
+        method: 'POST'
+      });
       return data;
     },
     onSuccess: (_data, id) => {
@@ -377,7 +399,9 @@ export function useGenerateCustomerContract() {
       return data;
     },
     onSuccess: (_data, vars) => {
-      void qc.invalidateQueries({ queryKey: ['customer-contracts', vars.customerId] });
+      void qc.invalidateQueries({
+        queryKey: ['customer-contracts', vars.customerId]
+      });
     }
   });
 }
@@ -401,7 +425,9 @@ export function useUploadSignedContract() {
       return data;
     },
     onSuccess: (_data, vars) => {
-      void qc.invalidateQueries({ queryKey: ['customer-contracts', vars.customerId] });
+      void qc.invalidateQueries({
+        queryKey: ['customer-contracts', vars.customerId]
+      });
     }
   });
 }
@@ -423,13 +449,17 @@ export function useSyncZapSignContract() {
     },
     onSuccess: (_data, vars) => {
       if (vars.customerId) {
-        void qc.invalidateQueries({ queryKey: ['customer-contracts', vars.customerId] });
+        void qc.invalidateQueries({
+          queryKey: ['customer-contracts', vars.customerId]
+        });
       }
     }
   });
 }
 
-export function usePartnerCommercialSales(params: PageParams & { status?: string }) {
+export function usePartnerCommercialSales(
+  params: PageParams & { status?: string }
+) {
   return useQuery({
     queryKey: salesKeys.partnerList(params),
     queryFn: () => pagedGet<Sale>('/v1/partner/commercial-sales', params)

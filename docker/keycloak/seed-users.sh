@@ -1,6 +1,6 @@
 #!/bin/sh
 set -e
-/opt/keycloak/bin/kcadm.sh config credentials --server http://localhost:8080 --realm master --user admin --password "${KC_ADMIN_PWD:-admin}"
+/opt/keycloak/bin/kcadm.sh config credentials --server http://localhost:8080 --realm master --user admin --password "${KC_ADMIN_PWD:?Defina KC_ADMIN_PWD}"
 
 ORG='{"luxus":{"id":"00000000-0000-0000-0000-000000000001","name":["Luxus Connect"]}}'
 

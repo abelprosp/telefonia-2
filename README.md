@@ -10,6 +10,8 @@
     ·
     <a href="docs/DEPLOY_VPS.md">Deploy em VPS</a>
     ·
+    <a href="docs/TELEFONIA_INTAKE.md">Integração de clientes e vendas</a>
+    ·
     <a href="docs/RAILWAY.md">Deploy no Railway</a>
   </p>
 </p>
@@ -54,7 +56,7 @@ O backend é uma **API REST em Go** (binário único, ~15 MB) com o mesmo contra
 - **Leitura:** Handler → Store (SQL) → DTOs JSON snake_case.
 - **Importação de faturas:** upload S3/R2 → `POST /v1/provider-invoices` → fila `luxus-connect-events` → parser VIVO.
 
-**Solução:** [`Luxus.Connect.slnx`](Luxus.Connect.slnx) (frontend + Docker). Backend Go em [`api/go.mod`](api/go.mod).
+**Estrutura:** backend Go em [`api/go.mod`](api/go.mod), frontend em [`src/Luxus.Connect.Web`](src/Luxus.Connect.Web) e infraestrutura Docker em [`docker-compose.yml`](docker-compose.yml).
 
 ## Stack tecnológica
 

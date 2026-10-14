@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { toast } from 'sonner';
 
+import { ImportedSaleDetails } from '@/components/customer-intakes';
 import { PageWrapper } from '@/components/page-wrapper';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -158,6 +159,8 @@ function SaleDetailPage() {
             )}
           </div>
         </div>
+
+        {sale.intake && <ImportedSaleDetails intake={sale.intake} />}
 
         <Card>
           <CardHeader>

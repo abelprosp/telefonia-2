@@ -27,7 +27,11 @@ export const SignedIn = ({ children }: SignedInProps) => {
     return (
       <AuthConfigError
         message={error.message}
-        hint="Verifique se o Keycloak está a correr em http://localhost:8081 e se o realm «luxus» existe. Utilizador de dev: dev / dev"
+        hint={
+          import.meta.env.DEV
+            ? 'Verifique se o Keycloak está a correr em http://localhost:8081 e se o realm «luxus» existe.'
+            : 'Verifique se o provedor de identidade está disponível e tente novamente.'
+        }
       />
     );
   }

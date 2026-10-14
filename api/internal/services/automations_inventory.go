@@ -165,6 +165,12 @@ func (s *Service) DispatchWebhookEvent(orgID, event string, data map[string]any)
 		return
 	}
 	go func() {
+		defer func() {
+			if rec := recover(); rec != nil {
+				// Never let a webhook dispatch panic take down the process.
+				_ = rec
+			}
+		}()
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 		defer cancel()
 		rows, err := s.Store.ListActiveWebhooksForEvent(ctx, orgID, event)

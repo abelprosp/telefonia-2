@@ -1,4 +1,4 @@
-import { createFileRoute, Outlet } from '@tanstack/react-router';
+import { createFileRoute, Outlet, redirect } from '@tanstack/react-router';
 import { useAuth } from 'react-oidc-context';
 
 import { AppTopBar } from '@/components/app-top-bar';
@@ -9,6 +9,8 @@ import { PageLoader } from '@/components/page-loader';
 import { SignedIn } from '@/components/signed-in';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { getAuthConfigHint } from '@/lib/auth-config-hint';
+import { resolveAuthRoleState } from '@/lib/auth-roles';
+import { getCurrentAccessToken } from '@/lib/client';
 
 const RouteComponent = () => {
   const { isLoading, error } = useAuth();
@@ -42,5 +44,64 @@ const RouteComponent = () => {
 };
 
 export const Route = createFileRoute('/__app')({
+  // Guarda de papéis no nível da rota (defesa em profundidade; a API também valida).
+  // Espelha a política já aplicada em LayoutSidebar, mas antes de renderizar a página.
+  beforeLoad: ({ location }) => {
+    const token = getCurrentAccessToken();
+    // Sem token ainda não há papéis para avaliar; o componente SignedIn trata o login.
+    if (!token) {
+      return;
+    }
+    const state = resolveAuthRoleState(token);
+    const path = location.pathname;
+
+    if (state.isCustomerPortal) {
+      if (!path.startsWith('/portal') && path !== '/settings') {
+        throw redirect({ to: '/portal' });
+      }
+      return;
+    }
+
+    if (state.isInternalStaff && path.startsWith('/portal')) {
+      throw redirect({ to: '/' });
+    }
+
+    if (
+      state.isViewer &&
+      !state.canAccessOperations &&
+      !state.canAccessFinance &&
+      path !== '/' &&
+      path !== '/settings'
+    ) {
+      throw redirect({ to: '/' });
+    }
+
+    if (state.isPartnerOnly) {
+      if (
+        path.startsWith('/portal') ||
+        (!path.startsWith('/partner') && path !== '/settings')
+      ) {
+        throw redirect({ to: '/partner' });
+      }
+      return;
+    }
+
+    if (
+      state.canAccessFinance &&
+      !state.canAccessOperations &&
+      !path.startsWith('/finance') &&
+      path !== '/settings'
+    ) {
+      throw redirect({ to: '/finance' });
+    }
+
+    if (
+      state.canAccessOperations &&
+      !state.canAccessFinance &&
+      (path.startsWith('/finance') || path.startsWith('/users'))
+    ) {
+      throw redirect({ to: '/' });
+    }
+  },
   component: RouteComponent
 });

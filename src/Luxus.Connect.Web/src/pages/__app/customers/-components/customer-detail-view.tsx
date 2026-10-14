@@ -26,6 +26,7 @@ import {
   type ListCustomerResponse
 } from '@/api';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { CustomerIntakes } from '@/components/customer-intakes';
 import { LinkCustomerLineSheet } from '@/components/link-customer-line-sheet';
 import { Button } from '@/components/ui/button';
 import {
@@ -982,11 +983,44 @@ export function CustomerDetailView({
 
         <DetailSection
           title="Endereços"
-          description="O contrato OpenAPI atual não inclui endereços no detalhe do cliente."
+          description="Endereços cadastrados para este cliente."
         >
-          <div className="border-input rounded-md border border-dashed p-6 text-center text-sm">
-            <p className="text-muted-foreground">Nenhum endereço encontrado.</p>
-          </div>
+          {((customer as RegisteredCustomer).addresses ?? []).length > 0 ? (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {((customer as RegisteredCustomer).addresses ?? []).map(
+                (item, index) => (
+                  <address
+                    key={index}
+                    className="rounded-md border p-4 text-sm not-italic"
+                  >
+                    <p>
+                      {item.street}, {item.number}
+                      {item.complement ? ` · ${item.complement}` : ''}
+                    </p>
+                    <p>
+                      {item.neighborhood} · {item.city}/{item.state}
+                    </p>
+                    <p>
+                      CEP {item.zip_code} · {item.country || 'Brasil'}
+                    </p>
+                  </address>
+                )
+              )}
+            </div>
+          ) : (
+            <p className="text-muted-foreground text-sm">
+              Nenhum endereço encontrado.
+            </p>
+          )}
+        </DetailSection>
+
+        <Separator />
+
+        <DetailSection
+          title="Vendas recebidas de outros sistemas"
+          description="Histórico comercial e documentos vinculados ao cliente."
+        >
+          <CustomerIntakes customerId={customer.id} />
         </DetailSection>
 
         <Separator />

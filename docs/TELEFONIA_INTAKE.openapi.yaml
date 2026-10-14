@@ -1,0 +1,210 @@
+openapi: 3.1.0
+info:
+  title: Telefonia — recebimento de clientes e vendas
+  version: 1.0.0
+servers:
+  - url: https://telefonia.redobrai.online/api
+paths:
+  /v1/intake/customers:
+    post:
+      summary: Importar cliente, venda e documentos com chave de integração
+      security: [{ IntakeKey: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CustomerIntake' }
+      responses:
+        '201':
+          description: Cliente e venda recebidos
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IntakeResult' }
+        '200':
+          description: Reenvio idêntico, sem novas gravações
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IntakeResult' }
+        '400': { description: JSON, valor, documento ou arquivo inválido }
+        '401': { description: Chave inválida }
+        '409': { description: Venda já recebida com outro conteúdo, cliente inativo ou documento ambíguo }
+        '413': { description: Requisição acima de 24 MiB }
+        '429': { description: Limite de concorrência ou requisições atingido }
+        '503': { description: Integração ou storage não configurados }
+  /v1/customers:
+    post:
+      summary: Cadastro atual, aceitando também o envelope de intake
+      security: [{ Bearer: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '../src/Luxus.Connect.Web/docs/openapi.yaml#/components/schemas/CreateCustomerCommand'
+                - $ref: '#/components/schemas/CustomerIntake'
+      responses:
+        '201':
+          description: Cadastro criado; resposta depende do formato enviado
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '../src/Luxus.Connect.Web/docs/openapi.yaml#/components/schemas/ListCustomerResponse'
+                  - $ref: '#/components/schemas/IntakeResult'
+        '200':
+          description: Reenvio idêntico do envelope
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IntakeResult' }
+        '401': { description: JWT ausente ou inválido }
+        '403': { description: Perfil sem acesso operacional ou MFA obrigatório pendente }
+  /v1/customers/{id}/imported-sales:
+    get:
+      summary: Últimas 100 vendas importadas do cliente
+      security: [{ Bearer: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Histórico da organização autenticada, sem conteúdo Base64
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/IntakeRecord' } }
+        '404': { description: Cliente não encontrado na organização }
+  /v1/customers/{id}/attachments/{attachmentId}/download:
+    get:
+      summary: Obter URL temporária para um documento do cliente
+      security: [{ Bearer: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: attachmentId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: URL temporária autorizada
+          content:
+            application/json:
+              schema: { $ref: '../src/Luxus.Connect.Web/docs/openapi.yaml#/components/schemas/PresignedUrlModel' }
+        '404': { description: Cliente ou anexo não encontrado na organização }
+components:
+  securitySchemes:
+    IntakeKey: { type: apiKey, in: header, name: X-API-Key }
+    Bearer: { type: http, scheme: bearer, bearerFormat: JWT }
+  schemas:
+    Money:
+      type: number
+      minimum: 0
+      maximum: 999999999999.99
+      multipleOf: 0.01
+      description: Reais, até duas casas decimais; envie como número decimal sem notação exponencial.
+    CustomerIntake:
+      type: object
+      additionalProperties: false
+      required: [sale, client]
+      properties:
+        sourceSystem: { type: string, maxLength: 128, default: external }
+        sale: { $ref: '#/components/schemas/IntakeSale' }
+        client: { $ref: '#/components/schemas/IntakeClient' }
+        attachments:
+          type: array
+          maxItems: 10
+          description: Soma dos arquivos decodificados limitada a 16 MiB.
+          items: { $ref: '#/components/schemas/IntakeAttachment' }
+    IntakeSale:
+      type: object
+      additionalProperties: false
+      required: [id, protocol, soldAt, value, commissionValue]
+      properties:
+        id: { type: string, minLength: 1, maxLength: 256 }
+        protocol: { type: string, minLength: 1, maxLength: 256 }
+        taskProtocol: { type: string, maxLength: 256 }
+        soldAt: { type: string, format: date-time }
+        concludedAt: { type: [string, 'null'], format: date-time }
+        value: { $ref: '#/components/schemas/Money' }
+        commissionValue: { $ref: '#/components/schemas/Money' }
+        operatorName: { type: string, maxLength: 256 }
+        planName: { type: string, maxLength: 256 }
+        lineNumber: { type: string, maxLength: 256 }
+        simType: { type: string, maxLength: 256 }
+        isVirginChip: { type: boolean }
+        iccid: { type: string, maxLength: 22 }
+        deviceImei: { type: string, maxLength: 15 }
+        deviceEid: { type: string, maxLength: 32 }
+        devicePlatform: { type: string, maxLength: 256 }
+        isPortability: { type: boolean }
+        portabilityNumber: { type: string, maxLength: 256 }
+        donorOperator: { type: string, maxLength: 256 }
+        isUpgrade: { type: boolean }
+        upgradeOfProtocol: { type: string, maxLength: 256 }
+        contractFormat: { type: string, maxLength: 256 }
+        partnerName: { type: string, maxLength: 256 }
+        branchName: { type: string, maxLength: 256 }
+        notes: { type: string, maxLength: 4000 }
+      allOf:
+        - if: { required: [isPortability], properties: { isPortability: { const: true } } }
+          then: { required: [portabilityNumber, donorOperator], properties: { portabilityNumber: { minLength: 1 }, donorOperator: { minLength: 1 } } }
+        - if: { required: [isUpgrade], properties: { isUpgrade: { const: true } } }
+          then: { required: [upgradeOfProtocol], properties: { upgradeOfProtocol: { minLength: 1 } } }
+    IntakeClient:
+      type: object
+      additionalProperties: false
+      required: [name, document, documentType]
+      properties:
+        id: { type: string, maxLength: 256 }
+        name: { type: string, minLength: 1, maxLength: 256 }
+        document: { type: string, maxLength: 256 }
+        documentType: { type: string, enum: [CPF, CNPJ] }
+        legalName: { type: string, maxLength: 256 }
+        rg: { type: string, maxLength: 256 }
+        email: { type: string, maxLength: 256 }
+        phone: { type: string, maxLength: 256 }
+        address: { type: string, maxLength: 256 }
+        addressNumber: { type: string, maxLength: 16 }
+        complement: { type: string, maxLength: 128 }
+        neighborhood: { type: string, maxLength: 128 }
+        city: { type: string, maxLength: 128 }
+        state: { type: string, maxLength: 64 }
+        zipCode: { type: string, maxLength: 10 }
+      allOf:
+        - if: { required: [documentType], properties: { documentType: { const: CNPJ } } }
+          then: { required: [legalName], properties: { legalName: { minLength: 1 }, rg: { const: '' } } }
+    IntakeAttachment:
+      type: object
+      additionalProperties: false
+      required: [id, type, name, mimeType, contentBase64]
+      properties:
+        id: { type: string, minLength: 1, maxLength: 256 }
+        type: { type: string, minLength: 1, maxLength: 64, examples: [CONTRACT] }
+        name: { type: string, minLength: 1, maxLength: 256 }
+        mimeType: { type: string, enum: [application/pdf, image/jpeg, image/png, image/webp] }
+        contentBase64: { type: string, contentEncoding: base64, maxLength: 11184812, writeOnly: true }
+    IntakeResult:
+      type: object
+      required: [customer_id, sale_id, intake_id, replayed]
+      properties:
+        customer_id: { type: string, format: uuid }
+        sale_id: { type: string, format: uuid }
+        intake_id: { type: string, format: uuid }
+        replayed: { type: boolean }
+    IntakeRecord:
+      type: object
+      required: [id, source_system, customer_id, sale_id, sale, client, attachments, imported_at]
+      properties:
+        id: { type: string, format: uuid }
+        source_system: { type: string }
+        customer_id: { type: string, format: uuid }
+        sale_id: { type: string, format: uuid }
+        sale: { $ref: '#/components/schemas/IntakeSale' }
+        client: { $ref: '#/components/schemas/IntakeClient' }
+        imported_at: { type: string, format: date-time }
+        attachments:
+          type: array
+          items:
+            type: object
+            properties:
+              external_id: { type: string }
+              attachment_id: { type: string, format: uuid }
+              type: { type: string }
+              name: { type: string }
+              mime_type: { type: string }
+              size_bytes: { type: integer }

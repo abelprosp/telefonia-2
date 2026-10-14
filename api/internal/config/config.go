@@ -10,6 +10,8 @@ import (
 )
 
 type Config struct {
+	IntakeAPIKey                    string
+	IntakeOrgID                     string
 	DatabaseURL                     string
 	RabbitMQURL                     string
 	KeycloakRealm                   string
@@ -103,6 +105,8 @@ func Load() Config {
 	}
 
 	return Config{
+		IntakeAPIKey:                    strings.TrimSpace(os.Getenv("TELEFONIA_INTAKE_API_KEY")),
+		IntakeOrgID:                     strings.TrimSpace(os.Getenv("TELEFONIA_INTAKE_ORG_ID")),
 		DatabaseURL:                     dbURL,
 		RabbitMQURL:                     os.Getenv("RABBITMQ_URL"),
 		KeycloakRealm:                   os.Getenv("KEYCLOAK_REALM"),
@@ -166,8 +170,20 @@ func (c Config) IsProduction() bool {
 // Validate fails closed rather than replacing invalid endpoints or accepting
 // development credentials in production.
 func (c Config) Validate() error {
+	if (c.IntakeAPIKey == "") != (c.IntakeOrgID == "") {
+		return fmt.Errorf("TELEFONIA_INTAKE_API_KEY and TELEFONIA_INTAKE_ORG_ID must be configured together")
+	}
+	if c.IntakeAPIKey != "" && (len(c.IntakeAPIKey) < 32 || len(c.IntakeOrgID) > 36) {
+		return fmt.Errorf("intake requires a key of at least 32 characters and a valid organization ID")
+	}
 	if c.DatabaseURL == "" || c.KeycloakRealm == "" || c.KeycloakResource == "" || c.KeycloakAuthServerURL == "" {
 		return fmt.Errorf("DATABASE_URL and KEYCLOAK_REALM/AUTH_SERVER_URL/RESOURCE are required")
+	}
+	// Wildcard CORS is never acceptable because responses allow credentials.
+	for _, origin := range c.CORSOrigins {
+		if strings.Contains(origin, "*") {
+			return fmt.Errorf("CORS_ORIGINS must not contain wildcards")
+		}
 	}
 	if !c.IsProduction() {
 		return nil

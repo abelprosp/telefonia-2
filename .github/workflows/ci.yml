@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (Go)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache-dependency-path: api/go.sum
+      - name: Build
+        run: go build ./...
+      - name: Vet
+        run: go vet ./...
+      - name: Test
+        run: go test ./...
+
+  frontend:
+    name: Frontend (Vite/React)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/Luxus.Connect.Web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: src/Luxus.Connect.Web/package-lock.json
+      - name: Install
+        run: npm ci
+      - name: Typecheck & build
+        run: npm run build
+      - name: Lint
+        run: npm run lint
+      - name: Security tests
+        run: npm run test:security

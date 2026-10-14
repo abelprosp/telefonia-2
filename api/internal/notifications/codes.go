@@ -1,6 +1,9 @@
 package notifications
 
-import "strings"
+import (
+	"log/slog"
+	"strings"
+)
 
 type Notification struct {
 	Code    string  `json:"code"`
@@ -18,6 +21,9 @@ func NP(code, message, param string) Notification {
 
 // Shared
 func SharedUnexpectedError(detail string) Notification {
+	// Persist the raw internal error server-side for diagnosis; the client only
+	// ever receives the generic/mapped message below.
+	slog.Error("unexpected_error", "detail", detail)
 	msg := "Ocorreu um erro inesperado. Tente novamente."
 	d := strings.ToLower(strings.TrimSpace(detail))
 	switch {

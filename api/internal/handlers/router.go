@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	connectauth "github.com/luxus-connect/telefonia/api/internal/auth"
 
 	"github.com/luxus-connect/telefonia/api/internal/httputil"
@@ -19,6 +20,8 @@ import (
 )
 
 type Handler struct {
+	IntakeKey           string
+	IntakeOrg           string
 	Svc                 *services.Service
 	Presigned           *services.PresignedService
 	AgentKey            string
@@ -27,10 +30,10 @@ type Handler struct {
 }
 
 func decodeJSON(r *http.Request, v any) error {
-	defer r.Body.Close()
 	if r.Body == nil {
 		return nil
 	}
+	defer r.Body.Close()
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(v); err != nil {
@@ -64,6 +67,7 @@ func (h *Handler) RegisterRoutes(
 ) {
 
 	r.Route("/v1", func(r chi.Router) {
+		r.With(connectauth.IntakeAuthenticate(h.IntakeKey, h.IntakeOrg), middleware.Throttle(4)).Post("/intake/customers", h.customerIntake)
 
 		r.Post("/webhooks/sicredi", h.sicrediWebhook)
 		r.Post("/webhooks/zapsign", h.zapsignWebhook)
@@ -179,7 +183,7 @@ func (h *Handler) RegisterRoutes(
 
 				r.Get("/", h.listCustomers)
 
-				r.Post("/", h.createCustomer)
+				r.With(middleware.Throttle(4)).Post("/", h.createCustomer)
 
 				r.Route("/{id}", func(r chi.Router) {
 
@@ -202,6 +206,8 @@ func (h *Handler) RegisterRoutes(
 					r.Get("/provider-links", h.listCustomerProviderLinks)
 
 					r.Get("/attachments", h.listCustomerAttachments)
+					r.Get("/attachments/{attachmentId}/download", h.downloadCustomerIntakeAttachment)
+					r.Get("/imported-sales", h.listCustomerIntakes)
 
 					r.Post("/attachments", h.createCustomerAttachment)
 

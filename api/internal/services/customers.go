@@ -27,6 +27,8 @@ type ImportProcessor interface {
 }
 
 type Service struct {
+	IntakeStorage            IntakeObjectStorage
+	IntakeBucket             string
 	Store                    *store.Store
 	Publisher                EventPublisher
 	Processor                ImportProcessor
@@ -338,7 +340,15 @@ func (s *Service) ListCustomers(ctx context.Context, providerID *string, page ht
 	if err != nil {
 		return nil, 0, err
 	}
-	items, total, err := s.Store.ListCustomers(ctx, orgID, providerID, nil, page)
+	// A pure salesperson may only list the customers they are responsible for.
+	var salespersonUserID *string
+	if auth.IsSales(ctx) && !auth.IsMaster(ctx) && !auth.IsEmployee(ctx) {
+		if u := auth.UserFromContext(ctx); u != nil && strings.TrimSpace(u.ID) != "" {
+			id := u.ID
+			salespersonUserID = &id
+		}
+	}
+	items, total, err := s.Store.ListCustomers(ctx, orgID, providerID, salespersonUserID, page)
 	if err != nil || s.Keycloak == nil || !s.Keycloak.Enabled() {
 		return items, total, err
 	}
@@ -428,6 +438,16 @@ func (s *Service) CreateCustomer(ctx context.Context, input models.CreateCustome
 	id := uuid.New().String()
 	if err := s.Store.WithTx(ctx, func(txCtx context.Context, tx pgx.Tx) error {
 		txCtx = store.CtxWithTx(txCtx, tx)
+		if _, err := tx.Exec(txCtx, `SELECT pg_advisory_xact_lock(hashtextextended($1,0))`, "customer:"+orgID+":"+doc); err != nil {
+			return err
+		}
+		duplicate, err := s.Store.CustomerDocumentExists(txCtx, orgID, doc)
+		if err != nil {
+			return err
+		}
+		if duplicate {
+			return httputil.BusinessError(notifications.CustomerDocumentDuplicated)
+		}
 		if err := s.Store.CreateCustomer(txCtx, orgID, id, providerID, customerType,
 			strings.TrimSpace(input.Name), doc, docType, input.LegalName, input.StateRegistration,
 			input.ResponsibleSalespersonUserID, birthDate); err != nil {

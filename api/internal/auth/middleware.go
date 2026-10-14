@@ -211,24 +211,25 @@ func claimString(raw any) string {
 }
 
 func (m *Middleware) validateTokenIssuerAudience(claims jwt.MapClaims) error {
-	expectedIssuer := strings.TrimRight(m.cfg.KeycloakPublicAuthServerURL, "/") + "/realms/" + m.cfg.KeycloakRealm
-	if expectedIssuer == "/realms/" || strings.HasSuffix(expectedIssuer, "/realms/") {
-		expectedIssuer = strings.TrimRight(m.cfg.KeycloakAuthServerURL, "/") + "/realms/" + m.cfg.KeycloakRealm
+	realm := strings.TrimSpace(m.cfg.KeycloakRealm)
+	if realm == "" {
+		return fmt.Errorf("Keycloak realm is not configured")
 	}
+	publicURL := strings.TrimRight(strings.TrimSpace(m.cfg.KeycloakPublicAuthServerURL), "/")
+	if publicURL == "" {
+		publicURL = strings.TrimRight(strings.TrimSpace(m.cfg.KeycloakAuthServerURL), "/")
+	}
+	expectedIssuer := publicURL + "/realms/" + realm
+	// Accept either the public or the internal issuer used by Keycloak behind a reverse proxy.
+	altIssuer := strings.TrimRight(strings.TrimSpace(m.cfg.KeycloakAuthServerURL), "/") + "/realms/" + realm
 	iss := strings.TrimSpace(claimString(claims["iss"]))
-	if expectedIssuer != "" && !strings.HasSuffix(expectedIssuer, "/realms/") {
-		if iss != expectedIssuer {
-			// Accept either public or internal issuer used by Keycloak behind reverse proxy.
-			alt := strings.TrimRight(m.cfg.KeycloakAuthServerURL, "/") + "/realms/" + m.cfg.KeycloakRealm
-			if iss != alt {
-				return fmt.Errorf("Invalid token issuer")
-			}
-		}
+	if iss == "" || (iss != expectedIssuer && iss != altIssuer) {
+		return fmt.Errorf("Invalid token issuer")
 	}
 
 	clientID := strings.TrimSpace(m.cfg.KeycloakResource)
 	if clientID == "" {
-		return nil
+		return fmt.Errorf("Keycloak resource is not configured")
 	}
 	if azp := strings.TrimSpace(claimString(claims["azp"])); azp != "" {
 		if azp != clientID {

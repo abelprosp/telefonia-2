@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -16,6 +17,12 @@ import (
 	"github.com/luxus-connect/telefonia/api/internal/config"
 	"github.com/luxus-connect/telefonia/api/internal/models"
 )
+
+// PutIntakeObject only receives server-generated, tenant-scoped intake keys.
+func (c *Client) PutIntakeObject(ctx context.Context, bucket, key, contentType string, data []byte) error {
+	_, err := c.client.PutObject(ctx, &s3.PutObjectInput{Bucket: aws.String(bucket), Key: aws.String(key), ContentType: aws.String(contentType), ContentDisposition: aws.String("attachment"), Body: bytes.NewReader(data)})
+	return err
+}
 
 // MaxObjectBytes is the hard ceiling for objects loaded *into memory*.
 // Safe default for incidental GetObject callers: 512 MiB.
