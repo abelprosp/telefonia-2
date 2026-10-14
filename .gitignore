@@ -221,3 +221,4 @@ docker/build-secrets/nuget.credentials.config
 
 .cursor/
 ssl/
+parceiros-uploads/
