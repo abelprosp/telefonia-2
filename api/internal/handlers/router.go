@@ -26,6 +26,8 @@ type Handler struct {
 	Presigned           *services.PresignedService
 	AgentKey            string
 	AgentOrg            string
+	ParceirosKey        string
+	ParceirosOrg        string
 	ZapSignWebhookToken string
 }
 
@@ -71,6 +73,11 @@ func (h *Handler) RegisterRoutes(
 
 		r.Post("/webhooks/sicredi", h.sicrediWebhook)
 		r.Post("/webhooks/zapsign", h.zapsignWebhook)
+
+		r.Group(func(r chi.Router) {
+			r.Use(connectauth.ParceirosAuthenticate(h.ParceirosKey, h.ParceirosOrg))
+			r.Post("/integrations/luxus-parceiros/sales", h.importParceirosSale)
+		})
 
 		r.Group(func(r chi.Router) {
 			r.Use(connectauth.AgentAuthenticate(h.AgentKey, h.AgentOrg))

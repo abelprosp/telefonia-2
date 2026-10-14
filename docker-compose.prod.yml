@@ -129,6 +129,9 @@ services:
       - FINANCIAL_AGENT_API_KEY=${FINANCIAL_AGENT_API_KEY:-}
       - FINANCIAL_AGENT_ORG_ID=${FINANCIAL_AGENT_ORG_ID:-}
       - FINANCIAL_AGENT_PUBLIC_URL=${FINANCIAL_AGENT_PUBLIC_URL:-${PUBLIC_ORIGIN:?Defina a origem HTTPS publica}/api}
+      - PARCEIROS_INTAKE_API_KEY=${PARCEIROS_INTAKE_API_KEY:-}
+      - PARCEIROS_INTAKE_ORG_ID=${PARCEIROS_INTAKE_ORG_ID:-}
+      - PARCEIROS_UPLOAD_DIR=/var/lib/parceiros-uploads
       - ZAPSIGN_API_TOKEN=${ZAPSIGN_API_TOKEN:-}
       - ZAPSIGN_BASE_URL=${ZAPSIGN_BASE_URL:-}
       - ZAPSIGN_SANDBOX=${ZAPSIGN_SANDBOX:-false}
@@ -152,6 +155,8 @@ services:
       timeout: 5s
       retries: 12
       start_period: 20s
+    volumes:
+      - parceiros-uploads:/var/lib/parceiros-uploads
     ports: !override
       - '127.0.0.1:8010:80'
 
@@ -177,3 +182,5 @@ services:
 volumes:
   minio-data:
     name: connect.luxus.minio-data
+  parceiros-uploads:
+    name: connect.luxus.parceiros-uploads

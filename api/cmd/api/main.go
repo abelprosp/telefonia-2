@@ -98,6 +98,7 @@ func main() {
 		StateMachine:             statemachine.NewEngine(st),
 		FinancialAgentPublicURL:  cfg.FinancialAgentPublicURL,
 		FinancialAgentConfigured: cfg.FinancialAgentAPIKey != "" && cfg.FinancialAgentOrgID != "",
+		ParceirosUploadDir:       cfg.ParceirosUploadDir,
 	}
 	if zapClient.Enabled() {
 		logger.Info("zapsign integration enabled")
@@ -145,6 +146,11 @@ func main() {
 	} else {
 		logger.Info("financial n8n agent disabled — set FINANCIAL_AGENT_API_KEY and FINANCIAL_AGENT_ORG_ID")
 	}
+	if cfg.ParceirosIntakeAPIKey != "" && cfg.ParceirosIntakeOrgID != "" {
+		logger.Info("luxus parceiros intake enabled")
+	} else {
+		logger.Info("luxus parceiros intake disabled — set PARCEIROS_INTAKE_API_KEY and PARCEIROS_INTAKE_ORG_ID")
+	}
 
 	var presigned *services.PresignedService
 	if cfg.ObjectStorageServiceURL != "" {
@@ -184,6 +190,8 @@ func main() {
 		Presigned:           presigned,
 		AgentKey:            cfg.FinancialAgentAPIKey,
 		AgentOrg:            cfg.FinancialAgentOrgID,
+		ParceirosKey:        cfg.ParceirosIntakeAPIKey,
+		ParceirosOrg:        cfg.ParceirosIntakeOrgID,
 		ZapSignWebhookToken: cfg.ZapSignWebhookToken,
 	}
 
@@ -262,7 +270,7 @@ func main() {
 		r.Use(cors.Handler(cors.Options{
 			AllowedOrigins:   cfg.CORSOrigins,
 			AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"},
-			AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Correlation-ID", "X-Request-ID", "X-Agent-Key", "X-API-Key"},
+			AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Correlation-ID", "X-Request-ID", "X-Agent-Key", "X-API-Key", "X-Parceiros-Key"},
 			ExposedHeaders:   []string{"X-Correlation-ID", "X-Request-ID"},
 			AllowCredentials: true,
 			MaxAge:           300,
@@ -277,7 +285,7 @@ func main() {
 
 	addr := fmt.Sprintf(":%s", cfg.Port)
 	server := &http.Server{Addr: addr, Handler: r, ReadHeaderTimeout: 10 * time.Second,
-		ReadTimeout: 30 * time.Second, WriteTimeout: 5 * time.Minute, IdleTimeout: 60 * time.Second,
+		ReadTimeout: 120 * time.Second, WriteTimeout: 5 * time.Minute, IdleTimeout: 60 * time.Second,
 		MaxHeaderBytes: 1 << 20}
 
 	go func() {

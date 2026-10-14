@@ -39,6 +39,8 @@ func TestIntakeBodyLimitDoesNotExpandOtherRoutes(t *testing.T) {
 		{"PATCH", "/v1/customers", 3 << 20, 413},
 		{"POST", "/v1/providers", 3 << 20, 413},
 		{"POST", "/v1/intake/customers", 25 << 20, 413},
+		{"POST", "/v1/integrations/luxus-parceiros/sales", 31 << 20, 204},
+		{"POST", "/v1/integrations/luxus-parceiros/sales", 33 << 20, 413},
 	} {
 		r := httptest.NewRequest(test.method, test.path, nil)
 		r.ContentLength = test.length

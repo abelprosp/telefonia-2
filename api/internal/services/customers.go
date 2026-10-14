@@ -39,6 +39,7 @@ type Service struct {
 	StateMachine             *statemachine.Engine
 	FinancialAgentPublicURL  string
 	FinancialAgentConfigured bool
+	ParceirosUploadDir      string
 }
 
 func (s *Service) SM() *statemachine.Engine {
