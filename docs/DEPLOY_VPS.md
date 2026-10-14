@@ -144,6 +144,27 @@ Se alterares o FQDN, atualiza de forma consistente:
 
 ## Problemas frequentes
 
+### Registry indisponível com imagens ainda instaladas
+
+Se o pull falhar e os contêineres anteriores ainda existirem, use:
+
+```bash
+python3 scripts/pin-local-images.py &&
+docker compose -f docker-compose.yml -f docker-compose.prod.yml config --quiet &&
+DOCKER_PULL_POLICY=never bash docker-up.sh prod
+```
+
+O script exige os cinco contêineres, inclusive `minio-init.connect.luxus`
+(pode estar parado), e verifica as imagens antes de alterar o `.env`.
+Cria backup com permissão 600 e preserva as demais variáveis.
+Se algum contêiner ou imagem estiver ausente, interrompe sem alterar o `.env`.
+Não use `down` antes dessa recuperação nem remova as imagens do cache.
+O procedimento mantém as versões existentes; atualizações de segurança exigem
+depois imagens verificadas e acessíveis.
+
+Um ID local `sha256:...` difere de um digest de manifesto
+`registry/imagem@sha256:...`: não acrescente um registry ao ID local.
+
 | Sintoma                         | O que verificar                                                                                                    |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | Certbot **404** no desafio ACME | Porta **80** ocupada; registo **AAAA** a apontar para outro sítio; domínio ainda a apontar para hospedagem antiga. |

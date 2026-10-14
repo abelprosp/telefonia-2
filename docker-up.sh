@@ -29,10 +29,24 @@ if [ "${1:-}" = "prod" ]; then
   images=$(docker compose "${COMPOSE_FILES[@]}" config --format json |
     python3 -c 'import json,sys; s=json.load(sys.stdin)["services"]; print("\n".join(s[n]["image"] for n in ("postgres", "rabbitmq", "minio", "minio-init", "keycloak")))')
   while IFS= read -r image; do
-    if ! [[ "$image" =~ @sha256:[a-f0-9]{64}$ ]]; then
+    if [[ "$image" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+      # A local image ID is immutable, but is not a registry manifest digest.
+      local_id=$(docker image inspect --format '{{.Id}}' "$image")
+      if [ "$local_id" != "$image" ]; then
+        echo "Imagem local indisponível: $image" >&2
+        exit 1
+      fi
+    elif ! [[ "$image" =~ @sha256:[a-f0-9]{64}$ ]]; then
       echo "Produção exige imagens Postgres, RabbitMQ, MinIO, mc e Keycloak fixadas por digest SHA-256." >&2
       exit 1
     fi
   done <<< "$images"
 fi
-docker compose "${COMPOSE_FILES[@]}" up -d --build --remove-orphans --wait --wait-timeout 180
+PULL_ARGS=()
+if [ -n "${DOCKER_PULL_POLICY:-}" ]; then
+  case "$DOCKER_PULL_POLICY" in
+    always|missing|never) PULL_ARGS=(--pull "$DOCKER_PULL_POLICY") ;;
+    *) echo "DOCKER_PULL_POLICY deve ser always, missing ou never." >&2; exit 1 ;;
+  esac
+fi
+docker compose "${COMPOSE_FILES[@]}" up -d --build "${PULL_ARGS[@]}" --remove-orphans --wait --wait-timeout 180
