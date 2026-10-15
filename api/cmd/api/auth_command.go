@@ -22,7 +22,15 @@ func runAuthCommand(ctx context.Context, st *store.Store, cfg config.Config, arg
 		return fmt.Errorf("uso: api auth init-admin USUARIO EMAIL | reset-password USUARIO | reset-mfa USUARIO | import-keycloak")
 	}
 	if args[0] == "import-keycloak" {
-		return importLegacyAccounts(ctx, st, cfg)
+		assignments := []string{}
+		for i := 1; i < len(args); i++ {
+			if args[i] != "--assign-org" || i+1 >= len(args) {
+				return fmt.Errorf("uso: api auth import-keycloak [--assign-org USUARIO=UUID]")
+			}
+			i++
+			assignments = append(assignments, args[i])
+		}
+		return importLegacyAccounts(ctx, st, cfg, assignments...)
 	}
 	if len(args) < 2 {
 		return fmt.Errorf("informe o usuário")
@@ -108,7 +116,30 @@ func runAuthCommand(ctx context.Context, st *store.Store, cfg config.Config, arg
 	return nil
 }
 
-func importLegacyAccounts(ctx context.Context, st *store.Store, cfg config.Config) error {
+func parseOrganizationAssignments(values []string) (map[string]string, error) {
+	out := map[string]string{}
+	for _, value := range values {
+		name, id, ok := strings.Cut(value, "=")
+		name = strings.TrimSpace(name)
+		id = strings.TrimSpace(id)
+		parsed, err := uuid.Parse(id)
+		if !ok || name == "" || err != nil || parsed == uuid.Nil {
+			return nil, fmt.Errorf("vínculo inválido; use --assign-org USUARIO=UUID")
+		}
+		if _, exists := out[name]; exists {
+			return nil, fmt.Errorf("usuário %s informado mais de uma vez", name)
+		}
+		out[name] = parsed.String()
+	}
+	return out, nil
+}
+
+func importLegacyAccounts(ctx context.Context, st *store.Store, cfg config.Config, assignments ...string) error {
+	assigned, err := parseOrganizationAssignments(assignments)
+	if err != nil {
+		return err
+	}
+	used := map[string]bool{}
 	kc := keycloak.NewAdminClient(cfg)
 	if !kc.Enabled() {
 		return fmt.Errorf("configure temporariamente KEYCLOAK_AUTH_SERVER_URL, KEYCLOAK_REALM e KEYCLOAK_ADMIN_PASSWORD para a migração")
@@ -136,7 +167,19 @@ func importLegacyAccounts(ctx context.Context, st *store.Store, cfg config.Confi
 				}
 			}
 			if org == nil || org.ID == "" {
-				return fmt.Errorf("usuário %s sem organização: corrija o vínculo antes de importar", old.Username)
+				if id, ok := assigned[old.Username]; ok {
+					org = &auth.Organization{ID: id}
+					used[old.Username] = true
+				} else {
+					return fmt.Errorf("usuário %s sem organização: informe --assign-org %s=UUID_DA_EMPRESA para esta conta", old.Username, old.Username)
+				}
+			}
+
+			if id, ok := assigned[old.Username]; ok && !used[old.Username] {
+				if org.ID != id {
+					return fmt.Errorf("usuário %s já pertence a outra organização; --assign-org não altera vínculos existentes", old.Username)
+				}
+				used[old.Username] = true
 			}
 			if _, e := uuid.Parse(org.ID); e != nil {
 				return fmt.Errorf("organização inválida para %s", old.Username)
@@ -159,6 +202,11 @@ func importLegacyAccounts(ctx context.Context, st *store.Store, cfg config.Confi
 		}
 		if len(page) < 100 {
 			break
+		}
+	}
+	for name := range assigned {
+		if !used[name] {
+			return fmt.Errorf("usuário %s informado em --assign-org não encontrado; nenhuma conta importada", name)
 		}
 	}
 	// Atomic and repeatable; existing local credentials are never overwritten.

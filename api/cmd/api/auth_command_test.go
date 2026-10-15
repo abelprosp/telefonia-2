@@ -68,9 +68,15 @@ func TestLegacyImportPreservesIdentityTenantAndLocalCredentials(t *testing.T) {
 	if u != nil {
 		t.Fatal("partial migration after missing tenant")
 	}
-	missingOrg = false
-	if e := importLegacyAccounts(ctx, st, cfg); e != nil {
+	if e := importLegacyAccounts(ctx, st, cfg, name+"="+org); e != nil {
 		t.Fatal(e)
+	}
+	missingOrg = false
+	if e := importLegacyAccounts(ctx, st, cfg, name+"="+uuid.NewString()); e == nil {
+		t.Fatal("explicit assignment overwrote an existing tenant")
+	}
+	if e := importLegacyAccounts(ctx, st, cfg, "misspelled-user="+org); e == nil {
+		t.Fatal("unknown explicit assignment ignored")
 	}
 	u, e = st.LocalUserByID(ctx, id)
 	if e != nil || u == nil || u.OrganizationID != org || u.Username != name || u.Document != "52998224725" || u.PasswordHash != "" {
@@ -90,5 +96,18 @@ func TestLegacyImportPreservesIdentityTenantAndLocalCredentials(t *testing.T) {
 	u, _ = st.LocalUserByID(ctx, id)
 	if u.PasswordHash != hash {
 		t.Fatal("repeat import overwrote local credentials")
+	}
+}
+
+func TestParseOrganizationAssignmentsRejectsAmbiguity(t *testing.T) {
+	org := uuid.NewString()
+	for _, values := range [][]string{{"arturabel"}, {"= " + org}, {"arturabel=invalid"}, {"arturabel=" + uuid.Nil.String()}, {"arturabel=" + org, "arturabel=" + org}} {
+		if _, e := parseOrganizationAssignments(values); e == nil {
+			t.Fatalf("invalid assignment accepted: %v", values)
+		}
+	}
+	mappings, e := parseOrganizationAssignments([]string{"arturabel=" + org})
+	if e != nil || mappings["arturabel"] != org {
+		t.Fatal("valid explicit assignment rejected")
 	}
 }

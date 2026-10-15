@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
 """One-time migration using the old container credentials, without printing them."""
 import json
+import argparse
 import os
 from pathlib import Path
 import subprocess
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Importar contas preservando IDs e empresas.")
+    parser.add_argument("--assign-org", action="append", default=[], metavar="USUARIO=UUID",
+                        help="Empresa explicitamente escolhida para uma conta sem organização; pode repetir.")
+    options = parser.parse_args()
     root = Path(__file__).resolve().parent.parent
     record = json.loads(subprocess.check_output(
         ["docker", "container", "inspect", "keycloak.connect.luxus"], text=True))[0]
@@ -24,7 +29,11 @@ def main():
     for key in ("KEYCLOAK_AUTH_SERVER_URL", "KEYCLOAK_REALM", "KEYCLOAK_RESOURCE", "KEYCLOAK_ADMIN_USERNAME", "KEYCLOAK_ADMIN_PASSWORD"):
         cmd.extend(["-e", key])
     cmd.extend(["connect-api", "auth", "import-keycloak"])
-    subprocess.run(cmd, cwd=root, env=env, check=True)
+    for assignment in options.assign_org:
+        cmd.extend(["--assign-org", assignment])
+    result = subprocess.run(cmd, cwd=root, env=env, check=False)
+    if result.returncode:
+        raise SystemExit("Migração interrompida. Corrija o erro informado acima e repita; não prossiga com o deploy.")
 
 
 if __name__ == "__main__":

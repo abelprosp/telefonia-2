@@ -38,6 +38,18 @@ sobrescritas. Contas sem empresa válida interrompem a importação; corrija ess
 vínculos na origem antes de tentar novamente. Usuários sem papel operacional
 ficam com acesso de portal, sem receber privilégios por padrão.
 
+Para uma conta sem organização, é possível escolher sua empresa somente durante
+a migração, sem editar o Keycloak. Exemplo, se `arturabel` pertence à Luxus padrão:
+
+```bash
+python3 scripts/migrate-keycloak-users.py \
+  --assign-org arturabel=00000000-0000-0000-0000-000000000001
+```
+
+Repita `--assign-org USUARIO=UUID` para outras contas sem empresa, escolhendo
+individualmente o destino correto. Vínculos existentes de outra empresa não
+são sobrescritos. Um nome não encontrado interrompe sem importação parcial.
+
 Senhas e autenticadores antigos não são copiados. Defina uma nova senha para
 cada conta importada, começando pelo seu administrador (substitua `SEU_USUARIO`):
 
