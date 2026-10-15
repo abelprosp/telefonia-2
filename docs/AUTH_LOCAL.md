@@ -50,6 +50,19 @@ Repita `--assign-org USUARIO=UUID` para outras contas sem empresa, escolhendo
 individualmente o destino correto. Vínculos existentes de outra empresa não
 são sobrescritos. Um nome não encontrado interrompe sem importação parcial.
 
+Se todas as contas sem empresa pertencerem à mesma organização, escolha
+explicitamente esse destino para o lote inteiro. Exemplo para a Luxus padrão:
+
+```bash
+python3 scripts/migrate-keycloak-users.py \
+  --assign-unassigned-to 00000000-0000-0000-0000-000000000001
+```
+
+Isso resolve todas as contas sem empresa de uma vez. Contas que já possuem
+organização continuam na empresa original. `--assign-org` tem prioridade para
+exceções individuais. Sem essas opções, a migração continua recusando contas
+sem vínculo, em vez de escolher uma empresa automaticamente.
+
 Senhas e autenticadores antigos não são copiados. Defina uma nova senha para
 cada conta importada, começando pelo seu administrador (substitua `SEU_USUARIO`):
 

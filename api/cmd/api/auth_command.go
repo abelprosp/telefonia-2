@@ -23,14 +23,23 @@ func runAuthCommand(ctx context.Context, st *store.Store, cfg config.Config, arg
 	}
 	if args[0] == "import-keycloak" {
 		assignments := []string{}
+		fallback := ""
 		for i := 1; i < len(args); i++ {
-			if args[i] != "--assign-org" || i+1 >= len(args) {
-				return fmt.Errorf("uso: api auth import-keycloak [--assign-org USUARIO=UUID]")
+			if (args[i] != "--assign-org" && args[i] != "--assign-unassigned-to") || i+1 >= len(args) {
+				return fmt.Errorf("uso: api auth import-keycloak [--assign-org USUARIO=UUID] [--assign-unassigned-to UUID]")
 			}
+			option := args[i]
 			i++
-			assignments = append(assignments, args[i])
+			if option == "--assign-unassigned-to" {
+				if fallback != "" {
+					return fmt.Errorf("informe --assign-unassigned-to apenas uma vez")
+				}
+				fallback = args[i]
+			} else {
+				assignments = append(assignments, args[i])
+			}
 		}
-		return importLegacyAccounts(ctx, st, cfg, assignments...)
+		return importLegacyAccountsWithDefault(ctx, st, cfg, fallback, assignments...)
 	}
 	if len(args) < 2 {
 		return fmt.Errorf("informe o usuário")
@@ -135,6 +144,17 @@ func parseOrganizationAssignments(values []string) (map[string]string, error) {
 }
 
 func importLegacyAccounts(ctx context.Context, st *store.Store, cfg config.Config, assignments ...string) error {
+	return importLegacyAccountsWithDefault(ctx, st, cfg, "", assignments...)
+}
+
+func importLegacyAccountsWithDefault(ctx context.Context, st *store.Store, cfg config.Config, fallback string, assignments ...string) error {
+	if fallback != "" {
+		parsed, e := uuid.Parse(fallback)
+		if e != nil || parsed == uuid.Nil {
+			return fmt.Errorf("--assign-unassigned-to exige um UUID de empresa válido")
+		}
+		fallback = parsed.String()
+	}
 	assigned, err := parseOrganizationAssignments(assignments)
 	if err != nil {
 		return err
@@ -170,6 +190,8 @@ func importLegacyAccounts(ctx context.Context, st *store.Store, cfg config.Confi
 				if id, ok := assigned[old.Username]; ok {
 					org = &auth.Organization{ID: id}
 					used[old.Username] = true
+				} else if fallback != "" {
+					org = &auth.Organization{ID: fallback}
 				} else {
 					return fmt.Errorf("usuário %s sem organização: informe --assign-org %s=UUID_DA_EMPRESA para esta conta", old.Username, old.Username)
 				}

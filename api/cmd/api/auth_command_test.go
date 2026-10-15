@@ -31,6 +31,11 @@ func TestLegacyImportPreservesIdentityTenantAndLocalCredentials(t *testing.T) {
 	name := "legacy-" + id
 	defer st.Pool().Exec(ctx, `DELETE FROM auth_users WHERE id=$1`, id)
 	missingOrg := true
+	bulk := false
+	unassignedID, foreignID, foreignOrg := uuid.NewString(), uuid.NewString(), uuid.NewString()
+	for _, testID := range []string{unassignedID, foreignID} {
+		defer st.Pool().Exec(ctx, `DELETE FROM auth_users WHERE id=$1`, testID)
+	}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
@@ -44,7 +49,11 @@ func TestLegacyImportPreservesIdentityTenantAndLocalCredentials(t *testing.T) {
 			if !missingOrg {
 				attrs["organization_id"] = []string{org}
 			}
-			json.NewEncoder(w).Encode([]keycloak.UserRecord{{ID: id, Username: name, Email: "legacy@example.com", Enabled: true, Attributes: attrs}})
+			records := []keycloak.UserRecord{{ID: id, Username: name, Email: "legacy@example.com", Enabled: true, Attributes: attrs}}
+			if bulk {
+				records = append(records, keycloak.UserRecord{ID: unassignedID, Username: "unassigned-" + unassignedID, Email: "unassigned@example.com", Enabled: true}, keycloak.UserRecord{ID: foreignID, Username: "foreign-" + foreignID, Email: "foreign@example.com", Enabled: true, Attributes: map[string][]string{"organization_id": {foreignOrg}}})
+			}
+			json.NewEncoder(w).Encode(records)
 		case r.URL.Path == "/admin/realms/luxus/clients":
 			if r.URL.Query().Get("clientId") != "connect-cli" {
 				t.Error("foreign application roles requested")
@@ -97,6 +106,23 @@ func TestLegacyImportPreservesIdentityTenantAndLocalCredentials(t *testing.T) {
 	if u.PasswordHash != hash {
 		t.Fatal("repeat import overwrote local credentials")
 	}
+	bulk = true
+	fallback := uuid.NewString()
+	if e = importLegacyAccountsWithDefault(ctx, st, cfg, fallback); e != nil {
+		t.Fatal(e)
+	}
+	unassigned, _ := st.LocalUserByID(ctx, unassignedID)
+	foreign, _ := st.LocalUserByID(ctx, foreignID)
+	if unassigned == nil || unassigned.OrganizationID != fallback {
+		t.Fatal("explicit batch destination not applied")
+	}
+	if foreign == nil || foreign.OrganizationID != foreignOrg {
+		t.Fatal("batch migration reassigned existing tenant")
+	}
+	u, _ = st.LocalUserByID(ctx, id)
+	if u.OrganizationID != org || u.PasswordHash != hash {
+		t.Fatal("batch migration overwrote existing local identity")
+	}
 }
 
 func TestParseOrganizationAssignmentsRejectsAmbiguity(t *testing.T) {
@@ -109,5 +135,13 @@ func TestParseOrganizationAssignmentsRejectsAmbiguity(t *testing.T) {
 	mappings, e := parseOrganizationAssignments([]string{"arturabel=" + org})
 	if e != nil || mappings["arturabel"] != org {
 		t.Fatal("valid explicit assignment rejected")
+	}
+}
+
+func TestBatchOrganizationRejectsInvalidDestination(t *testing.T) {
+	for _, id := range []string{"invalid", uuid.Nil.String()} {
+		if e := importLegacyAccountsWithDefault(context.Background(), nil, config.Config{}, id); e == nil || !strings.Contains(e.Error(), "UUID") {
+			t.Fatal("invalid destination was not rejected before importing")
+		}
 	}
 }

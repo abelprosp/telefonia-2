@@ -11,6 +11,8 @@ def main():
     parser = argparse.ArgumentParser(description="Importar contas preservando IDs e empresas.")
     parser.add_argument("--assign-org", action="append", default=[], metavar="USUARIO=UUID",
                         help="Empresa explicitamente escolhida para uma conta sem organização; pode repetir.")
+    parser.add_argument("--assign-unassigned-to", metavar="UUID",
+                        help="Empresa de destino de TODAS as contas sem organização. Preserva vínculos existentes.")
     options = parser.parse_args()
     root = Path(__file__).resolve().parent.parent
     record = json.loads(subprocess.check_output(
@@ -31,6 +33,8 @@ def main():
     cmd.extend(["connect-api", "auth", "import-keycloak"])
     for assignment in options.assign_org:
         cmd.extend(["--assign-org", assignment])
+    if options.assign_unassigned_to:
+        cmd.extend(["--assign-unassigned-to", options.assign_unassigned_to])
     result = subprocess.run(cmd, cwd=root, env=env, check=False)
     if result.returncode:
         raise SystemExit("Migração interrompida. Corrija o erro informado acima e repita; não prossiga com o deploy.")
