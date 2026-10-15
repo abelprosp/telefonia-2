@@ -499,7 +499,7 @@ export function CustomerDetailView({
                 <Input
                   id="customer-salesperson"
                   disabled={!isActive}
-                  placeholder="Opcional — ex.: sub do Keycloak"
+                  placeholder="Opcional — ID do usuário responsável"
                   {...form.register('responsible_salesperson_user_id')}
                 />
                 <FieldError

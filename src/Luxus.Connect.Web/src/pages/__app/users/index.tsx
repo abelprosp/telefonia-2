@@ -2,7 +2,16 @@ import { useMemo, useState } from 'react';
 
 import { createFileRoute, Navigate } from '@tanstack/react-router';
 import { type ColumnDef } from '@tanstack/react-table';
-import { Building2, KeyRound, Pencil, Plus, Sparkles, UserCheck, UserCog, UserX } from 'lucide-react';
+import {
+  Building2,
+  KeyRound,
+  Pencil,
+  Plus,
+  Sparkles,
+  UserCheck,
+  UserCog,
+  UserX
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 import { DataTable } from '@/components/data-table';
@@ -28,7 +37,12 @@ import {
   SheetTitle
 } from '@/components/ui/sheet';
 import { getErrorMessage, isApiHttpError } from '@/lib/api-error';
-import { PROFILE_OPTIONS, profileLabel, useAuthRoles, type UserProfile } from '@/lib/auth-roles';
+import {
+  PROFILE_OPTIONS,
+  profileLabel,
+  useAuthRoles,
+  type UserProfile
+} from '@/lib/auth-roles';
 import {
   type OrganizationUser,
   useCreateOrganizationUser,
@@ -88,8 +102,8 @@ function UsersPage() {
   const handleSaveEdit = () => {
     if (!editingUser) return;
 
-    if (editPassword && editPassword.length < 6) {
-      toast.error('A nova senha deve ter no mínimo 6 caracteres.');
+    if (editPassword && editPassword.length < 12) {
+      toast.error('A nova senha deve ter no mínimo 12 caracteres.');
       return;
     }
 
@@ -101,12 +115,12 @@ function UsersPage() {
         email: editEmail.trim(),
         profile: editProfile,
         enabled: editEnabled,
-        password: editPassword.trim() ? editPassword.trim() : undefined
+        password: editPassword || undefined
       },
       {
         onSuccess: () => {
           toast.success(
-            editPassword.trim()
+            editPassword
               ? 'Dados e senha do usuário atualizados com sucesso!'
               : 'Dados do usuário atualizados com sucesso!'
           );
@@ -114,7 +128,8 @@ function UsersPage() {
           setEditingUser(null);
           setEditPassword('');
         },
-        onError: (e) => toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+        onError: (e) =>
+          toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
       }
     );
   };
@@ -128,9 +143,13 @@ function UsersPage() {
         accessorKey: 'organization_name',
         header: 'Organização / Empresa',
         cell: ({ row }) => (
-          <div className="flex items-center gap-1.5 font-medium text-xs">
-            <Building2 className="size-3.5 text-muted-foreground" />
-            <span>{row.original.organization_name || row.original.organization_id || '—'}</span>
+          <div className="flex items-center gap-1.5 text-xs font-medium">
+            <Building2 className="text-muted-foreground size-3.5" />
+            <span>
+              {row.original.organization_name ||
+                row.original.organization_id ||
+                '—'}
+            </span>
           </div>
         )
       },
@@ -140,7 +159,10 @@ function UsersPage() {
         cell: ({ row }) => {
           const isMaster = row.original.profile === 'master';
           return (
-            <Badge variant={isMaster ? 'default' : 'secondary'} className="font-normal text-xs">
+            <Badge
+              variant={isMaster ? 'default' : 'secondary'}
+              className="text-xs font-normal"
+            >
               {profileLabel(row.original.profile)}
             </Badge>
           );
@@ -150,7 +172,10 @@ function UsersPage() {
         accessorKey: 'enabled',
         header: 'Status',
         cell: ({ row }) => (
-          <Badge variant={row.original.enabled ? 'outline' : 'destructive'} className="font-normal text-xs">
+          <Badge
+            variant={row.original.enabled ? 'outline' : 'destructive'}
+            className="text-xs font-normal"
+          >
             {row.original.enabled ? 'Ativo' : 'Inativo'}
           </Badge>
         )
@@ -159,7 +184,7 @@ function UsersPage() {
         id: 'actions',
         header: 'Ações',
         cell: ({ row }) => (
-          <div className="flex gap-2 justify-end">
+          <div className="flex justify-end gap-2">
             <Button
               size="sm"
               variant="outline"
@@ -172,22 +197,34 @@ function UsersPage() {
             <Button
               size="sm"
               variant="ghost"
-              className={row.original.enabled ? 'text-destructive hover:bg-destructive/10' : 'text-green-600 hover:bg-green-50'}
+              className={
+                row.original.enabled
+                  ? 'text-destructive hover:bg-destructive/10'
+                  : 'text-green-600 hover:bg-green-50'
+              }
               onClick={() =>
                 updateMutation.mutate(
                   { id: row.original.id, enabled: !row.original.enabled },
                   {
                     onSuccess: () =>
                       toast.success(
-                        row.original.enabled ? 'Usuário desativado.' : 'Usuário ativado.'
+                        row.original.enabled
+                          ? 'Usuário desativado.'
+                          : 'Usuário ativado.'
                       ),
                     onError: (e) =>
-                      toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+                      toast.error(
+                        isApiHttpError(e) ? e.message : getErrorMessage(e)
+                      )
                   }
                 )
               }
             >
-              {row.original.enabled ? <UserX className="size-3.5" /> : <UserCheck className="size-3.5" />}
+              {row.original.enabled ? (
+                <UserX className="size-3.5" />
+              ) : (
+                <UserCheck className="size-3.5" />
+              )}
             </Button>
           </div>
         )
@@ -228,7 +265,8 @@ function UsersPage() {
           setCreateProfile('employee');
           setCreateOrgName('');
         },
-        onError: (e) => toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+        onError: (e) =>
+          toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
       }
     );
   };
@@ -239,14 +277,18 @@ function UsersPage() {
 
   if (listQuery.isPending) {
     return (
-      <PageWrapper breadcrumbs={[{ label: 'Início', to: '/' }, { label: 'Usuários' }]}>
+      <PageWrapper
+        breadcrumbs={[{ label: 'Início', to: '/' }, { label: 'Usuários' }]}
+      >
         <ListPageSkeleton pageSize={10} columns={SKELETON_COLUMNS} />
       </PageWrapper>
     );
   }
 
   return (
-    <PageWrapper breadcrumbs={[{ label: 'Início', to: '/' }, { label: 'Usuários' }]}>
+    <PageWrapper
+      breadcrumbs={[{ label: 'Início', to: '/' }, { label: 'Usuários' }]}
+    >
       <div className="flex flex-col gap-6 p-6">
         <ListPageHeader
           title="Gestão de Usuários"
@@ -259,7 +301,11 @@ function UsersPage() {
           }
         />
 
-        <DataTable columns={columns} data={listQuery.data ?? []} getRowId={(r) => r.id} />
+        <DataTable
+          columns={columns}
+          data={listQuery.data ?? []}
+          getRowId={(r) => r.id}
+        />
       </div>
 
       {/* MODAL 1: CADASTRAR NOVO USUÁRIO */}
@@ -267,11 +313,12 @@ function UsersPage() {
         <SheetContent className="overflow-y-auto sm:max-w-lg">
           <SheetHeader>
             <SheetTitle className="flex items-center gap-2">
-              <UserCog className="size-5 text-primary" />
+              <UserCog className="text-primary size-5" />
               Cadastrar Novo Usuário
             </SheetTitle>
             <SheetDescription>
-              Preencha os dados de acesso e selecione o perfil de permissão do usuário.
+              Preencha os dados de acesso e selecione o perfil de permissão do
+              usuário.
             </SheetDescription>
           </SheetHeader>
           <div className="grid gap-4 px-4 py-2">
@@ -315,7 +362,7 @@ function UsersPage() {
               <Input
                 type="password"
                 value={createPassword}
-                placeholder="Mínimo 6 caracteres"
+                placeholder="Mínimo 12 caracteres"
                 onChange={(e) => setCreatePassword(e.target.value)}
               />
             </div>
@@ -323,7 +370,9 @@ function UsersPage() {
               <Label>Perfil de Acesso</Label>
               <Select
                 value={createProfile}
-                onValueChange={(v) => setCreateProfile((v ?? 'employee') as UserProfile)}
+                onValueChange={(v) =>
+                  setCreateProfile((v ?? 'employee') as UserProfile)
+                }
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -339,17 +388,20 @@ function UsersPage() {
             </div>
 
             {createProfile === 'master' ? (
-              <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-3">
-                <div className="flex items-center gap-2 text-primary font-medium text-sm">
+              <div className="border-primary/20 bg-primary/5 space-y-3 rounded-xl border p-4">
+                <div className="text-primary flex items-center gap-2 text-sm font-medium">
                   <Sparkles className="size-4" />
                   Nova Organização Multi-tenant
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Este usuário terá perfil <strong>Master</strong> e receberá uma organização exclusiva,
-                  com configurações de empresa, whitelabel e parâmetros de faturamento isolados.
+                <p className="text-muted-foreground text-xs">
+                  Este usuário terá perfil <strong>Master</strong> e receberá
+                  uma organização exclusiva, com configurações de empresa,
+                  whitelabel e parâmetros de faturamento isolados.
                 </p>
                 <div className="space-y-1.5 pt-1">
-                  <Label className="text-xs font-semibold">Nome da Nova Empresa / Organização</Label>
+                  <Label className="text-xs font-semibold">
+                    Nome da Nova Empresa / Organização
+                  </Label>
                   <Input
                     value={createOrgName}
                     placeholder="Ex: Telecom Brasil / Alpha Soluções"
@@ -359,10 +411,12 @@ function UsersPage() {
                 </div>
               </div>
             ) : (
-              <div className="rounded-xl border bg-muted/40 p-3 text-xs text-muted-foreground flex items-center gap-2">
-                <Building2 className="size-4 text-primary shrink-0" />
+              <div className="bg-muted/40 text-muted-foreground flex items-center gap-2 rounded-xl border p-3 text-xs">
+                <Building2 className="text-primary size-4 shrink-0" />
                 <span>
-                  Este usuário pertencerá à <strong>sua organização atual</strong> (isolada das demais empresas).
+                  Este usuário pertencerá à{' '}
+                  <strong>sua organização atual</strong> (isolada das demais
+                  empresas).
                 </span>
               </div>
             )}
@@ -390,25 +444,34 @@ function UsersPage() {
         <SheetContent className="overflow-y-auto sm:max-w-lg">
           <SheetHeader>
             <SheetTitle className="flex items-center gap-2">
-              <Pencil className="size-5 text-primary" />
+              <Pencil className="text-primary size-5" />
               Editar Usuário & Senha
             </SheetTitle>
             <SheetDescription>
-              Atualize os dados cadastrais, perfil de acesso ou redefina a senha de login do usuário.
+              Atualize os dados cadastrais, perfil de acesso ou redefina a senha
+              de login do usuário.
             </SheetDescription>
           </SheetHeader>
 
           {editingUser && (
             <div className="grid gap-4 px-4 py-2">
-              <div className="rounded-xl border bg-muted/30 p-3 text-xs flex items-center justify-between">
+              <div className="bg-muted/30 flex items-center justify-between rounded-xl border p-3 text-xs">
                 <div>
-                  <span className="text-muted-foreground block">Login (Imutável)</span>
-                  <span className="font-semibold text-sm">{editingUser.username}</span>
+                  <span className="text-muted-foreground block">
+                    Login (Imutável)
+                  </span>
+                  <span className="text-sm font-semibold">
+                    {editingUser.username}
+                  </span>
                 </div>
                 <div className="text-right">
-                  <span className="text-muted-foreground block">Organização</span>
-                  <span className="font-semibold text-xs">
-                    {editingUser.organization_name || editingUser.organization_id || '—'}
+                  <span className="text-muted-foreground block">
+                    Organização
+                  </span>
+                  <span className="text-xs font-semibold">
+                    {editingUser.organization_name ||
+                      editingUser.organization_id ||
+                      '—'}
                   </span>
                 </div>
               </div>
@@ -443,7 +506,9 @@ function UsersPage() {
                 <Label>Perfil de Acesso</Label>
                 <Select
                   value={editProfile}
-                  onValueChange={(v) => setEditProfile((v ?? 'employee') as UserProfile)}
+                  onValueChange={(v) =>
+                    setEditProfile((v ?? 'employee') as UserProfile)
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -468,26 +533,31 @@ function UsersPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="active">Ativo (Acesso Liberado)</SelectItem>
-                    <SelectItem value="inactive">Inativo (Acesso Bloqueado)</SelectItem>
+                    <SelectItem value="active">
+                      Ativo (Acesso Liberado)
+                    </SelectItem>
+                    <SelectItem value="inactive">
+                      Inativo (Acesso Bloqueado)
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               {/* Redefinição de Senha */}
-              <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 space-y-2">
-                <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 font-medium text-sm">
+              <div className="space-y-2 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
+                <div className="flex items-center gap-2 text-sm font-medium text-amber-700 dark:text-amber-400">
                   <KeyRound className="size-4" />
                   Redefinir Senha de Acesso
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Preencha uma nova senha abaixo somente se desejar alterá-la. Se deixar em branco, a senha atual continuará inalterada.
+                <p className="text-muted-foreground text-xs">
+                  Preencha uma nova senha abaixo somente se desejar alterá-la.
+                  Se deixar em branco, a senha atual continuará inalterada.
                 </p>
                 <Input
                   type="password"
                   value={editPassword}
                   placeholder="Digite a nova senha (mínimo 6 dígitos)"
-                  className="bg-background text-sm mt-1"
+                  className="bg-background mt-1 text-sm"
                   onChange={(e) => setEditPassword(e.target.value)}
                 />
               </div>
@@ -498,7 +568,11 @@ function UsersPage() {
             <Button variant="outline" onClick={() => setEditOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleSaveEdit} disabled={updateMutation.isPending} className="gap-2">
+            <Button
+              onClick={handleSaveEdit}
+              disabled={updateMutation.isPending}
+              className="gap-2"
+            >
               {updateMutation.isPending ? 'Salvando...' : 'Salvar Alterações'}
             </Button>
           </SheetFooter>

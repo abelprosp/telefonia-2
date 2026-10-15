@@ -1,10 +1,6 @@
 import { useMemo } from 'react';
 
-import { useAuth } from 'react-oidc-context';
-
-import { env } from '@/env';
-import { decode } from '@/lib/jwt';
-import { type TokenPayload } from '@/types/auth';
+import { useAuth } from '@/providers/auth';
 
 export type UserProfile =
   | 'master'
@@ -34,31 +30,16 @@ export type AuthRoleState = {
   profile: UserProfile;
 };
 
-function rolesFromAccessToken(token: string | undefined): string[] {
-  if (!token) {
-    return [];
-  }
-
-  const payload = decode<TokenPayload & { roles?: string[] }>(token);
-  if (!payload) {
-    return [];
-  }
-
-  const fromClaim = payload.roles ?? [];
-  const fromRealm = payload.realm_access?.roles ?? [];
-  const fromClient = payload.resource_access?.[env.VITE_CLIENT_ID]?.roles ?? [];
-
-  return [
+export function resolveAuthRoleState(
+  assignedRoles: string[] | undefined
+): AuthRoleState {
+  const roles = [
     ...new Set(
-      [...fromClaim, ...fromRealm, ...fromClient]
+      (assignedRoles ?? [])
         .map((role) => role.trim().toLowerCase())
         .filter(Boolean)
     )
   ];
-}
-
-export function resolveAuthRoleState(token: string | undefined): AuthRoleState {
-  const roles = rolesFromAccessToken(token);
   const isMaster = roles.includes('master') || roles.includes('admin');
   const isEmployee = roles.includes('employee');
   const isOperator = roles.includes('operator');
@@ -70,7 +51,8 @@ export function resolveAuthRoleState(token: string | undefined): AuthRoleState {
     isMaster || isEmployee || isOperator || isFinancial || isSales || isViewer;
   // Sem token ainda não dá para classificar. Tratar papéis vazios como
   // cliente nesse intervalo manda o Master para /portal e ele fica preso lá.
-  const isCustomerPortal = Boolean(token) && !isInternalStaff && !isPartner;
+  const isCustomerPortal =
+    Boolean(assignedRoles) && !isInternalStaff && !isPartner;
   const profile = resolveProfile(roles);
 
   return {
@@ -120,10 +102,7 @@ export function profileLabel(profile: UserProfile): string {
 export function useAuthRoles(): AuthRoleState {
   const { user } = useAuth();
 
-  return useMemo(
-    () => resolveAuthRoleState(user?.access_token),
-    [user?.access_token]
-  );
+  return useMemo(() => resolveAuthRoleState(user?.roles), [user?.roles]);
 }
 
 export function roleLabel(roles: Pick<AuthRoleState, 'profile'>) {

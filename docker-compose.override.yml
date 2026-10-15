@@ -14,7 +14,6 @@ services:
 
     environment:
 
-      - AUTH_PROXY_PASS=http://keycloak:8080/auth/
 
       - API_PROXY_PASS=http://connect-api:80/
 
@@ -28,25 +27,9 @@ services:
 
         VITE_API_URL: ${VITE_API_URL:-http://localhost:8002}
 
-        VITE_AUTH_URL: ${VITE_AUTH_URL:-http://localhost:8081/auth}
 
-        VITE_CLIENT_ID: connect-cli
 
         VITE_STORAGE_BUCKET_NAME: luxus-connect
-
-  keycloak:
-    environment:
-      - KC_HTTP_RELATIVE_PATH=/auth
-      - KC_HOSTNAME=http://localhost:8081/auth
-      - KC_HOSTNAME_ADMIN=http://localhost:8081/auth
-      - KC_HOSTNAME_URL=http://localhost:8081/auth
-      - KC_HOSTNAME_ADMIN_URL=http://localhost:8081/auth
-      - KC_HOSTNAME_STRICT=false
-      - KC_HOSTNAME_STRICT_HTTPS=false
-      - KC_PROXY_HEADERS=xforwarded
-      - KC_HTTP_ENABLED=true
-
-
 
   minio:
 
@@ -138,6 +121,7 @@ services:
 
     environment:
 
+      - AUTH_SECRET=${AUTH_SECRET:?Execute python3 scripts/configure-local-auth.py}
       - ENVIRONMENT=Development
       - TELEFONIA_INTAKE_API_KEY=${TELEFONIA_INTAKE_API_KEY:-}
       - TELEFONIA_INTAKE_ORG_ID=${TELEFONIA_INTAKE_ORG_ID:-}
@@ -148,17 +132,11 @@ services:
 
       - RABBITMQ_URL=amqp://${RMQ_USER}:${RMQ_PWD}@rabbitmq:5672
 
-      - KEYCLOAK_REALM=luxus
 
-      - KEYCLOAK_AUTH_SERVER_URL=http://keycloak:8080/auth
 
-      - KEYCLOAK_PUBLIC_AUTH_SERVER_URL=${KEYCLOAK_PUBLIC_AUTH_SERVER_URL:-http://localhost:8081/auth}
 
-      - KEYCLOAK_RESOURCE=connect-cli
 
-      - KEYCLOAK_ADMIN_USERNAME=admin
 
-      - KEYCLOAK_ADMIN_PASSWORD=${KC_ADMIN_PWD}
 
       - OBJECT_STORAGE_SERVICE_URL=${OBJECT_STORAGE_SERVICE_URL:-http://minio:9000}
 

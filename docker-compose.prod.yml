@@ -1,6 +1,6 @@
 # Produção na VPS Hostinger (telefonia.redobrai.online).
 # O nginx do Ubuntu escuta 80/443 e faz proxy para:
-#   web :3005  |  API :8010  |  Keycloak :8083  |  MinIO :19000
+#   web :3005  |  API :8010  |  MinIO :19000
 # Não publicar 80/443 nos contentores — senão o web não sobe e o host devolve 502.
 
 services:
@@ -66,50 +66,15 @@ services:
     entrypoint: ['/bin/sh', '/opt/connect/init.sh']
     restart: 'no'
 
-  keycloak:
-    image: ${KEYCLOAK_IMAGE:?Defina a imagem Keycloak com digest sha256}
-    volumes:
-      - ./docker/keycloak/luxus-realm.prod.json:/opt/keycloak/data/import/luxus-realm.json:ro
-    entrypoint:
-      - /opt/keycloak/bin/kc.sh
-      - start
-      - --import-realm
-      - --spi-theme-static-max-age=-1
-      - --spi-theme-cache-themes=false
-      - --spi-theme-cache-templates=false
-    depends_on:
-      postgres:
-        condition: service_healthy
-        restart: true
-    environment:
-      - PUBLIC_ORIGIN=${PUBLIC_ORIGIN:?Defina a origem HTTPS publica}
-      - KC_HTTP_RELATIVE_PATH=/auth
-      - KC_HTTP_ENABLED=true
-      - KC_SPI_REQUIRED_ACTION__UPDATE_PASSWORD__MAX_AUTH_AGE=0
-      - KC_PROXY_HEADERS=xforwarded
-      - KC_HOSTNAME=${PUBLIC_ORIGIN:?Defina a origem HTTPS publica}/auth
-      - KC_HOSTNAME_ADMIN=${PUBLIC_ORIGIN:?Defina a origem HTTPS publica}/auth
-      - KC_HOSTNAME_URL=${PUBLIC_ORIGIN:?Defina a origem HTTPS publica}/auth
-      - KC_HOSTNAME_ADMIN_URL=${PUBLIC_ORIGIN:?Defina a origem HTTPS publica}/auth
-      - KC_HOSTNAME_STRICT=true
-    ports: !override
-      - '127.0.0.1:8083:8080'
-    restart: on-failure
-
   connect-api:
     environment:
       - TELEFONIA_INTAKE_API_KEY=${TELEFONIA_INTAKE_API_KEY:-}
       - TELEFONIA_INTAKE_ORG_ID=${TELEFONIA_INTAKE_ORG_ID:-}
+      - AUTH_SECRET=${AUTH_SECRET:?Execute python3 scripts/configure-local-auth.py}
       - ENVIRONMENT=Production
       - PORT=80
       - DATABASE_URL=Host=postgres;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};Database=${POSTGRES_DB:-luxus_connect_dev};
       - RABBITMQ_URL=amqp://${RMQ_USER}:${RMQ_PWD}@rabbitmq:5672
-      - KEYCLOAK_REALM=luxus
-      - KEYCLOAK_AUTH_SERVER_URL=http://keycloak:8080/auth
-      - KEYCLOAK_PUBLIC_AUTH_SERVER_URL=${PUBLIC_ORIGIN:?Defina a origem HTTPS publica}/auth
-      - KEYCLOAK_RESOURCE=connect-cli
-      - KEYCLOAK_ADMIN_USERNAME=${KC_ADMIN_USERNAME:-admin}
-      - KEYCLOAK_ADMIN_PASSWORD=${KC_ADMIN_PWD}
       - OBJECT_STORAGE_SERVICE_URL=http://minio:9000
       - OBJECT_STORAGE_PUBLIC_URL=${PUBLIC_ORIGIN:?Defina a origem HTTPS publica}
       - OBJECT_STORAGE_ACCESS_KEY_ID=${OBJECT_STORAGE_ACCESS_KEY_ID:?Defina a chave da aplicacao}
@@ -143,9 +108,6 @@ services:
       rabbitmq:
         condition: service_healthy
         restart: true
-      keycloak:
-        condition: service_started
-        restart: true
       minio-init:
         condition: service_completed_successfully
     restart: on-failure
@@ -166,8 +128,6 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_API_URL: ${PUBLIC_ORIGIN:?Defina a origem HTTPS publica}/api
-        VITE_AUTH_URL: ${PUBLIC_ORIGIN:?Defina a origem HTTPS publica}/auth
-        VITE_CLIENT_ID: connect-cli
         VITE_STORAGE_BUCKET_NAME: ${OBJECT_STORAGE_BUCKET_NAME:-luxus-connect}
     ports:
       - '127.0.0.1:3005:80'

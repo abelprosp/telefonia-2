@@ -19,7 +19,7 @@ import (
 	"github.com/luxus-connect/telefonia/api/internal/handlers"
 	"github.com/luxus-connect/telefonia/api/internal/httputil"
 	"github.com/luxus-connect/telefonia/api/internal/importservice"
-	"github.com/luxus-connect/telefonia/api/internal/keycloak"
+	"github.com/luxus-connect/telefonia/api/internal/localauth"
 	"github.com/luxus-connect/telefonia/api/internal/messaging"
 	"github.com/luxus-connect/telefonia/api/internal/observability"
 	"github.com/luxus-connect/telefonia/api/internal/services"
@@ -62,14 +62,25 @@ func main() {
 	}
 	defer st.Close()
 
-	kcAdmin := keycloak.NewAdminClient(cfg)
+	localAuth, err := localauth.New(st, cfg.AuthSecret, cfg.IsProduction(), cfg.CORSOrigins)
+	if err != nil {
+		logger.Error("local auth init failed", "error", err)
+		os.Exit(1)
+	}
+	if len(os.Args) > 1 && os.Args[1] == "auth" {
+		if err := runAuthCommand(ctx, st, cfg, os.Args[2:]); err != nil {
+			logger.Error("auth command failed", "error", err)
+			os.Exit(1)
+		}
+		return
+	}
 
-	authMW, err := auth.NewMiddleware(cfg, logger, kcAdmin)
+	authMW, err := auth.NewMiddleware(cfg, logger, localAuth)
 	if err != nil {
 		logger.Error("auth middleware init failed", "error", err)
 		os.Exit(1)
 	}
-	authMW.StartJWKSRefresh(ctx)
+	localAuth.StartCleanup(ctx)
 
 	var publisher services.EventPublisher
 	if cfg.RabbitMQURL != "" {
@@ -91,7 +102,6 @@ func main() {
 	svc := &services.Service{
 		Store:                    st,
 		Publisher:                publisher,
-		Keycloak:                 kcAdmin,
 		Mailer:                   email.NewSender(cfg),
 		Sicredi:                  sicredi.NewClient(sicredi.ConfigFrom(cfg)),
 		ZapSign:                  zapClient,
@@ -213,6 +223,8 @@ func main() {
 				AND to_regclass('"Customers"') IS NOT NULL
 				AND to_regclass('"OrganizationSettings"') IS NOT NULL
 				AND to_regclass('"PortalCustomerLinks"') IS NOT NULL
+    AND to_regclass('auth_users') IS NOT NULL
+    AND to_regclass('auth_sessions') IS NOT NULL
 				AND EXISTS (
 					SELECT 1 FROM information_schema.columns
 					WHERE table_schema = 'public'
@@ -260,7 +272,6 @@ func main() {
 
 	r := chi.NewRouter()
 	r.Use(observability.CorrelationMiddleware)
-	r.Use(middleware.RealIP)
 	r.Use(observability.StructuredLoggerMiddleware(logger))
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.ThrottleBacklog(64, 128, 5*time.Second))
@@ -281,6 +292,7 @@ func main() {
 	r.Get("/health/live", observability.LivenessHandler())
 	r.With(authMW.Authenticate, authMW.RequireMaster).Get("/metrics/operations", observability.MetricsHandler())
 
+	localAuth.Register(r)
 	h.RegisterRoutes(r, authMW.Authenticate, authMW.OptionalAuthenticate, authMW.RequireOperational, authMW.RequireFinancialAccess, authMW.RequireMaster, authMW.RequirePartner)
 
 	addr := fmt.Sprintf(":%s", cfg.Port)

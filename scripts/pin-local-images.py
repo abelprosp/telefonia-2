@@ -24,7 +24,6 @@ def main():
         ("RABBITMQ_IMAGE", "rabbitmq.connect.luxus"),
         ("MINIO_IMAGE", "minio.connect.luxus"),
         ("MINIO_MC_IMAGE", "minio-init.connect.luxus"),
-        ("KEYCLOAK_IMAGE", "keycloak.connect.luxus"),
     ):
         image_id = inspect("container", container)["Image"]
         if not re.fullmatch(r"sha256:[a-f0-9]{64}", image_id):

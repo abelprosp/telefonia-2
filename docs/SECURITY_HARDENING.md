@@ -1,3 +1,5 @@
+> Autenticação atual: [login próprio e migração de contas](AUTH_LOCAL.md). As instruções de Keycloak abaixo são históricas e não se aplicam ao login atual.
+
 # Correções de segurança e interface
 
 ## Alterações

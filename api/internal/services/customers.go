@@ -13,7 +13,6 @@ import (
 	"github.com/luxus-connect/telefonia/api/internal/auth"
 	"github.com/luxus-connect/telefonia/api/internal/email"
 	"github.com/luxus-connect/telefonia/api/internal/httputil"
-	"github.com/luxus-connect/telefonia/api/internal/keycloak"
 	"github.com/luxus-connect/telefonia/api/internal/models"
 	"github.com/luxus-connect/telefonia/api/internal/notifications"
 	"github.com/luxus-connect/telefonia/api/internal/sicredi"
@@ -32,14 +31,13 @@ type Service struct {
 	Store                    *store.Store
 	Publisher                EventPublisher
 	Processor                ImportProcessor
-	Keycloak                 *keycloak.AdminClient
 	Mailer                   *email.Sender
 	Sicredi                  SicrediBoletoIssuer
 	ZapSign                  *zapsign.Client
 	StateMachine             *statemachine.Engine
 	FinancialAgentPublicURL  string
 	FinancialAgentConfigured bool
-	ParceirosUploadDir      string
+	ParceirosUploadDir       string
 }
 
 func (s *Service) SM() *statemachine.Engine {
@@ -350,7 +348,7 @@ func (s *Service) ListCustomers(ctx context.Context, providerID *string, page ht
 		}
 	}
 	items, total, err := s.Store.ListCustomers(ctx, orgID, providerID, salespersonUserID, page)
-	if err != nil || s.Keycloak == nil || !s.Keycloak.Enabled() {
+	if err != nil {
 		return items, total, err
 	}
 	lookupCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
@@ -369,8 +367,8 @@ func (s *Service) ListCustomers(ctx context.Context, providerID *string, page ht
 		if lookupCtx.Err() != nil {
 			continue
 		}
-		user, lookupErr := s.Keycloak.GetUserByID(lookupCtx, *id)
-		if lookupErr == nil && user != nil && toListUser(*user).OrganizationID == orgID {
+		user, lookupErr := s.Store.LocalUserByID(lookupCtx, *id)
+		if lookupErr == nil && user != nil && user.OrganizationID == orgID {
 			name := strings.TrimSpace(user.FirstName + " " + user.LastName)
 			if name == "" {
 				name = user.Username

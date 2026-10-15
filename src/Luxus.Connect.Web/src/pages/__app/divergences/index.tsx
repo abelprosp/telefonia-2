@@ -1,7 +1,6 @@
 import { useState } from 'react';
 
 import { createFileRoute } from '@tanstack/react-router';
-import { useAuth } from 'react-oidc-context';
 import { toast } from 'sonner';
 
 import { ListPageHeader } from '@/components/list-page';
@@ -24,6 +23,7 @@ import {
   useDivergences,
   useResolveDivergence
 } from '@/lib/ops-api';
+import { useAuth } from '@/providers/auth';
 
 export const Route = createFileRoute('/__app/divergences/')({
   component: DivergencesPage
@@ -41,7 +41,9 @@ function DivergencesPage() {
   const userId = auth.user?.profile.sub ?? '';
 
   return (
-    <PageWrapper breadcrumbs={[{ label: 'Início', to: '/' }, { label: 'Divergências' }]}>
+    <PageWrapper
+      breadcrumbs={[{ label: 'Início', to: '/' }, { label: 'Divergências' }]}
+    >
       <ListPageHeader
         title="Centro de divergências"
         description="Pendências persistentes: tipo, gravidade, impacto, idade, causa, evidência e resolução. Atribuir, comentar, resolver e reabrir."
@@ -65,13 +67,19 @@ function DivergencesPage() {
               <TableCell>{d.divergence_type}</TableCell>
               <TableCell>
                 {d.severity}
-                {d.severity === 'HIGH' ? ' (alta)' : d.severity === 'MEDIUM' ? ' (média)' : ' (baixa)'}
+                {d.severity === 'HIGH'
+                  ? ' (alta)'
+                  : d.severity === 'MEDIUM'
+                    ? ' (média)'
+                    : ' (baixa)'}
               </TableCell>
               <TableCell>{d.phone_number ?? '—'}</TableCell>
               <TableCell>
                 <p>{d.description}</p>
                 {d.recommended_action ? (
-                  <p className="text-xs">Ação recomendada: {d.recommended_action}</p>
+                  <p className="text-xs">
+                    Ação recomendada: {d.recommended_action}
+                  </p>
                 ) : null}
               </TableCell>
               <TableCell>{d.financial_impact ?? 0}</TableCell>
@@ -87,8 +95,12 @@ function DivergencesPage() {
                     assignMutation.mutate(
                       { id: d.id, owner_user_id: userId },
                       {
-                        onSuccess: () => toast.success('Divergência atribuída a você.'),
-                        onError: (e) => toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+                        onSuccess: () =>
+                          toast.success('Divergência atribuída a você.'),
+                        onError: (e) =>
+                          toast.error(
+                            isApiHttpError(e) ? e.message : getErrorMessage(e)
+                          )
                       }
                     )
                   }
@@ -101,10 +113,18 @@ function DivergencesPage() {
                   variant="outline"
                   onClick={() =>
                     resolveMutation.mutate(
-                      { id: d.id, action: 'resolve', notes: 'Resolvido no centro de divergências' },
                       {
-                        onSuccess: () => toast.success('Divergência resolvida.'),
-                        onError: (e) => toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+                        id: d.id,
+                        action: 'resolve',
+                        notes: 'Resolvido no centro de divergências'
+                      },
+                      {
+                        onSuccess: () =>
+                          toast.success('Divergência resolvida.'),
+                        onError: (e) =>
+                          toast.error(
+                            isApiHttpError(e) ? e.message : getErrorMessage(e)
+                          )
                       }
                     )
                   }
@@ -120,7 +140,10 @@ function DivergencesPage() {
                       { id: d.id, action: 'reopen' },
                       {
                         onSuccess: () => toast.success('Reaberta.'),
-                        onError: (e) => toast.error(isApiHttpError(e) ? e.message : getErrorMessage(e))
+                        onError: (e) =>
+                          toast.error(
+                            isApiHttpError(e) ? e.message : getErrorMessage(e)
+                          )
                       }
                     )
                   }
@@ -147,18 +170,30 @@ function DivergencesPage() {
                 toast.success('Comentário registrado.');
                 setComment('');
               },
-              onError: (err) => toast.error(isApiHttpError(err) ? err.message : getErrorMessage(err))
+              onError: (err) =>
+                toast.error(
+                  isApiHttpError(err) ? err.message : getErrorMessage(err)
+                )
             }
           );
         }}
       >
         <div>
           <Label htmlFor="div-id">ID da divergência</Label>
-          <Input id="div-id" value={activeId} onChange={(e) => setActiveId(e.target.value)} />
+          <Input
+            id="div-id"
+            value={activeId}
+            onChange={(e) => setActiveId(e.target.value)}
+          />
         </div>
         <div className="flex-1">
           <Label htmlFor="div-comment">Comentário</Label>
-          <Input id="div-comment" value={comment} onChange={(e) => setComment(e.target.value)} required />
+          <Input
+            id="div-comment"
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            required
+          />
         </div>
         <Button type="submit">Comentar</Button>
       </form>

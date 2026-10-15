@@ -1,3 +1,5 @@
+> Autenticação atual: [login próprio e migração de contas](AUTH_LOCAL.md). As instruções de Keycloak abaixo são históricas e não se aplicam ao login atual.
+
 # Deploy em VPS (Docker Compose — produção)
 
 Guia consolidado para publicar **Luxus Connect** na VPS Hostinger com
@@ -154,7 +156,7 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml config --quiet &
 DOCKER_PULL_POLICY=never bash docker-up.sh prod
 ```
 
-O script exige os cinco contêineres, inclusive `minio-init.connect.luxus`
+O script exige os quatro contêineres, inclusive `minio-init.connect.luxus`
 (pode estar parado), e verifica as imagens antes de alterar o `.env`.
 Cria backup com permissão 600 e preserva as demais variáveis.
 Se algum contêiner ou imagem estiver ausente, interrompe sem alterar o `.env`.

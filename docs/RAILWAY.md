@@ -1,3 +1,5 @@
+> Autenticação atual: [login próprio e migração de contas](AUTH_LOCAL.md). As instruções de Keycloak abaixo são históricas e não se aplicam ao login atual.
+
 # Deploy no Railway
 
 Guia para publicar **Luxus.Connect** no [Railway](https://railway.app) com três serviços principais: **PostgreSQL**, **connect-api** e **connect-web**.

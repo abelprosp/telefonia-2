@@ -1,7 +1,8 @@
 import { LogIn, RefreshCw } from 'lucide-react';
-import { useAuth } from 'react-oidc-context';
 
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/providers/auth';
+
 
 interface AuthConfigErrorProps {
   title?: string;
@@ -44,7 +45,7 @@ export const AuthConfigError = ({
       <a href="#login-retry" className="skip-link">
         Pular para o login
       </a>
-      <div className="rounded-full bg-destructive/10 p-3 text-destructive">
+      <div className="bg-destructive/10 text-destructive rounded-full p-3">
         <RefreshCw className="size-6" aria-hidden />
       </div>
       <h1 className="text-xl font-bold">{title}</h1>
@@ -52,11 +53,11 @@ export const AuthConfigError = ({
         {isStateError
           ? 'A sessão de login anterior expirou ou o redirecionamento foi interrompido.'
           : isScopeError
-            ? 'O Keycloak rejeitou os scopes do cliente (realm desatualizado). Veja o detalhe abaixo.'
+            ? 'Não foi possível iniciar a sessão. Tente novamente.'
             : message}
       </p>
       {hint && (
-        <p className="max-w-lg rounded-lg border bg-muted/50 p-3 text-xs whitespace-pre-wrap">
+        <p className="bg-muted/50 max-w-lg rounded-lg border p-3 text-xs whitespace-pre-wrap">
           {hint}
         </p>
       )}

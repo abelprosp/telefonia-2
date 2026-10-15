@@ -10,6 +10,7 @@ import (
 )
 
 type Config struct {
+	AuthSecret                      string
 	IntakeAPIKey                    string
 	IntakeOrgID                     string
 	DatabaseURL                     string
@@ -61,9 +62,9 @@ type Config struct {
 	FinancialAgentAPIKey            string
 	FinancialAgentOrgID             string
 	FinancialAgentPublicURL         string
-	ParceirosIntakeAPIKey          string
-	ParceirosIntakeOrgID           string
-	ParceirosUploadDir             string
+	ParceirosIntakeAPIKey           string
+	ParceirosIntakeOrgID            string
+	ParceirosUploadDir              string
 }
 
 func Load() Config {
@@ -108,6 +109,7 @@ func Load() Config {
 	}
 
 	return Config{
+		AuthSecret:                      os.Getenv("AUTH_SECRET"),
 		IntakeAPIKey:                    strings.TrimSpace(os.Getenv("TELEFONIA_INTAKE_API_KEY")),
 		IntakeOrgID:                     strings.TrimSpace(os.Getenv("TELEFONIA_INTAKE_ORG_ID")),
 		DatabaseURL:                     dbURL,
@@ -159,9 +161,9 @@ func Load() Config {
 		FinancialAgentAPIKey:            strings.TrimSpace(os.Getenv("FINANCIAL_AGENT_API_KEY")),
 		FinancialAgentOrgID:             strings.TrimSpace(os.Getenv("FINANCIAL_AGENT_ORG_ID")),
 		FinancialAgentPublicURL:         strings.TrimRight(firstNonEmpty(os.Getenv("FINANCIAL_AGENT_PUBLIC_URL"), sicrediPublicURL), "/"),
-		ParceirosIntakeAPIKey:          strings.TrimSpace(os.Getenv("PARCEIROS_INTAKE_API_KEY")),
-		ParceirosIntakeOrgID:           strings.TrimSpace(os.Getenv("PARCEIROS_INTAKE_ORG_ID")),
-		ParceirosUploadDir:             strings.TrimSpace(firstNonEmpty(os.Getenv("PARCEIROS_UPLOAD_DIR"), "./parceiros-uploads")),
+		ParceirosIntakeAPIKey:           strings.TrimSpace(os.Getenv("PARCEIROS_INTAKE_API_KEY")),
+		ParceirosIntakeOrgID:            strings.TrimSpace(os.Getenv("PARCEIROS_INTAKE_ORG_ID")),
+		ParceirosUploadDir:              strings.TrimSpace(firstNonEmpty(os.Getenv("PARCEIROS_UPLOAD_DIR"), "./parceiros-uploads")),
 	}
 }
 
@@ -182,8 +184,14 @@ func (c Config) Validate() error {
 	if c.IntakeAPIKey != "" && (len(c.IntakeAPIKey) < 32 || len(c.IntakeOrgID) > 36) {
 		return fmt.Errorf("intake requires a key of at least 32 characters and a valid organization ID")
 	}
-	if c.DatabaseURL == "" || c.KeycloakRealm == "" || c.KeycloakResource == "" || c.KeycloakAuthServerURL == "" {
-		return fmt.Errorf("DATABASE_URL and KEYCLOAK_REALM/AUTH_SERVER_URL/RESOURCE are required")
+	if c.DatabaseURL == "" {
+		return fmt.Errorf("DATABASE_URL is required")
+	}
+	if len(c.AuthSecret) < 32 {
+		return fmt.Errorf("AUTH_SECRET requires at least 32 characters")
+	}
+	if len(c.CORSOrigins) == 0 {
+		return fmt.Errorf("CORS_ORIGINS must contain the frontend origin")
 	}
 	// Wildcard CORS is never acceptable because responses allow credentials.
 	for _, origin := range c.CORSOrigins {
@@ -195,8 +203,7 @@ func (c Config) Validate() error {
 		return nil
 	}
 	for name, raw := range map[string]string{
-		"KEYCLOAK_PUBLIC_AUTH_SERVER_URL": c.KeycloakPublicAuthServerURL,
-		"OBJECT_STORAGE_PUBLIC_URL":       c.ObjectStoragePublicURL,
+		"OBJECT_STORAGE_PUBLIC_URL": c.ObjectStoragePublicURL,
 	} {
 		u, err := url.Parse(raw)
 		if err != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" {

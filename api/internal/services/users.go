@@ -2,15 +2,20 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/mail"
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/luxus-connect/telefonia/api/internal/auth"
 	"github.com/luxus-connect/telefonia/api/internal/httputil"
 	"github.com/luxus-connect/telefonia/api/internal/keycloak"
+	"github.com/luxus-connect/telefonia/api/internal/localauth"
 	"github.com/luxus-connect/telefonia/api/internal/models"
 	"github.com/luxus-connect/telefonia/api/internal/notifications"
+	"github.com/luxus-connect/telefonia/api/internal/store"
 )
 
 func profileFromRoles(roles []string) string {
@@ -45,6 +50,8 @@ func hasRole(set map[string]struct{}, role string) bool {
 
 func rolesForProfile(profile string) ([]string, error) {
 	switch strings.ToLower(strings.TrimSpace(profile)) {
+	case auth.RoleUser:
+		return []string{auth.RoleUser}, nil
 	case auth.RoleMaster, auth.RoleAdmin:
 		return []string{auth.RoleMaster, auth.RoleUser}, nil
 	case auth.RoleEmployee:
@@ -101,43 +108,53 @@ func toListUser(u keycloak.UserRecord) models.ListOrganizationUserResponse {
 	}
 }
 
-func (s *Service) ListOrganizationUsers(ctx context.Context, search string) ([]models.ListOrganizationUserResponse, error) {
-	if s.Keycloak == nil || !s.Keycloak.Enabled() {
-		return nil, httputil.UnavailableError(notifications.N("KEYCLOAK_ADMIN_UNAVAILABLE", "User management is not configured."))
+func localListUser(u store.LocalUser) models.ListOrganizationUserResponse {
+	return models.ListOrganizationUserResponse{ID: u.ID, Username: u.Username, Email: u.Email, FirstName: u.FirstName, LastName: u.LastName, FullName: strings.TrimSpace(u.FirstName + " " + u.LastName), Profile: profileFromRoles(u.Roles), Enabled: u.Enabled, OrganizationID: u.OrganizationID, OrganizationName: u.OrganizationName}
+}
+func validateLocalIdentity(username, email string) error {
+	address, err := mail.ParseAddress(email)
+	if len(username) == 0 || len(username) > 128 || strings.ContainsAny(username, " \t\r\n") || err != nil || address.Address != email || len(email) > 254 {
+		return httputil.ValidationError(notifications.N("USER_FIELDS_INVALID", "Informe usuário sem espaços e e-mail válido."))
 	}
-	callerOrg, err := requireCallerOrganization(ctx)
+	return nil
+}
+func localUserError(err error) error {
+	var pg *pgconn.PgError
+	if errors.As(err, &pg) && pg.Code == "23505" {
+		return httputil.BusinessError(notifications.N("USER_USERNAME_DUPLICATED", "Usuário já existe."))
+	}
+	return httputil.InternalError(notifications.SharedUnexpectedError("Falha ao salvar usuário."))
+}
+func (s *Service) ListOrganizationUsers(ctx context.Context, search string) ([]models.ListOrganizationUserResponse, error) {
+	org, err := requireCallerOrganization(ctx)
 	if err != nil {
 		return nil, err
 	}
-	users, err := s.Keycloak.ListUsers(ctx, search, 200)
+	users, err := s.Store.ListLocalUsers(ctx, org.ID, search)
 	if err != nil {
-		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+		return nil, localUserError(err)
 	}
-
-	items := make([]models.ListOrganizationUserResponse, 0, len(users))
+	out := []models.ListOrganizationUserResponse{}
 	for _, u := range users {
-		item := toListUser(u)
-		if item.OrganizationID != callerOrg.ID {
-			continue
-		}
-		items = append(items, item)
+		out = append(out, localListUser(u))
 	}
-	return items, nil
+	return out, nil
 }
 
 func (s *Service) CreateOrganizationUser(ctx context.Context, input models.CreateOrganizationUserInput) (*models.ListOrganizationUserResponse, error) {
-	if s.Keycloak == nil || !s.Keycloak.Enabled() {
-		return nil, httputil.UnavailableError(notifications.N("KEYCLOAK_ADMIN_UNAVAILABLE", "User management is not configured."))
-	}
 
 	username := strings.TrimSpace(input.Username)
 	email := strings.TrimSpace(input.Email)
-	password := strings.TrimSpace(input.Password)
+	password := input.Password
 	if username == "" || email == "" || password == "" {
 		return nil, httputil.ValidationError(notifications.N("USER_FIELDS_REQUIRED", "Username, email and password are required."))
 	}
-	if len(password) < 6 {
-		return nil, httputil.ValidationError(notifications.N("USER_PASSWORD_TOO_SHORT", "Password must be at least 6 characters."))
+	if err := validateLocalIdentity(username, email); err != nil {
+		return nil, err
+	}
+	passwordHash, err := localauth.HashPassword(password)
+	if err != nil {
+		return nil, httputil.ValidationError(notifications.N("PASSWORD_POLICY", err.Error()))
 	}
 
 	roleNames, err := rolesForProfile(input.Profile)
@@ -145,7 +162,7 @@ func (s *Service) CreateOrganizationUser(ctx context.Context, input models.Creat
 		return nil, httputil.ValidationError(notifications.N("USER_PROFILE_INVALID", "Invalid user profile."))
 	}
 
-	isNewUserMaster := strings.EqualFold(strings.TrimSpace(input.Profile), auth.RoleMaster)
+	isNewUserMaster := profileFromRoles(roleNames) == auth.RoleMaster
 
 	var targetOrgID string
 	var targetOrgName string
@@ -224,61 +241,11 @@ func (s *Service) CreateOrganizationUser(ctx context.Context, input models.Creat
 		lastName = "-"
 	}
 
-	userID, err := s.Keycloak.CreateUser(ctx, keycloak.CreateUserPayload{
-		Username:      username,
-		Email:         email,
-		FirstName:     firstName,
-		LastName:      lastName,
-		Enabled:       true,
-		EmailVerified: true,
-		Attributes:    keycloak.DefaultOrganizationAttribute(targetOrgID, targetOrgName),
-		Credentials: []keycloak.CredentialPayload{
-			{Type: "password", Value: password, Temporary: false},
-		},
-	})
-	if err != nil {
-		if strings.Contains(err.Error(), "already exists") {
-			return nil, httputil.BusinessError(notifications.N("USER_USERNAME_DUPLICATED", "Username already exists."))
-		}
-		return nil, httputil.BusinessError(notifications.N("USER_CREATE_FAILED", truncateErr("Falha ao criar usuário no Keycloak", err)))
+	user := store.LocalUser{ID: uuid.NewString(), Username: username, Email: email, FirstName: firstName, LastName: lastName, Enabled: true, Roles: roleNames, OrganizationID: targetOrgID, OrganizationName: targetOrgName, PasswordHash: passwordHash}
+	if err := s.Store.CreateLocalUser(ctx, &user); err != nil {
+		return nil, localUserError(err)
 	}
-
-	// Garante o atributo organization no Keycloak (PUT parcial de outros fluxos já não apaga mais).
-	if err := s.Keycloak.SetUserOrganizationAttribute(ctx, userID, targetOrgID, targetOrgName); err != nil {
-		return nil, httputil.BusinessError(notifications.N("USER_ORG_ATTRIBUTE_FAILED", truncateErr("Falha ao gravar organização do usuário", err)))
-	}
-
-	if err := s.Keycloak.ReplaceUserRealmRoles(ctx, userID, roleNames); err != nil {
-		return nil, httputil.BusinessError(notifications.N("USER_ROLES_FAILED", truncateErr("Falha ao atribuir perfil do usuário", err)))
-	}
-
-	item := models.ListOrganizationUserResponse{
-		ID:               userID,
-		Username:         username,
-		Email:            email,
-		FirstName:        firstName,
-		LastName:         lastName,
-		FullName:         strings.TrimSpace(firstName + " " + lastName),
-		Profile:          profileFromRoles(roleNames),
-		Enabled:          true,
-		OrganizationID:   targetOrgID,
-		OrganizationName: targetOrgName,
-	}
-
-	// Confirma no Keycloak; se o GET omitir attributes, ainda devolvemos o que gravamos.
-	if created, err := s.Keycloak.GetUserByID(ctx, userID); err == nil && created != nil {
-		listed := toListUser(*created)
-		if listed.OrganizationID != "" {
-			item.OrganizationID = listed.OrganizationID
-			item.OrganizationName = listed.OrganizationName
-		}
-	}
-	if raw, err := s.Keycloak.GetUserOrganizationAttribute(ctx, userID); err != nil || !strings.Contains(raw, targetOrgID) {
-		return nil, httputil.BusinessError(notifications.N(
-			"USER_ORG_ATTRIBUTE_MISSING",
-			"Usuário criado, mas o atributo organization não ficou gravado no Keycloak. Verifique o user profile (organization).",
-		))
-	}
+	item := localListUser(user)
 	return &item, nil
 }
 
@@ -293,124 +260,67 @@ func truncateErr(prefix string, err error) string {
 	return prefix + ": " + msg
 }
 
-
 func (s *Service) UpdateOrganizationUser(ctx context.Context, userID string, input models.UpdateOrganizationUserInput) (*models.ListOrganizationUserResponse, error) {
-	if s.Keycloak == nil || !s.Keycloak.Enabled() {
-		return nil, httputil.UnavailableError(notifications.N("KEYCLOAK_ADMIN_UNAVAILABLE", "User management is not configured."))
-	}
-	userID = strings.TrimSpace(userID)
-	if userID == "" {
-		return nil, httputil.ValidationError(notifications.N("USER_NOT_FOUND", "User was not found."))
-	}
-
-	callerOrg, err := requireCallerOrganization(ctx)
+	org, err := requireCallerOrganization(ctx)
 	if err != nil {
 		return nil, err
 	}
-	target, err := s.Keycloak.GetUserByID(ctx, userID)
+	target, err := s.Store.LocalUserByID(ctx, userID)
 	if err != nil {
-		return nil, httputil.NotFoundError(notifications.N("USER_NOT_FOUND", "User was not found."))
+		return nil, localUserError(err)
 	}
-	targetItem := toListUser(*target)
-	isPlatformAdmin := callerOrg.ID == auth.DefaultLuxusOrganizationID
-	if !isPlatformAdmin && targetItem.OrganizationID != callerOrg.ID {
+	if target == nil {
+		return nil, httputil.NotFoundError(notifications.N("USER_NOT_FOUND", "Usuário não encontrado."))
+	}
+	if target.OrganizationID != org.ID {
 		return nil, httputil.ForbiddenError(notifications.N("FORBIDDEN", "Usuário fora da organização autenticada."))
 	}
-
-	if input.FirstName != nil || input.LastName != nil || input.Email != nil {
-		firstName := target.FirstName
-		lastName := target.LastName
-		email := target.Email
-		if input.FirstName != nil {
-			firstName = strings.TrimSpace(*input.FirstName)
-		}
-		if input.LastName != nil {
-			lastName = strings.TrimSpace(*input.LastName)
-		}
-		if input.Email != nil {
-			email = strings.TrimSpace(*input.Email)
-		}
-		if err := s.Keycloak.UpdateUserProfile(ctx, userID, firstName, lastName, email); err != nil {
-			return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
-		}
+	caller := auth.UserFromContext(ctx)
+	if caller != nil && caller.ID == userID && (input.Profile != nil && strings.ToLower(strings.TrimSpace(*input.Profile)) != profileFromRoles(target.Roles) || input.Password != nil || input.Enabled != nil && !*input.Enabled) {
+		return nil, httputil.ValidationError(notifications.N("SELF_ACCOUNT_CHANGE", "Altere sua senha em Segurança da conta. Seu próprio perfil e acesso não podem ser removidos aqui."))
 	}
-
+	if input.FirstName != nil {
+		target.FirstName = strings.TrimSpace(*input.FirstName)
+	}
+	if input.LastName != nil {
+		target.LastName = strings.TrimSpace(*input.LastName)
+	}
+	if input.Email != nil {
+		target.Email = strings.TrimSpace(*input.Email)
+	}
+	if err := validateLocalIdentity(target.Username, target.Email); err != nil {
+		return nil, err
+	}
 	if input.Enabled != nil {
-		if err := s.Keycloak.SetUserEnabled(ctx, userID, *input.Enabled); err != nil {
-			return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
-		}
+		target.Enabled = *input.Enabled
 	}
-
 	if input.Profile != nil {
-		roleNames, err := rolesForProfile(*input.Profile)
+		roles, err := rolesForProfile(*input.Profile)
 		if err != nil {
-			return nil, httputil.ValidationError(notifications.N("USER_PROFILE_INVALID", "Invalid user profile."))
+			return nil, httputil.ValidationError(notifications.N("USER_PROFILE_INVALID", "Perfil inválido."))
 		}
-		if err := s.Keycloak.ReplaceUserRealmRoles(ctx, userID, roleNames); err != nil {
-			return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
-		}
+		target.Roles = roles
 	}
-
-	if input.Password != nil && strings.TrimSpace(*input.Password) != "" {
-		newPass := strings.TrimSpace(*input.Password)
-		if len(newPass) < 6 {
-			return nil, httputil.ValidationError(notifications.N("USER_PASSWORD_TOO_SHORT", "Password must be at least 6 characters."))
+	if input.Password != nil {
+		hash, err := localauth.HashPassword(*input.Password)
+		if err != nil {
+			return nil, httputil.ValidationError(notifications.N("PASSWORD_POLICY", err.Error()))
 		}
-		if err := s.Keycloak.ResetPassword(ctx, userID, newPass, false); err != nil {
-			return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
-		}
+		target.PasswordHash = hash
 	}
-
 	if input.OrganizationName != nil {
-		orgName := strings.TrimSpace(*input.OrganizationName)
-		if orgName == "" {
-			return nil, httputil.ValidationError(notifications.N(
-				"ORGANIZATION_NAME_REQUIRED",
-				"Informe o nome da empresa.",
-			))
+		if org.ID != auth.DefaultLuxusOrganizationID {
+			return nil, httputil.ForbiddenError(notifications.N("FORBIDDEN", "Apenas o administrador da plataforma pode alterar a empresa."))
 		}
-		if !isPlatformAdmin {
-			return nil, httputil.ForbiddenError(notifications.N("FORBIDDEN", "Only the platform admin can reassign organizations."))
+		if strings.TrimSpace(*input.OrganizationName) == "" {
+			return nil, httputil.ValidationError(notifications.N("ORGANIZATION_NAME_REQUIRED", "Informe a empresa."))
 		}
-
-		orgID := strings.TrimSpace(targetItem.OrganizationID)
-		if orgID == "" || orgID == "luxus" || orgID == "default" {
-			// Usuário sem tenant próprio: provisiona organização nova.
-			orgID = uuid.NewString()
-			blankSettings := &models.OrganizationSettingsResponse{
-				OrganizationID: orgID,
-				Company: models.CompanySettingsDto{
-					CompanyName: orgName,
-					TradingName: orgName,
-				},
-				Whitelabel: models.WhitelabelSettingsDto{
-					AppName:      orgName,
-					PrimaryColor: "#0f766e",
-				},
-				System: models.SystemSettingsDto{
-					DefaultDueDay:         10,
-					LateFeePercentage:     2.0,
-					InterestRateMonthly:   1.0,
-					DaysBeforeDueReminder: 3,
-					DaysAfterDueReminder:  2,
-					ProrataDivisor:        30,
-				},
-				Sicredi: models.SicrediSettingsDto{Sandbox: true},
-			}
-			if err := s.Store.UpsertOrganizationSettings(ctx, orgID, nil, blankSettings); err != nil {
-				return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
-			}
-		}
-		if err := s.Keycloak.SetUserOrganizationAttribute(ctx, userID, orgID, orgName); err != nil {
-			return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
-		}
+		target.OrganizationName = strings.TrimSpace(*input.OrganizationName)
 	}
-
-	created, err := s.Keycloak.GetUserByID(ctx, userID)
-	if err != nil {
-		return nil, httputil.NotFoundError(notifications.N("USER_NOT_FOUND", "User was not found."))
+	if err := s.Store.UpdateLocalUser(ctx, target); err != nil {
+		return nil, localUserError(err)
 	}
-	item := toListUser(*created)
+	item := localListUser(*target)
 	return &item, nil
 }
 
@@ -421,4 +331,3 @@ func requireCallerOrganization(ctx context.Context) (*auth.Organization, error) 
 	}
 	return org, nil
 }
-

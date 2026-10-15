@@ -6,7 +6,7 @@ import {
   Search,
   UserCircle
 } from 'lucide-react';
-import { useAuth } from 'react-oidc-context';
+
 
 import { NotificationsDropdown } from '@/components/notifications-dropdown';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -24,7 +24,7 @@ import { Input } from '@/components/ui/input';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { performLogout } from '@/lib/auth-actions';
 import { roleLabel, useAuthRoles } from '@/lib/auth-roles';
-
+import { useAuth } from '@/providers/auth';
 
 export const AppTopBar = () => {
   const auth = useAuth();
@@ -56,7 +56,7 @@ export const AppTopBar = () => {
           placeholder="Pesquisar..."
           className="bg-muted/40 h-10 rounded-full border-0 pr-14 pl-10 shadow-none"
         />
-        <kbd className="text-muted-foreground pointer-events-none absolute top-1/2 right-3 hidden -translate-y-1/2 items-center gap-1 rounded-md border bg-background px-1.5 py-0.5 text-[10px] font-medium sm:flex">
+        <kbd className="text-muted-foreground bg-background pointer-events-none absolute top-1/2 right-3 hidden -translate-y-1/2 items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium sm:flex">
           ⌘ K
         </kbd>
       </div>
@@ -72,7 +72,7 @@ export const AppTopBar = () => {
             render={
               <button
                 type="button"
-                className="flex items-center gap-2 rounded-full px-2 py-1 hover:bg-muted cursor-pointer transition-colors outline-hidden"
+                className="hover:bg-muted flex cursor-pointer items-center gap-2 rounded-full px-2 py-1 outline-hidden transition-colors"
               />
             }
           >
@@ -81,7 +81,9 @@ export const AppTopBar = () => {
               <AvatarFallback>{initials}</AvatarFallback>
             </Avatar>
             <div className="hidden text-left text-sm leading-tight md:grid">
-              <span className="max-w-32 truncate font-medium">{displayName}</span>
+              <span className="max-w-32 truncate font-medium">
+                {displayName}
+              </span>
               <span className="text-muted-foreground max-w-32 truncate text-xs">
                 {roleLabel(authRoles)}
               </span>
@@ -98,7 +100,9 @@ export const AppTopBar = () => {
               </DropdownMenuLabel>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => void navigate({ to: '/settings' })}>
+            <DropdownMenuItem
+              onClick={() => void navigate({ to: '/settings' })}
+            >
               <UserCircle />
               Perfil e Configurações
             </DropdownMenuItem>
@@ -113,4 +117,3 @@ export const AppTopBar = () => {
     </header>
   );
 };
-

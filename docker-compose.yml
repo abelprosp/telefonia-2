@@ -49,27 +49,6 @@ services:
     volumes:
       - seq-data:/var/lib/seq/data/
 
-  keycloak:
-    image: 'quay.io/keycloak/keycloak:latest'
-    container_name: keycloak.connect.luxus
-    hostname: keycloak.connect.luxus
-    user: root
-    ports:
-      - '8081:8080'
-      - '8443:8443'
-    environment:
-      - KEYCLOAK_ADMIN=admin
-      - KEYCLOAK_ADMIN_PASSWORD=${KC_ADMIN_PWD}
-      - KC_DB=postgres
-      - KC_DB_USERNAME=${KC_DB_USERNAME}
-      - KC_DB_PASSWORD=${KC_DB_PASSWORD}
-      - KC_DB_URL=jdbc:postgresql://postgres:5432/luxus_kc_dev
-    volumes:
-      - keycloak-data:/opt/keycloak/data
-      - ./resources/theme/:/opt/keycloak/themes/
-      - ./docker/keycloak/luxus-realm.json:/opt/keycloak/data/import/luxus-realm.json:ro
-    entrypoint: /opt/keycloak/bin/kc.sh --verbose start-dev --import-realm --spi-theme-static-max-age=-1 --spi-theme-cache-themes=false --spi-theme-cache-templates=false
-
   connect-api:
     image: ${REGISTRY:-luxus/connect/api}:${PLATFORM:-linux}-${TAG:-latest}
     container_name: api.connect.luxus
@@ -89,8 +68,6 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_API_URL: ${VITE_API_URL:-http://localhost:8002}
-        VITE_AUTH_URL: ${VITE_AUTH_URL:-http://localhost:8081/auth}
-        VITE_CLIENT_ID: ${VITE_CLIENT_ID:-connect-cli}
         VITE_STORAGE_BUCKET_NAME: ${VITE_STORAGE_BUCKET_NAME:-luxus-connect}
 
   connect-web-dev:
@@ -102,8 +79,6 @@ services:
     environment:
       - VITE_USE_POLLING=true
       - VITE_API_URL=${VITE_API_URL:-http://localhost:8002}
-      - VITE_AUTH_URL=${VITE_AUTH_URL:-http://localhost:8081/auth}
-      - VITE_CLIENT_ID=${VITE_CLIENT_ID:-connect-cli}
       - VITE_STORAGE_BUCKET_NAME=${VITE_STORAGE_BUCKET_NAME:-luxus-connect}
     volumes:
       - ./src/Luxus.Connect.Web:/app
@@ -117,8 +92,6 @@ volumes:
     name: connect.luxus.postgres-vol
   seq-data:
     name: connect.luxus.seq-vol
-  keycloak-data:
-    name: connect.luxus.keycloak-vol
   rabbitmq-data:
     name: connect.luxus.rabbitmq-data-vol
   rabbitmq-mnesia:

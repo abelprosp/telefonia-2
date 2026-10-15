@@ -1,7 +1,8 @@
 import { useEffect, type ReactNode } from 'react';
 
 import { useNavigate } from '@tanstack/react-router';
-import { useAuth } from 'react-oidc-context';
+
+import { useAuth } from '@/providers/auth';
 
 import { PageLoader } from './page-loader';
 

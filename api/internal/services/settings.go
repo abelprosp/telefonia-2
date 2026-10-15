@@ -28,39 +28,18 @@ func (s *Service) GetCurrentUserProfile(ctx context.Context) (*models.UserProfil
 		}
 	}
 
-	// Tentar obter dados atualizados do Keycloak se disponível
-	if s.Keycloak != nil && s.Keycloak.Enabled() {
-		if kcUser, err := s.Keycloak.GetUserByID(ctx, u.ID); err == nil && kcUser != nil {
-			if kcUser.FirstName != "" {
-				firstName = kcUser.FirstName
-			}
-			if kcUser.LastName != "" {
-				lastName = kcUser.LastName
-			}
-			if kcUser.Email != "" {
-				u.Email = kcUser.Email
-			}
-			if len(kcUser.Roles) > 0 {
-				u.Roles = kcUser.Roles
-			}
-		}
-	}
-
 	calcFullName := strings.TrimSpace(firstName + " " + lastName)
 	if calcFullName == "" {
 		calcFullName = u.Username
 	}
 
-	mfaEnrolled := auth.MFAVerifiedFromClaims(u.Acr, u.Amr)
-	if !mfaEnrolled && s.Keycloak != nil && s.Keycloak.Enabled() {
-		if hasOTP, err := s.Keycloak.UserHasOTP(ctx, u.ID); err == nil {
-			mfaEnrolled = hasOTP
+	mfaEnrolled := false
+	if s.Store != nil {
+		if local, e := s.Store.LocalUserByID(ctx, u.ID); e == nil && local != nil {
+			mfaEnrolled = local.MFASecret != ""
 		}
 	}
-	accountURL := ""
-	if s.Keycloak != nil {
-		accountURL = s.Keycloak.AccountSecurityURL()
-	}
+	accountURL := "/settings"
 
 	return &models.UserProfileResponse{
 		ID:               u.ID,
@@ -81,47 +60,34 @@ func (s *Service) GetCurrentUserProfile(ctx context.Context) (*models.UserProfil
 }
 
 func (s *Service) UpdateCurrentUserProfile(ctx context.Context, input models.UpdateUserProfileInput) (*models.UserProfileResponse, error) {
-	// Password changes belong to Keycloak's account flow, which reauthenticates
-	// the user and applies the realm's password and MFA policies.
 	if input.NewPassword != nil || input.CurrentPassword != nil {
-		return nil, httputil.ValidationError(notifications.N("PASSWORD_ACCOUNT_FLOW_REQUIRED", "Altere sua senha na página de segurança da conta."))
+		return nil, httputil.ValidationError(notifications.N("PASSWORD_ACCOUNT_FLOW_REQUIRED", "Use a seção Segurança da conta para alterar a senha."))
 	}
 	u := auth.UserFromContext(ctx)
 	if u == nil || u.ID == "" {
 		return nil, httputil.ForbiddenError(notifications.N("UNAUTHORIZED", "Usuário não autenticado."))
 	}
-
-	if s.Keycloak == nil || !s.Keycloak.Enabled() {
-		return nil, httputil.UnavailableError(notifications.N("KEYCLOAK_ADMIN_UNAVAILABLE", "Keycloak admin is not available."))
+	local, err := s.Store.LocalUserByID(ctx, u.ID)
+	if err != nil || local == nil {
+		return nil, httputil.NotFoundError(notifications.N("USER_NOT_FOUND", "Usuário não encontrado."))
 	}
-
-	firstName := ""
-	lastName := ""
-	email := u.Email
-
-	// Pegar dados atuais
-	if kcUser, err := s.Keycloak.GetUserByID(ctx, u.ID); err == nil && kcUser != nil {
-		firstName = kcUser.FirstName
-		lastName = kcUser.LastName
-		if kcUser.Email != "" {
-			email = kcUser.Email
-		}
-	}
-
 	if input.FirstName != nil {
-		firstName = strings.TrimSpace(*input.FirstName)
+		local.FirstName = strings.TrimSpace(*input.FirstName)
 	}
 	if input.LastName != nil {
-		lastName = strings.TrimSpace(*input.LastName)
+		local.LastName = strings.TrimSpace(*input.LastName)
 	}
-	if input.Email != nil && strings.TrimSpace(*input.Email) != "" {
-		email = strings.TrimSpace(*input.Email)
+	if input.Email != nil {
+		local.Email = strings.TrimSpace(*input.Email)
 	}
-
-	if err := s.Keycloak.UpdateUserProfile(ctx, u.ID, firstName, lastName, email); err != nil {
-		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+	if err := validateLocalIdentity(local.Username, local.Email); err != nil {
+		return nil, err
 	}
-
+	if err := s.Store.UpdateLocalUser(ctx, local); err != nil {
+		return nil, httputil.InternalError(notifications.SharedUnexpectedError("Falha ao salvar perfil."))
+	}
+	u.Name = strings.TrimSpace(local.FirstName + " " + local.LastName)
+	u.Email = local.Email
 	return s.GetCurrentUserProfile(ctx)
 }
 

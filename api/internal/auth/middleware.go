@@ -2,44 +2,46 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
 	"sync"
-	"time"
 
-	keyfunc "github.com/MicahParks/keyfunc/v3"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/luxus-connect/telefonia/api/internal/config"
 	"github.com/luxus-connect/telefonia/api/internal/httputil"
-	"github.com/luxus-connect/telefonia/api/internal/keycloak"
+	"github.com/luxus-connect/telefonia/api/internal/localauth"
 	"github.com/luxus-connect/telefonia/api/internal/notifications"
 )
 
 type Middleware struct {
-	jwks     keyfunc.Keyfunc
-	cfg      config.Config
-	logger   *slog.Logger
-	keycloak *keycloak.AdminClient
+	local  *localauth.Manager
+	cfg    config.Config
+	logger *slog.Logger
 }
 
-func NewMiddleware(cfg config.Config, logger *slog.Logger, kc *keycloak.AdminClient) (*Middleware, error) {
-	jwksURL := fmt.Sprintf("%s/realms/%s/protocol/openid-connect/certs",
-		cfg.KeycloakAuthServerURL, cfg.KeycloakRealm)
+var errOrigin = errors.New("origem não permitida")
+var errMFA = errors.New("confirme o autenticador para continuar")
 
-	jwks, err := keyfunc.NewDefault([]string{jwksURL})
-	if err != nil {
-		return nil, fmt.Errorf("jwks: %w", err)
-	}
-
-	return &Middleware{jwks: jwks, cfg: cfg, logger: logger, keycloak: kc}, nil
+func NewMiddleware(cfg config.Config, logger *slog.Logger, local *localauth.Manager) (*Middleware, error) {
+	return &Middleware{cfg: cfg, logger: logger, local: local}, nil
 }
 
 func (m *Middleware) Authenticate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
 		req, err := m.authenticateRequest(r, true)
 		if err != nil {
+			if errors.Is(err, errOrigin) {
+				httputil.WriteFail(w, http.StatusForbidden, notifications.N("CSRF_REJECTED", "Origem da solicitação não permitida."))
+				return
+			}
+			if errors.Is(err, errMFA) {
+				httputil.WriteFail(w, http.StatusForbidden, notifications.N("MFA_REQUIRED", "Confirme o autenticador para continuar."))
+				return
+			}
 			httputil.WriteFail(w, http.StatusUnauthorized, notifications.N("UNAUTHORIZED", err.Error()))
 			return
 		}
@@ -53,8 +55,8 @@ func (m *Middleware) Authenticate(next http.Handler) http.Handler {
 	})
 }
 
-// OptionalAuthenticate parses a Bearer token when present so public routes
-// (e.g. organization-settings) can resolve the tenant. Invalid/missing tokens
+// OptionalAuthenticate resolves a valid session for public branding routes.
+// Invalid/missing sessions
 // continue without blocking the request.
 func (m *Middleware) OptionalAuthenticate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -68,70 +70,29 @@ func (m *Middleware) OptionalAuthenticate(next http.Handler) http.Handler {
 }
 
 func (m *Middleware) authenticateRequest(r *http.Request, required bool) (*http.Request, error) {
-	authHeader := r.Header.Get("Authorization")
-	if !strings.HasPrefix(authHeader, "Bearer ") {
-		if required {
-			return nil, fmt.Errorf("Missing or invalid authorization header")
+	if m.local == nil {
+		return nil, fmt.Errorf("autenticação indisponível")
+	}
+	session, err := m.local.Resolve(r)
+	if err != nil {
+		if !required {
+			return r, nil
 		}
-		return r, nil
-	}
-	tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
-
-	token, err := jwt.Parse(tokenStr, m.jwks.Keyfunc,
-		jwt.WithValidMethods([]string{"RS256"}),
-		jwt.WithExpirationRequired(),
-	)
-	if err != nil || !token.Valid {
-		return nil, fmt.Errorf("Invalid token")
-	}
-
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok {
-		return nil, fmt.Errorf("Invalid token claims")
-	}
-	if err := m.validateTokenIssuerAudience(claims); err != nil {
 		return nil, err
 	}
-
-	user := extractUser(claims, m.cfg.KeycloakResource)
-	user = m.enrichUserIdentity(r.Context(), tokenStr, claims, user)
-	ctx := WithUser(r.Context(), user)
-
-	var org *Organization
-	// Prefer the Keycloak user attribute written at user-create time. The SPA
-	// historically requested the built-in "organization" scope, which collides
-	// with Keycloak Organizations and often yields a claim without nested id.
-	if user != nil && strings.TrimSpace(user.ID) != "" {
-		if resolved := m.resolveOrganizationFromKeycloak(r.Context(), user.ID); resolved != nil {
-			org = resolved
-		}
+	if r.Method != "GET" && r.Method != "HEAD" && r.Method != "OPTIONS" && !m.local.AllowedOrigin(r) {
+		return nil, errOrigin
 	}
-	if org == nil || strings.TrimSpace(org.ID) == "" {
-		if claim, ok := claims["organization"]; ok && claim != nil {
-			parsed, err := ParseOrganizationFromClaims(claim)
-			if err != nil {
-				m.logger.Warn("failed to parse organization claim", "error", err)
-			} else {
-				org = parsed
-			}
-		}
+	u := session.User
+	amr := []string{"pwd"}
+	if session.Verified && u.MFASecret != "" {
+		amr = append(amr, "otp")
 	}
-	if org == nil || strings.TrimSpace(org.ID) == "" {
-		if id := strings.TrimSpace(claimString(claims["organization_id"])); id != "" {
-			name := ""
-			if org != nil {
-				name = org.Name
-			}
-			org = &Organization{ID: id, Name: name}
-		}
+	ctx := WithUser(r.Context(), &User{ID: u.ID, Username: u.Username, Email: u.Email, Name: strings.TrimSpace(u.FirstName + " " + u.LastName), Roles: u.Roles, Document: u.Document, Amr: amr})
+	ctx = WithOrganization(ctx, &Organization{ID: u.OrganizationID, Name: u.OrganizationName})
+	if m.local.NeedsMFA(session) && strings.TrimSuffix(r.URL.Path, "/") != "/v1/me" {
+		return nil, errMFA
 	}
-	if org != nil {
-		org = normalizeOrganization(org)
-	}
-	if org != nil && strings.TrimSpace(org.ID) != "" {
-		ctx = WithOrganization(ctx, org)
-	}
-
 	return r.WithContext(ctx), nil
 }
 
@@ -354,23 +315,4 @@ var bgMu sync.Mutex
 func BackgroundContext(orgID string) context.Context {
 	ctx := context.Background()
 	return WithOrganization(ctx, &Organization{ID: orgID})
-}
-
-// RefreshJWKS periodically refreshes JWKS in production.
-func (m *Middleware) StartJWKSRefresh(ctx context.Context) {
-	if !m.cfg.IsProduction() {
-		return
-	}
-	go func() {
-		ticker := time.NewTicker(1 * time.Hour)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				// keyfunc v3 auto-refreshes; noop placeholder for explicit refresh hook
-			}
-		}
-	}()
 }

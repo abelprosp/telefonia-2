@@ -2,7 +2,6 @@
 set -euo pipefail
 
 db_name="${POSTGRES_DB:-luxus_connect_dev}"
-keycloak_db="luxus_kc_dev"
 
 create_database_if_missing() {
 	local name="$1"
@@ -15,7 +14,6 @@ create_database_if_missing() {
 }
 
 create_database_if_missing "$db_name"
-create_database_if_missing "$keycloak_db"
 
 shopt -s nullglob
 migrations=(/docker-entrypoint-initdb.d/migrations/[0-9]*.sql)

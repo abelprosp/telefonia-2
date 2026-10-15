@@ -163,12 +163,51 @@ func (c *AdminClient) do(ctx context.Context, method, path string, body any) (*h
 }
 
 func (c *AdminClient) ListUsers(ctx context.Context, search string, max int) ([]UserRecord, error) {
+	return c.ListUsersPage(ctx, search, 0, max)
+}
+
+// MigrationRoles reads effective realm roles and only this application's client
+// roles. Other applications must never grant privileges in Telefonia.
+func (c *AdminClient) MigrationRoles(ctx context.Context, userID, clientID string) ([]string, error) {
+	if clientID == "" {
+		clientID = "connect-cli"
+	}
+	client, e := c.resolveClientInternalID(ctx, clientID)
+	if e != nil {
+		return nil, e
+	}
+	out := []string{}
+	for _, suffix := range []string{"realm/composite", "clients/" + client + "/composite"} {
+		path := fmt.Sprintf("/admin/realms/%s/users/%s/role-mappings/%s", c.realm, userID, suffix)
+		response, e := c.do(ctx, http.MethodGet, path, nil)
+		if e != nil {
+			return nil, e
+		}
+		var roles []roleRepresentation
+		if response.StatusCode != http.StatusOK {
+			response.Body.Close()
+			return nil, fmt.Errorf("migration roles: HTTP %d", response.StatusCode)
+		}
+		e = json.NewDecoder(response.Body).Decode(&roles)
+		response.Body.Close()
+		if e != nil {
+			return nil, e
+		}
+		for _, role := range roles {
+			out = append(out, role.Name)
+		}
+	}
+	return out, nil
+}
+
+// ListUsersPage is retained for the one-time migration command only.
+func (c *AdminClient) ListUsersPage(ctx context.Context, search string, first, max int) ([]UserRecord, error) {
 	if max <= 0 {
 		max = 100
 	}
 	// briefRepresentation=false is required so Keycloak returns user attributes
 	// (organization / organization_id) used for tenant isolation in the UI.
-	path := fmt.Sprintf("/admin/realms/%s/users?max=%d&briefRepresentation=false", c.realm, max)
+	path := fmt.Sprintf("/admin/realms/%s/users?first=%d&max=%d&briefRepresentation=false", c.realm, first, max)
 	if strings.TrimSpace(search) != "" {
 		path += "&search=" + url.QueryEscape(strings.TrimSpace(search))
 	}

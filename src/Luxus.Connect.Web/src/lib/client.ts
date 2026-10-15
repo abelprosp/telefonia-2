@@ -1,25 +1,18 @@
-import type {
-  AxiosError,
-  AxiosRequestConfig,
-  AxiosResponse,
-  InternalAxiosRequestConfig
-} from 'axios';
+import type { AxiosError, AxiosRequestConfig, AxiosResponse } from 'axios';
 import axios from 'axios';
 
 import { env } from '@/env';
 
 import { isAxiosError, toApiHttpError } from './api-error';
 
-let getAccessTokenFromAuth: () => string | null = () => null;
+let getRolesFromAuth: () => string[] | undefined = () => undefined;
 let onUnauthorized: (() => void) | undefined;
 
-/** Synchronous access to the current OIDC token (used by route guards). */
-export const getCurrentAccessToken = () => getAccessTokenFromAuth();
-
-export const registerAuthTokenGetter = (getter: () => string | null) => {
-  getAccessTokenFromAuth = getter;
+export const getCurrentRoles = () => getRolesFromAuth();
+export const registerAuthRolesGetter = (getter: () => string[] | undefined) => {
+  getRolesFromAuth = getter;
   return () => {
-    getAccessTokenFromAuth = () => null;
+    getRolesFromAuth = () => undefined;
   };
 };
 
@@ -37,12 +30,7 @@ export type RequestConfig<TData = unknown> = {
   params?: unknown;
   data?: TData | FormData;
   responseType?:
-    | 'arraybuffer'
-    | 'blob'
-    | 'document'
-    | 'json'
-    | 'text'
-    | 'stream';
+    'arraybuffer' | 'blob' | 'document' | 'json' | 'text' | 'stream';
   signal?: AbortSignal;
   validateStatus?: (status: number) => boolean;
   headers?: AxiosRequestConfig['headers'];
@@ -94,31 +82,7 @@ export const mergeConfig = <T extends RequestConfig>(
   }, {});
 };
 
-export const api = axios.create(getConfig());
-
-api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  const headers = config.headers;
-  const existing =
-    typeof headers.get === 'function'
-      ? headers.get('Authorization')
-      : (headers as { Authorization?: string }).Authorization;
-
-  if (existing) {
-    return config;
-  }
-
-  const token = getAccessTokenFromAuth();
-
-  if (token) {
-    if (typeof headers.set === 'function') {
-      headers.set('Authorization', `Bearer ${token}`);
-    } else {
-      (headers as { Authorization?: string }).Authorization = `Bearer ${token}`;
-    }
-  }
-
-  return config;
-});
+export const api = axios.create({ ...getConfig(), withCredentials: true });
 
 api.interceptors.response.use(
   (response) => response,
@@ -126,7 +90,7 @@ api.interceptors.response.use(
     const response = error.response;
 
     if (response) {
-      const hadToken = Boolean(getAccessTokenFromAuth());
+      const hadToken = Boolean(getRolesFromAuth());
 
       if (response.status === 401 && hadToken) {
         onUnauthorized?.();

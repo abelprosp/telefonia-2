@@ -89,7 +89,7 @@ func (s *Service) ListInAppNotifications(ctx context.Context, userID string) (*m
 	notifications = append(notifications, models.InAppNotification{
 		ID:          notifID,
 		Title:       "Segurança da Conta",
-		Description: "A autenticação em dois fatores (MFA/OTP) está disponível no Keycloak.",
+		Description: "Configure o autenticador em Configurações > Segurança da conta.",
 		Category:    "system",
 		Severity:    "success",
 		CreatedAt:   time.Now().Add(-24 * time.Hour),

@@ -1,5 +1,5 @@
 import { createFileRoute, Outlet, redirect } from '@tanstack/react-router';
-import { useAuth } from 'react-oidc-context';
+
 
 import { AppTopBar } from '@/components/app-top-bar';
 import { AuthConfigError } from '@/components/auth-config-error';
@@ -10,7 +10,8 @@ import { SignedIn } from '@/components/signed-in';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { getAuthConfigHint } from '@/lib/auth-config-hint';
 import { resolveAuthRoleState } from '@/lib/auth-roles';
-import { getCurrentAccessToken } from '@/lib/client';
+import { getCurrentRoles } from '@/lib/client';
+import { useAuth } from '@/providers/auth';
 
 const RouteComponent = () => {
   const { isLoading, error } = useAuth();
@@ -33,7 +34,11 @@ const RouteComponent = () => {
           <SignedIn>
             <AppTopBar />
             <MfaGuidanceBanner />
-            <div id="conteudo-principal" className="flex flex-1 flex-col" tabIndex={-1}>
+            <div
+              id="conteudo-principal"
+              className="flex flex-1 flex-col"
+              tabIndex={-1}
+            >
               <Outlet />
             </div>
           </SignedIn>
@@ -47,7 +52,7 @@ export const Route = createFileRoute('/__app')({
   // Guarda de papéis no nível da rota (defesa em profundidade; a API também valida).
   // Espelha a política já aplicada em LayoutSidebar, mas antes de renderizar a página.
   beforeLoad: ({ location }) => {
-    const token = getCurrentAccessToken();
+    const token = getCurrentRoles();
     // Sem token ainda não há papéis para avaliar; o componente SignedIn trata o login.
     if (!token) {
       return;

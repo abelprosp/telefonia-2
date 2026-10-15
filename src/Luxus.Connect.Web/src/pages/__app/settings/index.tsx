@@ -7,7 +7,6 @@ import {
   CreditCard,
   Eye,
   Globe,
-  KeyRound,
   Loader2,
   LogOut,
   Palette,
@@ -22,7 +21,6 @@ import {
   UserCog,
   Users
 } from 'lucide-react';
-import { useAuth } from 'react-oidc-context';
 import { toast } from 'sonner';
 
 import {
@@ -38,6 +36,7 @@ import {
   type SystemSettings,
   type WhitelabelSettings
 } from '@/api/settings-api';
+import { AccountSecurity } from '@/components/account-security';
 import { PageWrapper } from '@/components/page-wrapper';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -57,6 +56,7 @@ import { getErrorMessage, isApiHttpError } from '@/lib/api-error';
 import { performLogout } from '@/lib/auth-actions';
 import { roleLabel, useAuthRoles } from '@/lib/auth-roles';
 import { useExportOrganizationData } from '@/lib/ops-api';
+import { useAuth } from '@/providers/auth';
 
 import { WebhooksSettingsPanel } from './-components/webhooks-settings-panel';
 
@@ -494,7 +494,9 @@ function SettingsPage() {
                       <span className="text-muted-foreground">
                         Autenticação
                       </span>
-                      <span className="font-semibold">Keycloak SSO / OIDC</span>
+                      <span className="font-semibold">
+                        Autenticação Telefonia
+                      </span>
                     </div>
                   </div>
 
@@ -578,34 +580,7 @@ function SettingsPage() {
               </Card>
 
               <Card className="rounded-2xl border shadow-xs">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <KeyRound className="text-primary size-5" />
-                    Segurança da conta
-                  </CardTitle>
-                  <CardDescription>
-                    Altere sua senha e configure a autenticação de dois fatores
-                    na página de segurança da conta. Confirme sua identidade
-                    quando solicitado.
-                  </CardDescription>
-                </CardHeader>
-                <CardFooter>
-                  <Button
-                    nativeButton={false}
-                    render={
-                      <a
-                        href={
-                          userProfile?.mfa_account_url ||
-                          `${auth.settings.authority}/account/#/security/signingin`
-                        }
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      />
-                    }
-                  >
-                    Gerenciar senha e autenticação
-                  </Button>
-                </CardFooter>
+                <AccountSecurity />
               </Card>
             </div>
           </div>

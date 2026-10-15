@@ -20,7 +20,7 @@ import {
   Users,
   Wallet
 } from 'lucide-react';
-import { useAuth } from 'react-oidc-context';
+
 
 import { NavMain } from '@/components/nav-main';
 import {
@@ -36,6 +36,7 @@ import {
 import { performLogout } from '@/lib/auth-actions';
 import { useAuthRoles } from '@/lib/auth-roles';
 import { useApp } from '@/providers/app';
+import { useAuth } from '@/providers/auth';
 import { useWhitelabel } from '@/providers/whitelabel-provider';
 
 type MenuItem = {

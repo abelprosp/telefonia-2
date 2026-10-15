@@ -5,7 +5,7 @@ import {
   LogOut,
   UserCircle
 } from 'lucide-react';
-import { useAuth } from 'react-oidc-context';
+
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -24,6 +24,7 @@ import {
   useSidebar
 } from '@/components/ui/sidebar';
 import { performLogout } from '@/lib/auth-actions';
+import { useAuth } from '@/providers/auth';
 
 export const NavUser = ({
   user
@@ -40,7 +41,6 @@ export const NavUser = ({
   const onSignout = async () => {
     await performLogout(auth);
   };
-
 
   return (
     <SidebarMenu>

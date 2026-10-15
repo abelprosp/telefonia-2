@@ -23,18 +23,12 @@
 - **Especificação normativa:** [`docs/Documento de Especificação Funcional-v2.md`](docs/Documento%20de%20Especificação%20Funcional-v2.md)
 - **Backlog de implementação:** [`docs/BACKLOG_IMPLEMENTACAO_SPEC_V2.md`](docs/BACKLOG_IMPLEMENTACAO_SPEC_V2.md)
 
-### Identidade (Keycloak)
+### Login e segurança
 
-Utilizadores e organizações vivem no **Keycloak** (SSO). O PostgreSQL da aplicação **não** duplica tabelas de utilizadores/organizações; campos de auditoria e contexto multi-tenant usam identificadores do token (ex.: _subject_, claims) como texto, com regras na API.
-
-**MFA (OTP):** o IdP é o Keycloak — não há TOTP próprio na API. No Admin Console do realm `luxus`:
-
-1. **Authentication → Required actions → Configure OTP** — Enabled (já no `luxus-realm.json` para instalações novas; `defaultAction` permanece `false` para não bloquear o utilizador `dev` local).
-2. Para papéis privilegiados (master/admin/financeiro), marque Configure OTP como ação obrigatória no utilizador, ou ative o fluxo Browser com **OTP Form**.
-3. Conta do utilizador: `{KEYCLOAK}/realms/luxus/account/#/security/signingin`.
-4. A API lê `acr`/`amr` do JWT e, se o admin client estiver configurado, verifica credencial `otp`. Sem MFA, a aplicação mostra um aviso com o link acima.
-
-Não altere `otpRequired` no realm em massa em ambientes já importados: isso pode forçar OTP em todas as contas (incluindo `dev`).
+O Telefonia usa autenticação própria: usuário e senha, Argon2id, sessões em
+cookie HttpOnly e MFA por aplicativo autenticador. Não depende do Keycloak.
+Consulte [a migração, configuração e recuperação de contas](docs/AUTH_LOCAL.md).
+A migração preserva IDs, empresas e vínculos, mas exige novas senhas.
 
 **APM:** não há Datadog/New Relic. Durações de HTTP, importação, passos do pipeline e `db.ping` ficam em `GET /metrics/operations` e na tabela `OperationMetrics`.
 
@@ -44,7 +38,7 @@ O backend é uma **API REST em Go** (binário único, ~15 MB) com o mesmo contra
 
 | Camada | Localização | Função |
 | ------ | ----------- | ------ |
-| **API** | [`api/`](api/) | HTTP (chi), auth JWT Keycloak, handlers REST, consumer RabbitMQ |
+| **API** | [`api/`](api/) | HTTP (chi), autenticação própria por sessão, handlers REST, consumer RabbitMQ |
 | **Store** | `api/internal/store` | PostgreSQL via pgx (queries e comandos) |
 | **Serviços** | `api/internal/services` | Regras de negócio (clientes, linhas, faturas, etc.) |
 | **Importação** | `api/internal/importservice` + `api/internal/vivo` | Parser VIVO + pipeline assíncrono |
@@ -63,10 +57,10 @@ O backend é uma **API REST em Go** (binário único, ~15 MB) com o mesmo contra
 | Área | Tecnologias |
 | ---- | ----------- |
 | **Backend** | Go 1.22, chi, pgx, RabbitMQ (amqp), AWS SDK v2 (S3/R2) |
-| **Auth** | Keycloak (OIDC), validação JWT + JWKS |
+| **Auth** | Argon2id, sessões revogáveis no PostgreSQL, TOTP |
 | **Frontend** | Vite, React, TypeScript, TanStack Router, TanStack Query, Tailwind, shadcn/ui |
 | **Object storage** | API compatível com S3 (URLs pré-assinadas, importação de faturas) |
-| **Containerização** | Docker, Docker Compose; produção: nginx no `connect-web` (TLS, `/auth`, `/api`) |
+| **Containerização** | Docker, Docker Compose; produção: nginx no `connect-web` (TLS, `/api`) |
 
 ## Início rápido (desenvolvimento)
 
@@ -97,10 +91,8 @@ POSTGRES_PASSWORD=postgres
 # Seq (hash da password inicial — não é texto plano)
 SEQ_PWD_HASH=YourPasswordHashHere
 
-# Keycloak
-KC_ADMIN_PWD=admin
-KC_DB_USERNAME=postgres
-KC_DB_PASSWORD=postgres
+# Login próprio: gerado automaticamente por docker-up.sh
+# AUTH_SECRET=
 
 # RabbitMQ
 RMQ_USER=guest
@@ -136,9 +128,8 @@ base vazia; em uma base existente, a API aplica as migrações incrementais
 ```bash
 cd api
 export DATABASE_URL="Host=localhost;Username=postgres;Password=postgres;Database=luxus_connect_dev"
-export KEYCLOAK_REALM=luxus
-export KEYCLOAK_AUTH_SERVER_URL=http://localhost:8081/auth
-export KEYCLOAK_RESOURCE=connect-cli
+export AUTH_SECRET="$(openssl rand -hex 32)" # guarde a mesma chave nos próximos arranques
+export CORS_ORIGINS=http://localhost:5173
 go run ./cmd/api
 ```
 

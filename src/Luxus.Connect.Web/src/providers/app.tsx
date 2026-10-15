@@ -8,16 +8,17 @@ import {
 } from 'react';
 
 import { QueryClientProvider } from '@tanstack/react-query';
-import { useAuth } from 'react-oidc-context';
+
 
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import {
-  registerAuthTokenGetter,
+  registerAuthRolesGetter,
   registerUnauthorizedHandler
 } from '@/lib/client';
 import { queryClient } from '@/lib/query-client';
 import { getItem, setItem } from '@/lib/storage';
+import { useAuth } from '@/providers/auth';
 import { WhitelabelProvider } from '@/providers/whitelabel-provider';
 import { ThemeSchema, type Theme } from '@/types/app';
 
@@ -50,13 +51,12 @@ export const AppProvider = ({
   storageKey = 'luxus-connect',
   ...props
 }: AppProviderProps) => {
-  const { signinRedirect, user } = useAuth();
+  const { removeUser, user } = useAuth();
 
-  // Regista o token antes de os filhos dispararem queries. Um layout effect corre
-  // antes dos useEffect dos filhos, evitando a primeira chamada sem Authorization.
+  // Disponibiliza os papéis às guardas de navegação; a API valida a sessão.
   useLayoutEffect(() => {
-    return registerAuthTokenGetter(() => user?.access_token ?? null);
-  }, [user?.access_token]);
+    return registerAuthRolesGetter(() => user?.roles);
+  }, [user?.roles]);
 
   const [theme, setTheme] = useState<Theme>(() =>
     readStoredTheme(`${storageKey}.theme`, defaultTheme)
@@ -84,19 +84,10 @@ export const AppProvider = ({
 
   useEffect(() => {
     const unregister = registerUnauthorizedHandler(() => {
-      const now = Date.now();
-      const lastRedirect = Number(
-        sessionStorage.getItem('luxus_last_auth_redirect') || '0'
-      );
-      if (now - lastRedirect < 10000) {
-        // Prevent redirect/refresh storm if 401 persists
-        return;
-      }
-      sessionStorage.setItem('luxus_last_auth_redirect', String(now));
-      void signinRedirect();
+      void removeUser();
     });
     return unregister;
-  }, [signinRedirect]);
+  }, [removeUser]);
 
   const value = {
     theme,
@@ -118,8 +109,6 @@ export const AppProvider = ({
     </AppProviderContext.Provider>
   );
 };
-
-
 
 export const useApp = () => {
   const context = useContext(AppProviderContext);
