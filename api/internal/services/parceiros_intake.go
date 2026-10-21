@@ -2,18 +2,20 @@ package services
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"os"
 	"path"
-	"path/filepath"
 	"strings"
 	"time"
 	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/luxus-connect/telefonia/api/internal/httputil"
 	"github.com/luxus-connect/telefonia/api/internal/models"
+	"github.com/luxus-connect/telefonia/api/internal/notifications"
 	"github.com/luxus-connect/telefonia/api/internal/parceiros"
 	"github.com/luxus-connect/telefonia/api/internal/store"
 )
@@ -31,7 +33,7 @@ func (s *Service) ImportParceirosSale(ctx context.Context, orgID string, input p
 		return intakeResultFromRow(existing), nil
 	}
 
-	files, skipped, err := s.storeParceirosFiles(orgID, prepared.ExternalSaleID, input.Attachments, &prepared.Warnings)
+	files, skipped, err := s.storeParceirosFiles(ctx, orgID, prepared.ExternalSaleID, input.Attachments, &prepared.Warnings)
 	if err != nil {
 		return parceiros.IntakeResult{}, err
 	}
@@ -72,26 +74,26 @@ func (s *Service) ImportParceirosSale(ctx context.Context, orgID string, input p
 		}
 		row := store.ParceirosImportInsert{
 			ID: importID, OrganizationID: orgID, ExternalSaleID: prepared.ExternalSaleID,
-			Protocol: clip(&prepared.Warnings, "Protocolo", prepared.Protocol, 64),
+			Protocol:     clip(&prepared.Warnings, "Protocolo", prepared.Protocol, 64),
 			TaskProtocol: clip(&prepared.Warnings, "Protocolo do Task", prepared.TaskProtocol, 64),
-			CustomerID: customerID, PhoneLineID: lineID, CustomerCreated: created, PhoneLineCreated: lineCreated,
+			CustomerID:   customerID, PhoneLineID: lineID, CustomerCreated: created, PhoneLineCreated: lineCreated,
 			AttachmentsAccepted: accepted, AttachmentsSkipped: skipped,
-			PartnerName: clip(&prepared.Warnings, "Parceiro", input.Sale.PartnerName, 256),
-			BranchName: clip(&prepared.Warnings, "Filial", input.Sale.BranchName, 256),
+			PartnerName:  clip(&prepared.Warnings, "Parceiro", input.Sale.PartnerName, 256),
+			BranchName:   clip(&prepared.Warnings, "Filial", input.Sale.BranchName, 256),
 			OperatorName: clip(&prepared.Warnings, "Operadora", input.Sale.OperatorName, 128),
-			PlanName: clip(&prepared.Warnings, "Plano", input.Sale.PlanName, 128),
-			LineNumber: clip(&prepared.Warnings, "Número da linha", strings.TrimSpace(input.Sale.LineNumber), 32),
-			Value: input.Sale.Value, CommissionValue: input.Sale.CommissionValue,
+			PlanName:     clip(&prepared.Warnings, "Plano", input.Sale.PlanName, 128),
+			LineNumber:   clip(&prepared.Warnings, "Número da linha", strings.TrimSpace(input.Sale.LineNumber), 32),
+			Value:        input.Sale.Value, CommissionValue: input.Sale.CommissionValue,
 			SoldAt: prepared.SoldAt, ConcludedAt: prepared.ConcludedAt,
-			SimType: prepared.SimType,
-			Iccid: clip(&prepared.Warnings, "ICCID", prepared.Iccid, 64),
-			ContractFormat: clip(&prepared.Warnings, "Formato do contrato", input.Sale.ContractFormat, 32),
-			IsUpgrade: input.Sale.IsUpgrade,
+			SimType:           prepared.SimType,
+			Iccid:             clip(&prepared.Warnings, "ICCID", prepared.Iccid, 64),
+			ContractFormat:    clip(&prepared.Warnings, "Formato do contrato", input.Sale.ContractFormat, 32),
+			IsUpgrade:         input.Sale.IsUpgrade,
 			UpgradeOfProtocol: clip(&prepared.Warnings, "Protocolo do upgrade", input.Sale.UpgradeOfProtocol, 64),
-			IsPortability: input.Sale.IsPortability,
+			IsPortability:     input.Sale.IsPortability,
 			PortabilityNumber: clip(&prepared.Warnings, "Número da portabilidade", input.Sale.PortabilityNumber, 32),
-			DonorOperator: clip(&prepared.Warnings, "Operadora de origem", input.Sale.DonorOperator, 32),
-			Warnings: prepared.Warnings, Payload: payload,
+			DonorOperator:     clip(&prepared.Warnings, "Operadora de origem", input.Sale.DonorOperator, 32),
+			Warnings:          prepared.Warnings, Payload: payload,
 		}
 		if err = s.Store.InsertParceirosImport(ctx, row); err != nil {
 			return err
@@ -103,7 +105,7 @@ func (s *Service) ImportParceirosSale(ctx context.Context, orgID string, input p
 			if _, err = s.Store.CreateCustomerAttachment(ctx, orgID, customerID, file.attachmentID, models.RegisterCustomerAttachmentInput{
 				Title:            &title,
 				OriginalFileName: file.fileName,
-				StorageBucket:    "local",
+				StorageBucket:    s.IntakeBucket,
 				StorageObjectKey: file.objectKey,
 				ContentType:      &mime,
 				SizeBytes:        &size,
@@ -133,10 +135,20 @@ type parceirosStoredFile struct {
 	objectKey    string
 }
 
-func (s *Service) storeParceirosFiles(orgID, saleID string, attachments []parceiros.Attachment, warnings *[]string) ([]parceirosStoredFile, int, error) {
-	root := s.ParceirosUploadDir
-	if strings.TrimSpace(root) == "" {
-		root = "./parceiros-uploads"
+// safeStorageSegment guards every caller-controlled value used to build an
+// object key. The intake validation already rejects traversal, but this keeps
+// the storage layer safe even if a new caller forgets that validation.
+func safeStorageSegment(value string) bool {
+	return value != "" && value == strings.TrimSpace(value) && value != "." && value != ".." &&
+		!strings.ContainsAny(value, `/\`) && !strings.Contains(value, "\x00")
+}
+
+func (s *Service) storeParceirosFiles(ctx context.Context, orgID, saleID string, attachments []parceiros.Attachment, warnings *[]string) ([]parceirosStoredFile, int, error) {
+	if len(attachments) > 0 && (s.IntakeStorage == nil || strings.TrimSpace(s.IntakeBucket) == "") {
+		return nil, 0, httputil.UnavailableError(notifications.N("INTAKE_STORAGE_UNAVAILABLE", "Armazenamento indisponível para receber anexos."))
+	}
+	if !safeStorageSegment(orgID) || !safeStorageSegment(saleID) {
+		return nil, 0, httputil.ValidationError(notifications.N("INTAKE_INVALID_PATH", "Identificador inválido para armazenamento de anexos."))
 	}
 	var files []parceirosStoredFile
 	skipped := 0
@@ -160,13 +172,12 @@ func (s *Service) storeParceirosFiles(orgID, saleID string, attachments []parcei
 		}
 		attachmentID := uuid.NewString()
 		ext := attachmentExtension(attachment.MimeType, attachment.Name)
-		objectKey := path.Join(orgID, saleID, attachmentID+ext)
-		full := filepath.Join(root, filepath.FromSlash(objectKey))
-		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
-			return nil, skipped, err
-		}
-		if err := os.WriteFile(full, data, 0o644); err != nil {
-			return nil, skipped, err
+		// Deterministic key: a concurrent retry overwrites the same object
+		// instead of leaving an orphan copy behind.
+		keyHash := sha256.Sum256([]byte(orgID + "\x00" + saleID + "\x00" + externalID))
+		objectKey := path.Join(orgID, "parceiros", saleID, hex.EncodeToString(keyHash[:])+ext)
+		if !strings.HasPrefix(objectKey, orgID+"/parceiros/"+saleID+"/") {
+			return nil, skipped, httputil.ValidationError(notifications.N("INTAKE_INVALID_PATH", "Caminho de anexo inválido."))
 		}
 		name := strings.TrimSpace(attachment.Name)
 		if name == "" {
@@ -179,6 +190,9 @@ func (s *Service) storeParceirosFiles(orgID, saleID string, attachments []parcei
 		mime := strings.TrimSpace(attachment.MimeType)
 		if mime == "" {
 			mime = "application/octet-stream"
+		}
+		if err := s.IntakeStorage.PutIntakeObject(ctx, s.IntakeBucket, objectKey, mime, data); err != nil {
+			return nil, skipped, err
 		}
 		files = append(files, parceirosStoredFile{
 			externalID: externalID, attachmentID: attachmentID, title: title,
@@ -357,7 +371,7 @@ func attachmentExtension(mime, name string) string {
 	case "application/pdf":
 		return ".pdf"
 	}
-	ext := strings.ToLower(filepath.Ext(name))
+	ext := strings.ToLower(path.Ext(name))
 	if ext == "" || len(ext) > 8 || strings.Contains(ext, "/") || strings.Contains(ext, "\\") {
 		return ""
 	}

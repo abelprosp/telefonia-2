@@ -194,9 +194,6 @@ func (s *Service) DispatchWebhookEvent(orgID, event string, data map[string]any)
 }
 
 func postWebhook(ctx context.Context, targetURL, secret string, payload map[string]any) (int, string, error) {
-	if err := httputil.ValidatePublicHTTPSWebhookURL(targetURL); err != nil {
-		return 0, "", err
-	}
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return 0, "", err
@@ -215,7 +212,8 @@ func postWebhook(ctx context.Context, targetURL, secret string, payload map[stri
 		req.Header.Set("X-Luxus-Event", ev)
 	}
 
-	client := &http.Client{Timeout: 12 * time.Second}
+	client := httputil.NewPublicHTTPSWebhookClient(12 * time.Second)
+	defer client.CloseIdleConnections()
 	resp, err := client.Do(req)
 	if err != nil {
 		return 0, "", err

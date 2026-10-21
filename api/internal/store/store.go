@@ -114,7 +114,14 @@ func (s *Store) Pool() *pgxpool.Pool {
 }
 
 func (s *Store) WithTx(ctx context.Context, fn func(ctx context.Context, tx pgx.Tx) error) error {
-	tx, err := s.pool.Begin(ctx)
+	var tx pgx.Tx
+	var err error
+	if parent, ok := ctx.Value(txCtxKey{}).(pgx.Tx); ok {
+		// pgx implements nested Begin as a savepoint: no independent commit.
+		tx, err = parent.Begin(ctx)
+	} else {
+		tx, err = s.pool.Begin(ctx)
+	}
 	if err != nil {
 		return err
 	}

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -165,15 +164,19 @@ func (s *Store) ContractTemplateCodeExists(ctx context.Context, orgID, code stri
 }
 
 func (s *Store) NextSaleNumber(ctx context.Context, orgID string) (string, error) {
-	var count int64
+	// Reserve using PostgreSQL's UTC day and one atomic UPSERT. Gaps are acceptable;
+	// a deleted sale or concurrent request must never cause number reuse.
+	var number string
 	err := s.q(ctx).QueryRow(ctx, `
-		SELECT COUNT(*) FROM "Sales" WHERE "OrganizationId" = $1 AND "CreatedAt" >= date_trunc('day', NOW() AT TIME ZONE 'UTC')`,
-		orgID).Scan(&count)
-	if err != nil {
-		return "", err
-	}
-	now := time.Now().UTC()
-	return fmt.Sprintf("VND-%s-%04d", now.Format("20060102"), count+1), nil
+ WITH next AS (
+  INSERT INTO "SaleNumberCounters" ("OrganizationId", "Day", "LastValue")
+  VALUES ($1, to_char(CURRENT_TIMESTAMP AT TIME ZONE 'UTC', 'YYYYMMDD'), 1)
+  ON CONFLICT ("OrganizationId", "Day") DO UPDATE
+   SET "LastValue" = "SaleNumberCounters"."LastValue" + 1
+  RETURNING "Day", "LastValue"::text AS value
+ )
+ SELECT 'VND-' || "Day" || '-' || lpad(value, GREATEST(4, length(value)), '0') FROM next`, orgID).Scan(&number)
+	return number, err
 }
 
 func (s *Store) ListSales(ctx context.Context, orgID string, status *string, salespersonUserID *string, page httputil.PageSearch) ([]models.ListSaleResponse, int64, error) {

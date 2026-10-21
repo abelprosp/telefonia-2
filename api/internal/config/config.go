@@ -64,7 +64,6 @@ type Config struct {
 	FinancialAgentPublicURL         string
 	ParceirosIntakeAPIKey           string
 	ParceirosIntakeOrgID            string
-	ParceirosUploadDir              string
 }
 
 func Load() Config {
@@ -163,7 +162,6 @@ func Load() Config {
 		FinancialAgentPublicURL:         strings.TrimRight(firstNonEmpty(os.Getenv("FINANCIAL_AGENT_PUBLIC_URL"), sicrediPublicURL), "/"),
 		ParceirosIntakeAPIKey:           strings.TrimSpace(os.Getenv("PARCEIROS_INTAKE_API_KEY")),
 		ParceirosIntakeOrgID:            strings.TrimSpace(os.Getenv("PARCEIROS_INTAKE_ORG_ID")),
-		ParceirosUploadDir:              strings.TrimSpace(firstNonEmpty(os.Getenv("PARCEIROS_UPLOAD_DIR"), "./parceiros-uploads")),
 	}
 }
 

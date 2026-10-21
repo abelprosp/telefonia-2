@@ -3,11 +3,16 @@ package parceiros
 import (
 	"encoding/base64"
 	"net/mail"
+	"regexp"
 	"strings"
 	"time"
 	"unicode"
 	"unicode/utf8"
 )
+
+// safeExternalID is also used as a path segment for stored attachments, so it
+// must never contain separators, traversal segments or leading dots.
+var safeExternalID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`)
 
 const (
 	Origin          = "luxus_parceiros"
@@ -17,47 +22,47 @@ const (
 )
 
 type Sale struct {
-	ID                 string   `json:"id"`
-	Protocol           string   `json:"protocol"`
-	TaskProtocol       string   `json:"taskProtocol"`
-	SoldAt             string   `json:"soldAt"`
-	ConcludedAt        string   `json:"concludedAt"`
-	Value              *float64 `json:"value"`
-	CommissionValue    *float64 `json:"commissionValue"`
-	OperatorName       string   `json:"operatorName"`
-	PlanName           string   `json:"planName"`
-	LineNumber         string   `json:"lineNumber"`
-	SimType            string   `json:"simType"`
-	IsVirginChip       bool     `json:"isVirginChip"`
-	Iccid              string   `json:"iccid"`
-	DeviceImei         string   `json:"deviceImei"`
-	DeviceEid          string   `json:"deviceEid"`
-	DevicePlatform     string   `json:"devicePlatform"`
-	IsPortability      bool     `json:"isPortability"`
-	PortabilityNumber  string   `json:"portabilityNumber"`
-	DonorOperator      string   `json:"donorOperator"`
-	IsUpgrade          bool     `json:"isUpgrade"`
-	UpgradeOfProtocol  string   `json:"upgradeOfProtocol"`
-	ContractFormat     string   `json:"contractFormat"`
-	PartnerName        string   `json:"partnerName"`
-	BranchName         string   `json:"branchName"`
-	Notes              string   `json:"notes"`
+	ID                string   `json:"id"`
+	Protocol          string   `json:"protocol"`
+	TaskProtocol      string   `json:"taskProtocol"`
+	SoldAt            string   `json:"soldAt"`
+	ConcludedAt       string   `json:"concludedAt"`
+	Value             *float64 `json:"value"`
+	CommissionValue   *float64 `json:"commissionValue"`
+	OperatorName      string   `json:"operatorName"`
+	PlanName          string   `json:"planName"`
+	LineNumber        string   `json:"lineNumber"`
+	SimType           string   `json:"simType"`
+	IsVirginChip      bool     `json:"isVirginChip"`
+	Iccid             string   `json:"iccid"`
+	DeviceImei        string   `json:"deviceImei"`
+	DeviceEid         string   `json:"deviceEid"`
+	DevicePlatform    string   `json:"devicePlatform"`
+	IsPortability     bool     `json:"isPortability"`
+	PortabilityNumber string   `json:"portabilityNumber"`
+	DonorOperator     string   `json:"donorOperator"`
+	IsUpgrade         bool     `json:"isUpgrade"`
+	UpgradeOfProtocol string   `json:"upgradeOfProtocol"`
+	ContractFormat    string   `json:"contractFormat"`
+	PartnerName       string   `json:"partnerName"`
+	BranchName        string   `json:"branchName"`
+	Notes             string   `json:"notes"`
 }
 
 type Client struct {
-	Name           string `json:"name"`
-	Document       string `json:"document"`
-	DocumentType   string `json:"documentType"`
-	RG             string `json:"rg"`
-	Email          string `json:"email"`
-	Phone          string `json:"phone"`
-	Address        string `json:"address"`
-	AddressNumber  string `json:"addressNumber"`
-	Complement     string `json:"complement"`
-	Neighborhood   string `json:"neighborhood"`
-	City           string `json:"city"`
-	State          string `json:"state"`
-	ZipCode        string `json:"zipCode"`
+	Name          string `json:"name"`
+	Document      string `json:"document"`
+	DocumentType  string `json:"documentType"`
+	RG            string `json:"rg"`
+	Email         string `json:"email"`
+	Phone         string `json:"phone"`
+	Address       string `json:"address"`
+	AddressNumber string `json:"addressNumber"`
+	Complement    string `json:"complement"`
+	Neighborhood  string `json:"neighborhood"`
+	City          string `json:"city"`
+	State         string `json:"state"`
+	ZipCode       string `json:"zipCode"`
 }
 
 type Attachment struct {
@@ -139,6 +144,9 @@ func Prepare(input SaleIntake) (Prepared, error) {
 	}
 	if len(prepared.ExternalSaleID) > 64 || len(prepared.Protocol) > 64 {
 		return prepared, &ValidationError{Message: "sale.id e sale.protocol precisam ter no máximo 64 caracteres."}
+	}
+	if !safeExternalID.MatchString(prepared.ExternalSaleID) {
+		return prepared, &ValidationError{Message: "sale.id deve conter apenas letras, números, ponto, hífen ou sublinhado, sem barras ou '..'."}
 	}
 	if utf8.RuneCountInString(prepared.CustomerName) > maxName {
 		prepared.Warnings = append(prepared.Warnings, "Nome do cliente passou de 256 caracteres e foi encurtado na ficha. O texto completo fica no payload da venda.")

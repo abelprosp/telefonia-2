@@ -108,7 +108,6 @@ func main() {
 		StateMachine:             statemachine.NewEngine(st),
 		FinancialAgentPublicURL:  cfg.FinancialAgentPublicURL,
 		FinancialAgentConfigured: cfg.FinancialAgentAPIKey != "" && cfg.FinancialAgentOrgID != "",
-		ParceirosUploadDir:       cfg.ParceirosUploadDir,
 	}
 	if zapClient.Enabled() {
 		logger.Info("zapsign integration enabled")

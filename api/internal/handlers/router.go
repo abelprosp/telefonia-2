@@ -79,6 +79,20 @@ func (h *Handler) RegisterRoutes(
 			r.Post("/integrations/luxus-parceiros/sales", h.importParceirosSale)
 		})
 
+		// Approval decisions have their own role boundary: financial staff must
+		// not need operational write access to perform a second-level approval.
+		// Keep every /approvals route in one group; a later r.Route("/approvals")
+		// would mount a subrouter and silently drop the GET routes above.
+		r.Group(func(r chi.Router) {
+			r.Use(auth)
+			r.With(connectauth.ApprovalReadAccess).Get("/approvals", h.listApprovals)
+			r.With(connectauth.ApprovalReadAccess).Get("/approvals/", h.listApprovals)
+			r.With(connectauth.ApprovalDecisionAccess).Post("/approvals/{id}/approve", h.approveApproval)
+			r.With(connectauth.ApprovalDecisionAccess).Post("/approvals/{id}/reject", h.rejectApproval)
+			r.With(operational, connectauth.OperationalMutationGuard).Post("/approvals", h.createApproval)
+			r.With(operational, connectauth.OperationalMutationGuard).Post("/approvals/", h.createApproval)
+		})
+
 		r.Group(func(r chi.Router) {
 			r.Use(connectauth.AgentAuthenticate(h.AgentKey, h.AgentOrg))
 			r.Route("/agent/financial", func(r chi.Router) {
@@ -389,13 +403,6 @@ func (h *Handler) RegisterRoutes(
 				r.Post("/{id}/messages", h.addSupportTicketMessage)
 				r.Post("/{id}/attachments/upload-url", h.ticketAttachmentUploadURL)
 				r.Get("/{id}/messages/{messageId}/attachment", h.ticketAttachmentDownload)
-			})
-
-			r.Route("/approvals", func(r chi.Router) {
-				r.Get("/", h.listApprovals)
-				r.Post("/", h.createApproval)
-				r.Post("/{id}/approve", h.approveApproval)
-				r.Post("/{id}/reject", h.rejectApproval)
 			})
 
 			r.Route("/webhooks", func(r chi.Router) {

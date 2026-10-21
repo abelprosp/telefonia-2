@@ -81,3 +81,15 @@ func TestPrepareExigeIdentidadeDaVenda(t *testing.T) {
 		t.Fatal("esperava erro")
 	}
 }
+
+func TestPrepareRejeitaIDComTravessiaDeCaminho(t *testing.T) {
+	for _, id := range []string{"../escape", "..", "a/b", `a\b`, ".hidden", "sale\x00id"} {
+		_, err := Prepare(SaleIntake{
+			Sale:   Sale{ID: id, Protocol: "VND-1"},
+			Client: Client{Name: "Amanda"},
+		})
+		if err == nil {
+			t.Fatalf("sale.id %q deveria ser rejeitado", id)
+		}
+	}
+}

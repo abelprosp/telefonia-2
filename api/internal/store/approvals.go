@@ -9,26 +9,26 @@ import (
 )
 
 type ApprovalRequestRow struct {
-	ID                  string
-	OrganizationID      string
-	ActionType          string
-	EntityType          string
-	EntityID            string
-	Status              string
-	RequesterUserID     string
-	FirstApproverUserID *string
+	ID                   string
+	OrganizationID       string
+	ActionType           string
+	EntityType           string
+	EntityID             string
+	Status               string
+	RequesterUserID      string
+	FirstApproverUserID  *string
 	SecondApproverUserID *string
-	Justification       *string
-	PayloadJSON         *string
-	BeforeJSON          *string
-	AfterJSON           *string
-	RejectionReason     *string
-	RejectedBy          *string
-	CreatedAt           time.Time
-	FirstApprovedAt     *time.Time
-	SecondApprovedAt    *time.Time
-	RejectedAt          *time.Time
-	ExecutedAt          *time.Time
+	Justification        *string
+	PayloadJSON          *string
+	BeforeJSON           *string
+	AfterJSON            *string
+	RejectionReason      *string
+	RejectedBy           *string
+	CreatedAt            time.Time
+	FirstApprovedAt      *time.Time
+	SecondApprovedAt     *time.Time
+	RejectedAt           *time.Time
+	ExecutedAt           *time.Time
 }
 
 func (s *Store) InsertApprovalRequest(ctx context.Context, r ApprovalRequestRow) error {
@@ -44,6 +44,15 @@ func (s *Store) InsertApprovalRequest(ctx context.Context, r ApprovalRequestRow)
 
 func (s *Store) GetApprovalRequest(ctx context.Context, orgID, id string) (*ApprovalRequestRow, error) {
 	return s.scanApproval(s.q(ctx).QueryRow(ctx, approvalSelect+` WHERE "OrganizationId"=$1 AND "Id"=$2`, orgID, id))
+}
+
+// GetApprovalRequestForUpdate serializes decisions until the enclosing transaction commits.
+// Callers must pass a transaction context so execution and the decision are atomic.
+func (s *Store) GetApprovalRequestForUpdate(ctx context.Context, orgID, id string) (*ApprovalRequestRow, error) {
+	if _, ok := ctx.Value(txCtxKey{}).(pgx.Tx); !ok {
+		return nil, errors.New("approval lock requires transaction")
+	}
+	return s.scanApproval(s.q(ctx).QueryRow(ctx, approvalSelect+` WHERE "OrganizationId"=$1 AND "Id"=$2 FOR UPDATE`, orgID, id))
 }
 
 func (s *Store) FindOpenApproval(ctx context.Context, orgID, actionType, entityID string) (*ApprovalRequestRow, error) {
@@ -89,10 +98,10 @@ func (s *Store) UpdateApprovalRequest(ctx context.Context, r ApprovalRequestRow)
 			"Status"=$2, "FirstApproverUserId"=$3, "SecondApproverUserId"=$4,
 			"FirstApprovedAt"=$5, "SecondApprovedAt"=$6, "RejectedAt"=$7, "RejectedBy"=$8,
 			"RejectionReason"=$9, "AfterSnapshot"=$10::jsonb, "ExecutedAt"=$11
-		WHERE "Id"=$1`,
+		WHERE "Id"=$1 AND "OrganizationId"=$12`,
 		r.ID, r.Status, r.FirstApproverUserID, r.SecondApproverUserID,
 		r.FirstApprovedAt, r.SecondApprovedAt, r.RejectedAt, r.RejectedBy,
-		r.RejectionReason, r.AfterJSON, r.ExecutedAt)
+		r.RejectionReason, r.AfterJSON, r.ExecutedAt, r.OrganizationID)
 	return err
 }
 

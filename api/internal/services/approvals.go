@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/luxus-connect/telefonia/api/internal/auth"
 	"github.com/luxus-connect/telefonia/api/internal/httputil"
 	"github.com/luxus-connect/telefonia/api/internal/models"
@@ -77,29 +78,47 @@ func (s *Service) RequestTwoLevelApproval(ctx context.Context, input models.Crea
 	if strings.TrimSpace(input.EntityID) == "" {
 		return nil, httputil.ValidationError(notifications.N("APPROVAL_ENTITY_REQUIRED", "Informe a entidade da aprovação."))
 	}
-	if existing, err := s.Store.FindOpenApproval(ctx, orgID, action, input.EntityID); err != nil {
-		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
-	} else if existing != nil {
-		return toApprovalResponse(*existing), nil
-	}
-	now := time.Now().UTC()
-	before, _ := json.Marshal(input.Before)
-	payload, _ := json.Marshal(input.Payload)
-	beforeStr := string(before)
-	payloadStr := string(payload)
-	row := store.ApprovalRequestRow{
-		ID: uuid.New().String(), OrganizationID: orgID, ActionType: action,
-		EntityType: firstNonEmpty(input.EntityType, action), EntityID: input.EntityID,
-		Status: "pending_first", RequesterUserID: user.ID, Justification: optStr(input.Justification),
-		PayloadJSON: &payloadStr, BeforeJSON: &beforeStr, CreatedAt: now,
-	}
-	if err := s.Store.InsertApprovalRequest(ctx, row); err != nil {
-		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
-	}
-	s.auditLog(ctx, "RequestApproval", "ApprovalRequest", row.ID, nil, map[string]any{
-		"action": action, "entity_id": input.EntityID, "requester": user.ID,
+	var result *models.ApprovalRequestResponse
+	err = s.Store.WithTx(ctx, func(ctx context.Context, tx pgx.Tx) error {
+		ctx = store.CtxWithTx(ctx, tx)
+		// Serialize simultaneous requests for the same action/entity. Without this,
+		// two requests could create two open approvals and later execute twice.
+		if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`,
+			"approval:"+orgID+":"+action+":"+input.EntityID); err != nil {
+			return httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+		}
+		existing, err := s.Store.FindOpenApproval(ctx, orgID, action, input.EntityID)
+		if err != nil {
+			return httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+		}
+		if existing != nil {
+			result = toApprovalResponse(*existing)
+			return nil
+		}
+		now := time.Now().UTC()
+		before, _ := json.Marshal(input.Before)
+		payload, _ := json.Marshal(input.Payload)
+		beforeStr := string(before)
+		payloadStr := string(payload)
+		row := store.ApprovalRequestRow{
+			ID: uuid.New().String(), OrganizationID: orgID, ActionType: action,
+			EntityType: firstNonEmpty(input.EntityType, action), EntityID: input.EntityID,
+			Status: "pending_first", RequesterUserID: user.ID, Justification: optStr(input.Justification),
+			PayloadJSON: &payloadStr, BeforeJSON: &beforeStr, CreatedAt: now,
+		}
+		if err := s.Store.InsertApprovalRequest(ctx, row); err != nil {
+			return httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+		}
+		s.auditLog(ctx, "RequestApproval", "ApprovalRequest", row.ID, nil, map[string]any{
+			"action": action, "entity_id": input.EntityID, "requester": user.ID,
+		})
+		result = toApprovalResponse(row)
+		return nil
 	})
-	return toApprovalResponse(row), nil
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 func (s *Service) ListApprovalRequests(ctx context.Context, status string) ([]models.ApprovalRequestResponse, error) {
@@ -130,44 +149,62 @@ func (s *Service) ApproveRequest(ctx context.Context, id string) (*models.Approv
 	if !auth.CanApproveTwoLevel(ctx) {
 		return nil, httputil.ForbiddenError(notifications.N("APPROVAL_ROLE_REQUIRED", "Apenas master/admin/financeiro podem aprovar."))
 	}
-	row, err := s.Store.GetApprovalRequest(ctx, orgID, id)
+	var result *models.ApprovalRequestResponse
+	err = s.Store.WithTx(ctx, func(ctx context.Context, tx pgx.Tx) error {
+		ctx = store.CtxWithTx(ctx, tx)
+		// The row lock serializes concurrent decisions. The second decision waits
+		// for the first transaction to commit, then sees ExecutedAt and replays the
+		// response instead of executing the action again.
+		row, err := s.Store.GetApprovalRequestForUpdate(ctx, orgID, id)
+		if err != nil {
+			return httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+		}
+		if row == nil {
+			return httputil.NotFoundError(notifications.N("APPROVAL_NOT_FOUND", "Pedido de aprovação não encontrado."))
+		}
+		if row.RequesterUserID == user.ID {
+			return httputil.BusinessError(notifications.N("APPROVAL_SELF_FORBIDDEN", "Quem solicita não pode aprovar a si mesmo."))
+		}
+		now := time.Now().UTC()
+		switch row.Status {
+		case "approved":
+			if row.ExecutedAt != nil {
+				result = toApprovalResponse(*row)
+				return nil
+			}
+			return httputil.BusinessError(notifications.N("APPROVAL_NOT_PENDING", "Este pedido já foi concluído."))
+		case "pending_first":
+			row.Status = "pending_second"
+			row.FirstApproverUserID = &user.ID
+			row.FirstApprovedAt = &now
+			s.auditLog(ctx, "ApproveFirst", "ApprovalRequest", row.ID, map[string]any{"status": "pending_first"}, map[string]any{"status": "pending_second", "approver": user.ID})
+		case "pending_second":
+			if row.FirstApproverUserID != nil && *row.FirstApproverUserID == user.ID {
+				return httputil.BusinessError(notifications.N("APPROVAL_DISTINCT_REQUIRED", "A segunda aprovação deve ser de outro usuário privilegiado."))
+			}
+			row.Status = "approved"
+			row.SecondApproverUserID = &user.ID
+			row.SecondApprovedAt = &now
+			if err := s.executeApprovedAction(ctx, row); err != nil {
+				return err
+			}
+			row.ExecutedAt = &now
+			s.auditLog(ctx, "ApproveSecond", "ApprovalRequest", row.ID,
+				map[string]any{"status": "pending_second"},
+				map[string]any{"status": "approved", "approver": user.ID, "executed": true})
+		default:
+			return httputil.BusinessError(notifications.N("APPROVAL_NOT_PENDING", "Este pedido já foi concluído."))
+		}
+		if err := s.Store.UpdateApprovalRequest(ctx, *row); err != nil {
+			return httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+		}
+		result = toApprovalResponse(*row)
+		return nil
+	})
 	if err != nil {
-		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+		return nil, err
 	}
-	if row == nil {
-		return nil, httputil.NotFoundError(notifications.N("APPROVAL_NOT_FOUND", "Pedido de aprovação não encontrado."))
-	}
-	if row.RequesterUserID == user.ID {
-		return nil, httputil.BusinessError(notifications.N("APPROVAL_SELF_FORBIDDEN", "Quem solicita não pode aprovar a si mesmo."))
-	}
-	now := time.Now().UTC()
-	switch row.Status {
-	case "pending_first":
-		row.Status = "pending_second"
-		row.FirstApproverUserID = &user.ID
-		row.FirstApprovedAt = &now
-		s.auditLog(ctx, "ApproveFirst", "ApprovalRequest", row.ID, map[string]any{"status": "pending_first"}, map[string]any{"status": "pending_second", "approver": user.ID})
-	case "pending_second":
-		if row.FirstApproverUserID != nil && *row.FirstApproverUserID == user.ID {
-			return nil, httputil.BusinessError(notifications.N("APPROVAL_DISTINCT_REQUIRED", "A segunda aprovação deve ser de outro usuário privilegiado."))
-		}
-		row.Status = "approved"
-		row.SecondApproverUserID = &user.ID
-		row.SecondApprovedAt = &now
-		if err := s.executeApprovedAction(ctx, row); err != nil {
-			return nil, err
-		}
-		row.ExecutedAt = &now
-		s.auditLog(ctx, "ApproveSecond", "ApprovalRequest", row.ID,
-			map[string]any{"status": "pending_second"},
-			map[string]any{"status": "approved", "approver": user.ID, "executed": true})
-	default:
-		return nil, httputil.BusinessError(notifications.N("APPROVAL_NOT_PENDING", "Este pedido já foi concluído."))
-	}
-	if err := s.Store.UpdateApprovalRequest(ctx, *row); err != nil {
-		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
-	}
-	return toApprovalResponse(*row), nil
+	return result, nil
 }
 
 func (s *Service) RejectApprovalRequest(ctx context.Context, id string, reason string) (*models.ApprovalRequestResponse, error) {
@@ -182,24 +219,36 @@ func (s *Service) RejectApprovalRequest(ctx context.Context, id string, reason s
 	if !auth.CanApproveTwoLevel(ctx) {
 		return nil, httputil.ForbiddenError(notifications.N("APPROVAL_ROLE_REQUIRED", "Apenas master/admin/financeiro podem recusar."))
 	}
-	row, err := s.Store.GetApprovalRequest(ctx, orgID, id)
-	if err != nil || row == nil {
-		return nil, httputil.NotFoundError(notifications.N("APPROVAL_NOT_FOUND", "Pedido de aprovação não encontrado."))
+	var result *models.ApprovalRequestResponse
+	err = s.Store.WithTx(ctx, func(ctx context.Context, tx pgx.Tx) error {
+		ctx = store.CtxWithTx(ctx, tx)
+		row, err := s.Store.GetApprovalRequestForUpdate(ctx, orgID, id)
+		if err != nil || row == nil {
+			return httputil.NotFoundError(notifications.N("APPROVAL_NOT_FOUND", "Pedido de aprovação não encontrado."))
+		}
+		if row.RequesterUserID == user.ID {
+			return httputil.BusinessError(notifications.N("APPROVAL_SELF_FORBIDDEN", "Quem solicita não pode recusar a si mesmo."))
+		}
+		if row.Status != "pending_first" && row.Status != "pending_second" {
+			return httputil.BusinessError(notifications.N("APPROVAL_NOT_PENDING", "Este pedido já foi concluído."))
+		}
+		now := time.Now().UTC()
+		r := strings.TrimSpace(reason)
+		row.Status = "rejected"
+		row.RejectedBy = &user.ID
+		row.RejectedAt = &now
+		row.RejectionReason = &r
+		if err := s.Store.UpdateApprovalRequest(ctx, *row); err != nil {
+			return httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
+		}
+		s.auditLog(ctx, "RejectApproval", "ApprovalRequest", row.ID, nil, map[string]any{"reason": r, "rejected_by": user.ID})
+		result = toApprovalResponse(*row)
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
-	if row.RequesterUserID == user.ID {
-		return nil, httputil.BusinessError(notifications.N("APPROVAL_SELF_FORBIDDEN", "Quem solicita não pode recusar a si mesmo."))
-	}
-	now := time.Now().UTC()
-	r := strings.TrimSpace(reason)
-	row.Status = "rejected"
-	row.RejectedBy = &user.ID
-	row.RejectedAt = &now
-	row.RejectionReason = &r
-	if err := s.Store.UpdateApprovalRequest(ctx, *row); err != nil {
-		return nil, httputil.InternalError(notifications.SharedUnexpectedError(err.Error()))
-	}
-	s.auditLog(ctx, "RejectApproval", "ApprovalRequest", row.ID, nil, map[string]any{"reason": r, "rejected_by": user.ID})
-	return toApprovalResponse(*row), nil
+	return result, nil
 }
 
 func (s *Service) executeApprovedAction(ctx context.Context, row *store.ApprovalRequestRow) error {

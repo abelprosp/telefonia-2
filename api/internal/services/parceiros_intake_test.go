@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -14,6 +13,15 @@ import (
 	"github.com/luxus-connect/telefonia/api/internal/parceiros"
 	"github.com/luxus-connect/telefonia/api/internal/store"
 )
+
+type parceirosTestStorage struct {
+	uploads []string
+}
+
+func (s *parceirosTestStorage) PutIntakeObject(_ context.Context, bucket, key, _ string, _ []byte) error {
+	s.uploads = append(s.uploads, bucket+"/"+key)
+	return nil
+}
 
 func TestImportParceirosSale(t *testing.T) {
 	databaseURL := os.Getenv("TEST_DATABASE_URL")
@@ -27,8 +35,8 @@ func TestImportParceirosSale(t *testing.T) {
 	}
 	t.Cleanup(st.Close)
 
-	dir := t.TempDir()
-	svc := &Service{Store: st, ParceirosUploadDir: dir}
+	storage := &parceirosTestStorage{}
+	svc := &Service{Store: st, IntakeStorage: storage, IntakeBucket: "files"}
 	orgID := uuid.NewString()
 	suffix := fmt.Sprintf("%08d", time.Now().UnixNano()%100000000)
 	cpf := "111" + suffix
@@ -83,9 +91,8 @@ func TestImportParceirosSale(t *testing.T) {
 	if sim != "ESIM" {
 		t.Fatalf("sim %q", sim)
 	}
-	matches, err := filepath.Glob(filepath.Join(dir, orgID, saleID, "*.pdf"))
-	if err != nil || len(matches) != 1 {
-		t.Fatalf("arquivo %v %v", matches, err)
+	if len(storage.uploads) != 1 || !strings.HasPrefix(storage.uploads[0], "files/"+orgID+"/parceiros/"+saleID+"/") {
+		t.Fatalf("uploads %v", storage.uploads)
 	}
 
 	replay, err := svc.ImportParceirosSale(ctx, orgID, parceiros.SaleIntake{
