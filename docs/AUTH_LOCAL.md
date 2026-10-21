@@ -1,14 +1,23 @@
-# Login e MFA do Telefonia
+# Login e passkeys do Telefonia
 
-O Telefonia autentica usuários na API Go e no PostgreSQL existentes. Não exige realm, client, servidor de identidade, SMTP ou serviço pago.
+O Telefonia autentica usuários na API Go e no PostgreSQL existentes. Não exige realm, client, servidor de identidade, SMTP ou serviço pago. O segundo fator é uma passkey (WebAuthn): digital, Face ID, Windows Hello ou chave de segurança física.
 
 ## Login diário
 
 1. Entre com usuário e senha no próprio Telefonia.
-2. Se a conta usa MFA, informe o código de seis dígitos do seu aplicativo autenticador.
-3. No primeiro acesso de uma conta privilegiada em produção, escaneie o QR code no Google Authenticator, Microsoft Authenticator, 1Password ou outro aplicativo TOTP. Confirme o primeiro código e guarde os códigos de recuperação em local protegido.
+2. Confirme o acesso com a passkey cadastrada no seu dispositivo. Não há código de seis dígitos para digitar.
+3. No primeiro acesso em produção, cadastre uma passkey logo após a senha e guarde os códigos de recuperação em local protegido.
 
-O aplicativo autenticador funciona sem internet. Os códigos mudam a cada 30 segundos; mantenha a hora do celular automática. Se perder o aparelho, escolha a opção de código de recuperação. Cada código só pode ser utilizado uma vez.
+A passkey fica no dispositivo ou no gerenciador de senhas (iCloud Keychain, Google Password Manager, 1Password, Windows Hello). Cadastre mais de um dispositivo quando possível. Se perder o aparelho, use um código de recuperação; cada código funciona uma única vez.
+
+O primeiro cadastro de uma conta sem passkey exige apenas a senha. Conclua-o imediatamente após criar ou importar a conta, antes de compartilhar a senha. Depois que uma passkey existe, uma sessão só-senha não consegue cadastrar outra.
+
+### Requisitos
+
+- HTTPS em produção. WebAuthn não funciona em HTTP, exceto `localhost` durante o desenvolvimento.
+- O domínio da interface deve ser o mesmo configurado em `PUBLIC_ORIGIN`/`CORS_ORIGINS`.
+- Navegador atualizado com suporte a WebAuthn (Chrome, Edge, Firefox, Safari).
+- `WEBAUTHN_RP_ID` é o domínio sem esquema, porta ou caminho. Quando ausente, a API usa o host da primeira origem de `CORS_ORIGINS`.
 
 ## Configurar a VPS
 
@@ -21,7 +30,16 @@ python3 scripts/configure-local-auth.py
 docker compose -f docker-compose.yml -f docker-compose.prod.yml build connect-api connect-web
 ```
 
-A configuração cria `AUTH_SECRET` somente se estiver ausente e preserva as demais variáveis. Guarde essa chave junto do backup protegido: ela cifra os segredos MFA. Não a regenere a cada deploy. `PUBLIC_ORIGIN` deve ser a origem HTTPS do site, sem caminho; o Compose a usa para `CORS_ORIGINS`.
+A configuração cria `AUTH_SECRET` somente se estiver ausente e preserva as demais variáveis. Guarde essa chave junto do backup protegido e não a regenere a cada deploy. `PUBLIC_ORIGIN` deve ser a origem HTTPS do site, sem caminho; o Compose a usa para `CORS_ORIGINS`.
+
+Opcionalmente, defina explicitamente o domínio WebAuthn:
+
+```bash
+WEBAUTHN_RP_ID=telefonia.redobrai.online
+WEBAUTHN_RP_NAME=Telefonia
+```
+
+`WEBAUTHN_RP_ID` precisa ser o domínio da interface ou um sufixo registrável dele. Não inclua `https://`, porta ou barra. Depois de mudar esse valor, as passkeys antigas deixam de valer e os usuários precisam cadastrar novamente.
 
 ### Primeiro administrador ou recuperação de acesso
 
@@ -39,13 +57,13 @@ bash scripts/local-auth-admin.sh reset-password SEU_USUARIO
 
 A senha é solicitada sem exibição e não entra no histórico do shell. Use pelo menos 12 caracteres. O primeiro administrador só é criado em uma instalação sem administrador; não existe senha universal.
 
-Se o autenticador e todos os códigos de recuperação se perderem:
+Se a passkey e todos os códigos de recuperação se perderem:
 
 ```bash
 bash scripts/local-auth-admin.sh reset-mfa SEU_USUARIO
 ```
 
-O reset encerra sessões e exige novo cadastro do autenticador. Não há endpoint público para esse reset.
+`reset-passkeys` é um alias do mesmo comando. O reset remove as passkeys, os códigos de recuperação e as sessões, e exige novo cadastro no próximo login. Não há endpoint público para esse reset.
 
 ### Importação offline de contas antigas
 
@@ -55,7 +73,7 @@ Se as contas já foram importadas, não repita a migração: use a mesma conta l
 python3 scripts/import-local-users.py /root/backup/users.json
 ```
 
-A importação preserva UUIDs, empresas e vínculos e não sobrescreve contas locais existentes. Senhas e autenticadores da origem não são copiados. Defina uma senha local depois da importação. Para contas sem empresa, escolha explicitamente o vínculo correto:
+A importação preserva UUIDs, empresas e vínculos e não sobrescreve contas locais existentes. Senhas e passkeys da origem não são copiadas. Defina uma senha local depois da importação. Para contas sem empresa, escolha explicitamente o vínculo correto:
 
 ```bash
 python3 scripts/import-local-users.py /root/backup/users.json \
@@ -72,23 +90,27 @@ bash scripts/setup-vps-nginx.sh
 curl -fsS https://telefonia.redobrai.online/api/health
 ```
 
-Se precisar reutilizar imagens de dependências já disponíveis localmente, use `DOCKER_PULL_POLICY=never bash docker-up.sh prod`. O deploy recompila API e interface, sem executar `down` ou apagar volumes. Abra o site e faça login novamente. A atualização não para nem apaga automaticamente contêineres ou bancos antigos: valide primeiro o acesso local e seus backups.
+Se precisar reutilizar imagens de dependências já disponíveis localmente, use `DOCKER_PULL_POLICY=never bash docker-up.sh prod`. O deploy recompila API e interface, sem executar `down` ou apagar volumes. Abra o site e faça login novamente.
 
-Depois de confirmar login, MFA e permissões na versão nova, pare o contêiner legado, caso ele ainda exista na VPS:
+### Remover o Keycloak legado
+
+O código atual não usa Keycloak. Depois de confirmar login e permissões na versão nova, remova o contêiner e os volumes antigos da VPS com o script idempotente:
 
 ```bash
-docker stop keycloak.connect.luxus
+bash scripts/remove-legacy-keycloak.sh
 ```
 
-O serviço não faz parte do Compose atual. Preserve os backups antigos até validar a migração; não remova volumes durante o deploy.
+O script apenas lista o que encontrou e pede confirmação. Use `--yes` para execução não interativa e `--purge-volumes` para remover também os volumes `keycloak*`. Faça backup e preserve os volumes antigos até validar a migração. Não remova volumes durante o deploy.
 
 ## Proteções
 
 - Senhas com Argon2id e salt individual; mínimo de 12 caracteres e máximo de 256 bytes.
 - Sessões opacas revogáveis, com hash no banco e cookie HttpOnly, Secure e SameSite=Strict em produção.
 - Expiração absoluta de 12 horas; expiração por inatividade de 30 minutos. Sessão pendente de MFA vale dez minutos.
-- TOTP cifrado com AES-GCM; proteção contra repetição de códigos e códigos de recuperação de uso único.
-- MFA obrigatório para administradores e financeiro em produção; MFA configurado continua exigido nos logins seguintes.
+- WebAuthn com verificação de usuário obrigatória, desafio de uso único armazenado no servidor e validação de origem e RP ID pela biblioteca.
+- Códigos de recuperação de uso único, gerados apenas no primeiro cadastro de passkey.
+- MFA obrigatório para todas as contas em produção; quem já tem passkey continua exigido nos logins seguintes.
+- Uma sessão só-senha não pode adicionar uma segunda passkey: para isso é necessário confirmar uma passkey existente.
 - Escritas exigem Origin exato; sem curingas em CORS_ORIGINS.
 - Limites persistidos de tentativas; troca de senha/perfil/status invalida sessões.
 - Recuperação administrativa pela VPS, sem envio de senha ou código por e-mail.

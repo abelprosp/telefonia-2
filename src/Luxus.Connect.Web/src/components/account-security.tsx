@@ -1,10 +1,12 @@
 import { useState, type FormEvent } from 'react';
 
-import { MfaSetup } from '@/components/local-login';
+import { Fingerprint } from 'lucide-react';
+
+import { PasskeySetup } from '@/components/local-login';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { authRequest, useAuth } from '@/providers/auth';
+import { authRequest, passkeyErrorMessage, useAuth } from '@/providers/auth';
 
 export function AccountSecurity() {
   const auth = useAuth();
@@ -13,6 +15,21 @@ export function AccountSecurity() {
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [passkeyBusy, setPasskeyBusy] = useState(false);
+  const [passkeyError, setPasskeyError] = useState('');
+  const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
+  const addPasskey = async () => {
+    setPasskeyBusy(true);
+    setPasskeyError('');
+    try {
+      const result = await auth.registerPasskey();
+      setRecoveryCodes(result.recovery_codes);
+    } catch (e) {
+      setPasskeyError(passkeyErrorMessage(e));
+    } finally {
+      setPasskeyBusy(false);
+    }
+  };
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
@@ -80,14 +97,45 @@ export function AccountSecurity() {
           </p>
         )}
       </form>
-      <h3 className="font-semibold">Autenticação em dois fatores</h3>
+      <h3 className="font-semibold">Passkeys</h3>
       {auth.mfaEnrolled ? (
-        <p className="text-sm">
-          Autenticador ativo. Para recuperar o acesso, use um dos códigos
-          guardados ou contate o administrador da VPS.
-        </p>
+        <div className="space-y-3">
+          <p className="text-sm">
+            Passkey ativa ({auth.passkeyCount}{' '}
+            {auth.passkeyCount === 1 ? 'cadastrada' : 'cadastradas'}).
+          </p>
+          <p className="text-sm">
+            Você entra com digital, Face ID ou Windows Hello.
+          </p>
+          <Button
+            variant="outline"
+            disabled={passkeyBusy}
+            onClick={() => void addPasskey()}
+          >
+            <Fingerprint className="size-4" aria-hidden />
+            {passkeyBusy ? 'Adicionando…' : 'Adicionar outra passkey'}
+          </Button>
+          {recoveryCodes.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-sm">
+                Guarde estes códigos de recuperação; eles só aparecem agora.
+              </p>
+              <textarea
+                aria-label="Códigos de recuperação"
+                readOnly
+                value={recoveryCodes.join('\n')}
+                className="h-40 w-full rounded border p-3 font-mono text-xs"
+              />
+            </div>
+          )}
+          {passkeyError && (
+            <p role="alert" className="text-destructive text-sm">
+              {passkeyError}
+            </p>
+          )}
+        </div>
       ) : (
-        <MfaSetup onComplete={auth.refresh} />
+        <PasskeySetup onComplete={auth.refresh} />
       )}
     </div>
   );

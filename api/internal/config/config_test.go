@@ -6,7 +6,7 @@ import (
 )
 
 func TestLocalAuthRequiresOnlySecretAndFrontendOrigin(t *testing.T) {
-	c := Config{DatabaseURL: "postgres://local-test", AuthSecret: "01234567890123456789012345678901", CORSOrigins: []string{"http://localhost:5173"}}
+	c := Config{DatabaseURL: "postgres://local-test", AuthSecret: "01234567890123456789012345678901", CORSOrigins: []string{"http://localhost:5173"}, WebAuthnRPID: "localhost"}
 	if err := c.Validate(); err != nil {
 		t.Fatalf("local auth unexpectedly requires an external identity provider: %v", err)
 	}
@@ -19,6 +19,29 @@ func TestLocalAuthRequiresOnlySecretAndFrontendOrigin(t *testing.T) {
 	invalid.CORSOrigins = nil
 	if invalid.Validate() == nil {
 		t.Fatal("missing CSRF origins accepted")
+	}
+	for _, rpID := range []string{"", "https://localhost", "localhost:5173", "localhost/path", "evil.example"} {
+		invalid = c
+		invalid.WebAuthnRPID = rpID
+		if invalid.Validate() == nil {
+			t.Errorf("invalid WebAuthn RP ID accepted: %q", rpID)
+		}
+	}
+	invalid = c
+	invalid.CORSOrigins = []string{"https://telefonia.example"}
+	invalid.WebAuthnRPID = "other.example"
+	if invalid.Validate() == nil {
+		t.Fatal("RP ID unrelated to CORS origin accepted")
+	}
+}
+
+func TestLoadDerivesWebAuthnRPIDFromFirstOrigin(t *testing.T) {
+	t.Setenv("CORS_ORIGINS", "https://app.telefonia.example")
+	t.Setenv("WEBAUTHN_RP_ID", "")
+	t.Setenv("WEBAUTHN_RP_NAME", "")
+	c := Load()
+	if c.WebAuthnRPID != "app.telefonia.example" || c.WebAuthnRPName != "Telefonia" {
+		t.Fatalf("unexpected WebAuthn defaults: %q %q", c.WebAuthnRPID, c.WebAuthnRPName)
 	}
 }
 
@@ -36,9 +59,16 @@ func TestDatabaseCredentialsRoundTrip(t *testing.T) {
 }
 
 func TestProductionRejectsInvalidStorageInsteadOfChangingDomain(t *testing.T) {
-	c := Config{AuthSecret: "01234567890123456789012345678901", CORSOrigins: []string{"https://app.example"}, Environment: "Production", DatabaseURL: "postgres://db", ObjectStoragePublicURL: "https://storage.example", ObjectStorageAccessKeyID: "application", ObjectStorageSecretKey: "dedicated-secret"}
+	c := Config{AuthSecret: "01234567890123456789012345678901", CORSOrigins: []string{"https://app.example"}, WebAuthnRPID: "app.example", Environment: "Production", DatabaseURL: "postgres://db", ObjectStoragePublicURL: "https://storage.example", ObjectStorageAccessKeyID: "application", ObjectStorageSecretKey: "dedicated-secret"}
 	if err := c.Validate(); err != nil {
 		t.Fatal(err)
+	}
+	for _, rpID := range []string{"localhost", "127.0.0.1", "::1"} {
+		invalid := c
+		invalid.WebAuthnRPID = rpID
+		if invalid.Validate() == nil {
+			t.Errorf("production accepted local WebAuthn RP ID: %s", rpID)
+		}
 	}
 	for _, raw := range []string{"", "http://storage.example", "https://127.0.0.1", "https://storage.example/storage"} {
 		invalid := c

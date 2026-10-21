@@ -1,6 +1,6 @@
 # Deploy na VPS
 
-A autenticação é própria do Telefonia, com senha, sessões HttpOnly e MFA TOTP. A configuração de contas e recuperação está em [AUTH_LOCAL.md](AUTH_LOCAL.md).
+A autenticação é própria do Telefonia, com senha, sessões HttpOnly e passkeys WebAuthn. A configuração de contas e recuperação está em [AUTH_LOCAL.md](AUTH_LOCAL.md).
 
 ## Configuração
 
@@ -26,7 +26,7 @@ curl -fsS https://telefonia.redobrai.online/api/health
 
 ## Contas e MFA
 
-Siga [o guia de autenticação](AUTH_LOCAL.md) para criar o primeiro administrador, importar contas offline ou recuperar senha/MFA. Não crie uma conta nova para substituir outra existente sem avaliar seus vínculos com clientes e vendas.
+Siga [o guia de autenticação](AUTH_LOCAL.md) para criar o primeiro administrador, importar contas offline ou recuperar senha/passkeys. Não crie uma conta nova para substituir outra existente sem avaliar seus vínculos com clientes e vendas.
 
 ## Diagnóstico
 
@@ -34,4 +34,4 @@ Siga [o guia de autenticação](AUTH_LOCAL.md) para criar o primeiro administrad
 docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail 80 connect-api connect-web
 ```
 
-Para erro de login, confira a origem HTTPS exata em `PUBLIC_ORIGIN`, o cookie da sessão e a configuração do proxy. Para erro MFA, confira a hora do celular e use um código de recuperação se necessário. Para 502, verifique os serviços e as portas do proxy. Não compartilhe logs com senhas, tokens ou cookies.
+Para erro de login, confira a origem HTTPS exata em `PUBLIC_ORIGIN`, o cookie da sessão e a configuração do proxy. Para erro de passkey, confirme `WEBAUTHN_RP_ID`, o HTTPS e use um código de recuperação se necessário. Para 502, verifique os serviços e as portas do proxy. Não compartilhe logs com senhas, tokens ou cookies.

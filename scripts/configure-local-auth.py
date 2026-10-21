@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate a persistent MFA encryption key without printing credentials."""
+"""Generate a persistent authentication key without printing credentials."""
 from datetime import datetime
 import os
 from pathlib import Path

@@ -24,7 +24,7 @@ para a origem do Vite.
 
 O login usa a API do Telefonia e uma sessão em cookie HttpOnly. Não há provedor externo nem tokens persistidos no navegador. Em produção, publique frontend e API com HTTPS na mesma origem.
 
-O usuário entra com senha e confirma o código de seis dígitos de um aplicativo autenticador. No primeiro acesso que exige MFA, o próprio Telefonia apresenta o QR code, a chave manual e os códigos de recuperação. Guarde estes códigos em local seguro: cada um funciona uma única vez. A tela de login permite alternar entre o autenticador e um código de recuperação.
+O usuário entra com senha e confirma o acesso com uma passkey (digital, Face ID, Windows Hello ou chave de segurança). No primeiro acesso que exige MFA, o próprio Telefonia cadastra a passkey e apresenta os códigos de recuperação. Guarde estes códigos em local seguro: cada um funciona uma única vez. A tela de login permite alternar entre a passkey e um código de recuperação.
 
 ## shadcn/ui
 

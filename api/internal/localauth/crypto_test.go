@@ -6,7 +6,6 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"time"
 )
 
 func TestPasswordHashSaltAndPolicy(t *testing.T) {
@@ -28,47 +27,6 @@ func TestPasswordHashSaltAndPolicy(t *testing.T) {
 		t.Fatal("unbounded hashing parameters")
 	}
 }
-func TestTOTPVectorReplayAndClockSkew(t *testing.T) {
-	// RFC 6238 SHA-1 vector at 59 seconds, truncated to six digits.
-	secret := "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"
-	now := time.Unix(59, 0)
-	if totp(secret, 1) != "287082" {
-		t.Fatal("RFC vector mismatch")
-	}
-	step, ok := verifyTOTP(secret, "287082", now, -1)
-	if !ok || step != 1 {
-		t.Fatal("valid code rejected")
-	}
-	if _, ok = verifyTOTP(secret, "287082", now, step); ok {
-		t.Fatal("replayed code accepted")
-	}
-	if _, ok = verifyTOTP(secret, "287082", time.Unix(89, 0), -1); !ok {
-		t.Fatal("clock skew not supported")
-	}
-	for _, code := range []string{"", "12345", "abcdef", "2870827"} {
-		if _, ok := verifyTOTP(secret, code, now, -1); ok {
-			t.Fatal("invalid code accepted")
-		}
-	}
-}
-func TestEncryptedMFARejectsWrongKeyAndTampering(t *testing.T) {
-	secret := strings.Repeat("a", 64)
-	encrypted, e := seal(secret, "totp-key")
-	if e != nil {
-		t.Fatal(e)
-	}
-	plain, e := unseal(secret, encrypted)
-	if e != nil || plain != "totp-key" {
-		t.Fatal("round trip failed")
-	}
-	if _, e = unseal(strings.Repeat("b", 64), encrypted); e == nil {
-		t.Fatal("wrong key accepted")
-	}
-	if _, e = unseal(secret, "invalid"); e == nil {
-		t.Fatal("invalid envelope accepted")
-	}
-}
-
 func TestRecoveryCodeFormattingAndLegacyCompatibility(t *testing.T) {
 	a, err := newRecoveryCode()
 	if err != nil {
@@ -132,8 +90,12 @@ func TestCookieCSRFAndPrivilegedMFA(t *testing.T) {
 	}
 	m.Production = false
 	s.Verified = false
-	s.User.MFASecret = "configured"
+	s.User.PasskeyCount = 1
 	if !m.NeedsMFA(s) {
-		t.Fatal("enrolled MFA must be checked even in development")
+		t.Fatal("enrolled passkey must be checked even in development")
+	}
+	s.User.PasskeyCount = 0
+	if m.NeedsMFA(s) {
+		t.Fatal("development without passkeys should not force MFA")
 	}
 }

@@ -32,12 +32,23 @@ func TestCommercialWritesCannotAdministerOperations(t *testing.T) {
 
 func TestProductionPrivilegesRequireVerifiedMFA(t *testing.T) {
 	mw := &Middleware{cfg: config.Config{Environment: "Production"}}
-	for _, amr := range [][]string{nil, {"pwd"}, {"pwd", "otp"}} {
+	for _, amr := range [][]string{nil, {"pwd"}, {"pwd", "otp"}, {"pwd", "passkey"}, {"pwd", "webauthn"}, {"pwd", "hwk"}} {
 		ctx := WithUser(context.Background(), &User{Roles: []string{RoleMaster}, Amr: amr})
 		rec := httptest.NewRecorder()
 		mw.RequireMaster(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(204) })).ServeHTTP(rec, httptest.NewRequest("GET", "/", nil).WithContext(ctx))
 		if (rec.Code == 204) != (len(amr) == 2) {
 			t.Errorf("amr=%v status=%d", amr, rec.Code)
 		}
+	}
+}
+
+func TestMFAVerifiedFromClaimsAcceptsPasskey(t *testing.T) {
+	for _, amr := range [][]string{{"pwd", "passkey"}, {"pwd", "webauthn"}, {"pwd", "hwk"}} {
+		if !MFAVerifiedFromClaims("", amr) {
+			t.Errorf("amr=%v not recognized as verified", amr)
+		}
+	}
+	if MFAVerifiedFromClaims("", []string{"pwd"}) {
+		t.Fatal("password-only claims treated as verified")
 	}
 }

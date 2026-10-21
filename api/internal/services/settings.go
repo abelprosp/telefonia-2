@@ -36,7 +36,7 @@ func (s *Service) GetCurrentUserProfile(ctx context.Context) (*models.UserProfil
 	mfaEnrolled := false
 	if s.Store != nil {
 		if local, e := s.Store.LocalUserByID(ctx, u.ID); e == nil && local != nil {
-			mfaEnrolled = local.MFASecret != ""
+			mfaEnrolled = local.PasskeyCount > 0
 		}
 	}
 	accountURL := "/settings"

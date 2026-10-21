@@ -62,7 +62,7 @@ func main() {
 	}
 	defer st.Close()
 
-	localAuth, err := localauth.New(st, cfg.AuthSecret, cfg.IsProduction(), cfg.CORSOrigins)
+	localAuth, err := localauth.New(st, cfg.AuthSecret, cfg.IsProduction(), cfg.CORSOrigins, cfg.WebAuthnRPID, cfg.WebAuthnRPName)
 	if err != nil {
 		logger.Error("local auth init failed", "error", err)
 		os.Exit(1)
@@ -224,6 +224,8 @@ func main() {
 				AND to_regclass('"PortalCustomerLinks"') IS NOT NULL
     AND to_regclass('auth_users') IS NOT NULL
     AND to_regclass('auth_sessions') IS NOT NULL
+    AND to_regclass('auth_webauthn_credentials') IS NOT NULL
+    AND to_regclass('auth_webauthn_challenges') IS NOT NULL
 				AND EXISTS (
 					SELECT 1 FROM information_schema.columns
 					WHERE table_schema = 'public'

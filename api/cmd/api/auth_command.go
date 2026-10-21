@@ -18,7 +18,7 @@ import (
 // Passwords arrive via stdin so they do not appear in argv or Docker inspect.
 func runAuthCommand(ctx context.Context, st *store.Store, cfg config.Config, args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("uso: api auth init-admin USUARIO EMAIL | reset-password USUARIO | reset-mfa USUARIO | import-users ARQUIVO.json")
+		return fmt.Errorf("uso: api auth init-admin USUARIO EMAIL | reset-password USUARIO | reset-mfa|reset-passkeys USUARIO | import-users ARQUIVO.json")
 	}
 	if args[0] == "import-users" {
 		if len(args) < 2 {
@@ -67,20 +67,27 @@ func runAuthCommand(ctx context.Context, st *store.Store, cfg config.Config, arg
 			return fmt.Errorf("usuário já existe; use reset-password")
 		}
 		u = &store.LocalUser{ID: uuid.NewString(), Username: username, Email: strings.TrimSpace(args[2]), FirstName: "Administrador", OrganizationID: auth.DefaultLuxusOrganizationID, OrganizationName: "Luxus Connect", Enabled: true, Roles: []string{"master", "user"}}
-	case "reset-password", "reset-mfa":
+	case "reset-password", "reset-mfa", "reset-passkeys":
 		if u == nil {
 			return fmt.Errorf("usuário não encontrado")
 		}
 	default:
 		return fmt.Errorf("comando desconhecido")
 	}
-	if args[0] == "reset-mfa" {
+	if args[0] == "reset-mfa" || args[0] == "reset-passkeys" {
 		tx, e := st.Pool().Begin(ctx)
 		if e != nil {
 			return e
 		}
 		defer tx.Rollback(ctx)
+		// Clear legacy TOTP state without dropping the columns, and remove every passkey.
 		if _, e = tx.Exec(ctx, `UPDATE auth_users SET mfa_secret='',mfa_last_step=-1,version=version+1 WHERE id=$1`, u.ID); e != nil {
+			return e
+		}
+		if _, e = tx.Exec(ctx, `DELETE FROM auth_webauthn_credentials WHERE user_id=$1`, u.ID); e != nil {
+			return e
+		}
+		if _, e = tx.Exec(ctx, `DELETE FROM auth_webauthn_challenges WHERE user_id=$1`, u.ID); e != nil {
 			return e
 		}
 		if _, e = tx.Exec(ctx, `DELETE FROM auth_recovery_codes WHERE user_id=$1`, u.ID); e != nil {
@@ -98,7 +105,7 @@ func runAuthCommand(ctx context.Context, st *store.Store, cfg config.Config, arg
 		if e = tx.Commit(ctx); e != nil {
 			return e
 		}
-		fmt.Println("MFA redefinido. Todas as sessões foram encerradas.")
+		fmt.Println("Passkeys redefinidas. Todas as sessões foram encerradas.")
 		return nil
 	}
 	raw, err := io.ReadAll(io.LimitReader(os.Stdin, 258))

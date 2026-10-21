@@ -20,15 +20,14 @@ type LocalUser struct {
 	Document         string   `json:"document"`
 	Enabled          bool     `json:"enabled"`
 	PasswordHash     string   `json:"-"`
-	MFASecret        string   `json:"-"`
-	MFALastStep      int64    `json:"-"`
+	PasskeyCount     int      `json:"-"`
 }
 
-const localColumns = `id,username,email,first_name,last_name,organization_id,organization_name,roles,document,enabled,password_hash,mfa_secret,mfa_last_step,version`
+const localColumns = `id,username,email,first_name,last_name,organization_id,organization_name,roles,document,enabled,password_hash,version,(SELECT count(*)::int FROM auth_webauthn_credentials c WHERE c.user_id=auth_users.id) AS passkey_count`
 
 func scanLocal(row pgx.Row) (*LocalUser, error) {
 	u := &LocalUser{}
-	err := row.Scan(&u.ID, &u.Username, &u.Email, &u.FirstName, &u.LastName, &u.OrganizationID, &u.OrganizationName, &u.Roles, &u.Document, &u.Enabled, &u.PasswordHash, &u.MFASecret, &u.MFALastStep, &u.Version)
+	err := row.Scan(&u.ID, &u.Username, &u.Email, &u.FirstName, &u.LastName, &u.OrganizationID, &u.OrganizationName, &u.Roles, &u.Document, &u.Enabled, &u.PasswordHash, &u.Version, &u.PasskeyCount)
 	if err == pgx.ErrNoRows {
 		return nil, nil
 	}

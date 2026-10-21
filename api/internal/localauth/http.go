@@ -2,23 +2,21 @@ package localauth
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/base32"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-webauthn/webauthn/protocol"
+	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/jackc/pgx/v5"
 	"github.com/luxus-connect/telefonia/api/internal/store"
-	"github.com/skip2/go-qrcode"
 )
 
 type Manager struct {
@@ -26,6 +24,9 @@ type Manager struct {
 	Secret     string
 	Production bool
 	Origins    []string
+	RPID       string
+	RPName     string
+	wa         *webauthn.WebAuthn
 	dummy      string
 }
 type Session struct {
@@ -34,7 +35,8 @@ type Session struct {
 	Verified bool
 }
 
-func New(st *store.Store, secret string, production bool, origins []string) (*Manager, error) {
+// WebAuthn requires a stable RP ID and every accepted frontend origin.
+func New(st *store.Store, secret string, production bool, origins []string, rpID, rpName string) (*Manager, error) {
 	if len(secret) < 32 {
 		return nil, fmt.Errorf("AUTH_SECRET must contain at least 32 characters")
 	}
@@ -42,8 +44,31 @@ func New(st *store.Store, secret string, production bool, origins []string) (*Ma
 	if e != nil {
 		return nil, e
 	}
-	return &Manager{Store: st, Secret: secret, Production: production, Origins: origins, dummy: dummy}, nil
+	wa, e := webauthn.New(&webauthn.Config{RPID: rpID, RPDisplayName: rpName, RPOrigins: origins})
+	if e != nil {
+		return nil, fmt.Errorf("webauthn: %w", e)
+	}
+	return &Manager{Store: st, Secret: secret, Production: production, Origins: origins, RPID: rpID, RPName: rpName, wa: wa, dummy: dummy}, nil
 }
+
+// webauthnUser adapts a local account and its stored credentials to the library.
+type webauthnUser struct {
+	user        *store.LocalUser
+	credentials []webauthn.Credential
+}
+
+func (u webauthnUser) WebAuthnID() []byte { return []byte(u.user.ID) }
+func (u webauthnUser) WebAuthnName() string {
+	return u.user.Username
+}
+func (u webauthnUser) WebAuthnDisplayName() string {
+	if name := strings.TrimSpace(u.user.FirstName + " " + u.user.LastName); name != "" {
+		return name
+	}
+	return u.user.Username
+}
+func (u webauthnUser) WebAuthnCredentials() []webauthn.Credential { return u.credentials }
+
 func (m *Manager) cookieName() string {
 	if m.Production {
 		return "__Host-telefonia_session"
@@ -64,6 +89,7 @@ func (m *Manager) StartCleanup(ctx context.Context) {
 				cleanup, cancel := context.WithTimeout(ctx, 30*time.Second)
 				m.Store.Pool().Exec(cleanup, `DELETE FROM auth_sessions WHERE expires_at<now() OR last_seen<now()-interval '30 minutes'`)
 				m.Store.Pool().Exec(cleanup, `DELETE FROM auth_attempts WHERE expires_at<now()`)
+				m.Store.Pool().Exec(cleanup, `DELETE FROM auth_webauthn_challenges WHERE expires_at<now()`)
 				m.Store.Pool().Exec(cleanup, `DELETE FROM auth_events WHERE created_at<now()-interval '90 days'`)
 				cancel()
 			}
@@ -105,16 +131,8 @@ func (m *Manager) Resolve(r *http.Request) (*Session, error) {
 	}
 	return &Session{User: u, Hash: hash, Verified: verified}, nil
 }
-func privileged(u *store.LocalUser) bool {
-	for _, r := range u.Roles {
-		if r == "master" || r == "admin" || r == "financial" {
-			return true
-		}
-	}
-	return false
-}
 func (m *Manager) NeedsMFA(s *Session) bool {
-	return !s.Verified && (s.User.MFASecret != "" || m.Production && privileged(s.User))
+	return !s.Verified && (m.Production || s.User.PasskeyCount > 0)
 }
 func reply(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
@@ -141,7 +159,13 @@ func body(w http.ResponseWriter, r *http.Request, v any) bool {
 }
 func (m *Manager) sessionReply(w http.ResponseWriter, s *Session) {
 	u := s.User
-	reply(w, 200, map[string]any{"user": map[string]any{"profile": map[string]string{"sub": u.ID, "name": strings.TrimSpace(u.FirstName + " " + u.LastName), "email": u.Email, "preferred_username": u.Username}, "roles": u.Roles, "organization_id": u.OrganizationID}, "mfa_required": m.NeedsMFA(s), "mfa_enrolled": u.MFASecret != ""})
+	reply(w, 200, map[string]any{
+		"user":          map[string]any{"profile": map[string]string{"sub": u.ID, "name": strings.TrimSpace(u.FirstName + " " + u.LastName), "email": u.Email, "preferred_username": u.Username}, "roles": u.Roles, "organization_id": u.OrganizationID},
+		"mfa_required":  m.NeedsMFA(s),
+		"mfa_enrolled":  u.PasskeyCount > 0,
+		"passkey_count": u.PasskeyCount,
+		"mfa_method":    "passkey",
+	})
 }
 func (m *Manager) limited(ctx context.Context, bucket string, limit int) bool {
 	var count int
@@ -154,7 +178,14 @@ func (m *Manager) event(ctx context.Context, id, event string) {
 
 // Administrative recovery also clears the account's temporary attempt lockouts.
 func AccountAttemptBuckets(u *store.LocalUser) []string {
-	return []string{digest("login-user:" + strings.ToLower(u.Username)), digest("mfa:" + u.ID), digest("password:" + u.ID)}
+	return []string{
+		digest("login-user:" + strings.ToLower(u.Username)),
+		digest("mfa:" + u.ID),
+		digest("passkey-register:" + u.ID),
+		digest("passkey-login:" + u.ID),
+		digest("recovery:" + u.ID),
+		digest("password:" + u.ID),
+	}
 }
 func (m *Manager) Register(r chi.Router) {
 	r.Route("/v1/auth", func(r chi.Router) {
@@ -188,9 +219,13 @@ func (m *Manager) Register(r chi.Router) {
 			m.cookie(w, "", -1)
 			reply(w, 200, map[string]bool{"ok": true})
 		})
-		r.Post("/mfa/setup", m.setup)
-		r.Post("/mfa/confirm", m.confirm)
-		r.Post("/mfa/verify", m.verify)
+		r.Post("/webauthn/register/begin", m.registerBegin)
+		r.Post("/webauthn/register/finish", m.registerFinish)
+		r.Post("/webauthn/login/begin", m.loginBegin)
+		r.Post("/webauthn/login/finish", m.loginFinish)
+		r.Get("/webauthn/credentials", m.listCredentials)
+		r.Delete("/webauthn/credentials/{id}", m.deleteCredential)
+		r.Post("/recovery/verify", m.recoveryVerify)
 		r.Post("/password", m.password)
 	})
 }
@@ -228,9 +263,10 @@ func (m *Manager) login(w http.ResponseWriter, r *http.Request) {
 		fail(w, 500, "AUTH_ERROR", "Falha ao iniciar sessão.")
 		return
 	}
-	verified := u.MFASecret == "" && !(m.Production && privileged(u))
+	// Production always requires a passkey (or a recovery code) to elevate.
+	verified := !m.Production && u.PasskeyCount == 0
 	// Do not resurrect a password reset, disabled account, or role change racing login.
-	tag, e := m.Store.Pool().Exec(r.Context(), `INSERT INTO auth_sessions(token_hash,user_id,mfa_verified,expires_at,user_version) SELECT $1,id,$3,now()+interval '12 hours',version FROM auth_users WHERE id=$2 AND enabled AND password_hash=$4 AND roles=$5 AND mfa_secret=$6 AND version=$7`, digest(token), u.ID, verified, u.PasswordHash, u.Roles, u.MFASecret, u.Version)
+	tag, e := m.Store.Pool().Exec(r.Context(), `INSERT INTO auth_sessions(token_hash,user_id,mfa_verified,expires_at,user_version) SELECT $1,id,$3,now()+interval '12 hours',version FROM auth_users WHERE id=$2 AND enabled AND password_hash=$4 AND roles=$5 AND version=$6`, digest(token), u.ID, verified, u.PasswordHash, u.Roles, u.Version)
 	if e != nil || tag.RowsAffected() != 1 {
 		fail(w, 503, "AUTH_UNAVAILABLE", "Tente novamente.")
 		return
@@ -247,48 +283,332 @@ func (m *Manager) require(w http.ResponseWriter, r *http.Request) (*Session, boo
 	}
 	return s, true
 }
-func (m *Manager) setup(w http.ResponseWriter, r *http.Request) {
+
+// elevateTx rotates the token, marks the session verified, and revokes the
+// user's other sessions in the same transaction as the caller's writes.
+func (m *Manager) elevateTx(ctx context.Context, tx pgx.Tx, s *Session, event string) (string, error) {
+	token, err := randomToken()
+	if err != nil {
+		return "", err
+	}
+	tag, err := tx.Exec(ctx, `UPDATE auth_sessions SET token_hash=$2,mfa_verified=true,user_version=$3,last_seen=now() WHERE token_hash=$1 AND expires_at>now()`, s.Hash, digest(token), s.User.Version)
+	if err != nil {
+		return "", err
+	}
+	if tag.RowsAffected() != 1 {
+		return "", pgx.ErrNoRows
+	}
+	if _, err = tx.Exec(ctx, `DELETE FROM auth_sessions WHERE user_id=$1 AND token_hash<>$2`, s.User.ID, digest(token)); err != nil {
+		return "", err
+	}
+	if _, err = tx.Exec(ctx, `INSERT INTO auth_events(user_id,event) VALUES($1,$2)`, s.User.ID, event); err != nil {
+		return "", err
+	}
+	return token, nil
+}
+
+func (m *Manager) markVerified(w http.ResponseWriter, r *http.Request, s *Session, event string) bool {
+	tx, err := m.Store.Pool().Begin(r.Context())
+	if err != nil {
+		fail(w, 503, "AUTH_UNAVAILABLE", "Tente novamente.")
+		return false
+	}
+	defer tx.Rollback(r.Context())
+	token, err := m.elevateTx(r.Context(), tx, s, event)
+	if err != nil {
+		fail(w, 503, "AUTH_UNAVAILABLE", "Tente novamente.")
+		return false
+	}
+	if err = tx.Commit(r.Context()); err != nil {
+		fail(w, 503, "AUTH_UNAVAILABLE", "Tente novamente.")
+		return false
+	}
+	m.cookie(w, token, 12*3600)
+	s.Hash = digest(token)
+	s.Verified = true
+	return true
+}
+
+func (m *Manager) loadCredentials(ctx context.Context, userID string) ([]webauthn.Credential, error) {
+	// Credentials are scoped to the RP ID so a hostname change cannot reuse them.
+	rows, err := m.Store.Pool().Query(ctx, `SELECT credential FROM auth_webauthn_credentials WHERE user_id=$1 AND rp_id=$2 ORDER BY created_at`, userID, m.RPID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []webauthn.Credential{}
+	for rows.Next() {
+		var raw []byte
+		if err = rows.Scan(&raw); err != nil {
+			return nil, err
+		}
+		var credential webauthn.Credential
+		if err = json.Unmarshal(raw, &credential); err != nil {
+			return nil, err
+		}
+		out = append(out, credential)
+	}
+	return out, rows.Err()
+}
+
+// Challenges are stored server-side, keyed by the session token hash and kind,
+// and are single-use.
+func (m *Manager) saveChallenge(ctx context.Context, sessionHash, kind, userID string, data *webauthn.SessionData) error {
+	expires := data.Expires
+	if expires.IsZero() {
+		expires = time.Now().Add(5 * time.Minute)
+	}
+	raw, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	_, err = m.Store.Pool().Exec(ctx, `INSERT INTO auth_webauthn_challenges(session_hash,kind,user_id,session_data,expires_at) VALUES($1,$2,$3,$4,$5) ON CONFLICT(session_hash,kind) DO UPDATE SET user_id=EXCLUDED.user_id,session_data=EXCLUDED.session_data,expires_at=EXCLUDED.expires_at`, sessionHash, kind, userID, raw, expires)
+	return err
+}
+func (m *Manager) consumeChallenge(ctx context.Context, sessionHash, kind string) (*webauthn.SessionData, error) {
+	var raw []byte
+	if err := m.Store.Pool().QueryRow(ctx, `DELETE FROM auth_webauthn_challenges WHERE session_hash=$1 AND kind=$2 AND expires_at>now() RETURNING session_data`, sessionHash, kind).Scan(&raw); err != nil {
+		return nil, err
+	}
+	var data webauthn.SessionData
+	if err := json.Unmarshal(raw, &data); err != nil {
+		return nil, err
+	}
+	return &data, nil
+}
+
+func (m *Manager) registerBegin(w http.ResponseWriter, r *http.Request) {
 	s, ok := m.require(w, r)
 	if !ok {
 		return
 	}
-	if s.User.MFASecret != "" {
-		fail(w, 409, "MFA_ENROLLED", "Autenticador já configurado.")
+	if m.limited(r.Context(), "passkey-register:"+s.User.ID, 10) {
+		fail(w, 429, "PASSKEY_LIMIT", "Muitas tentativas. Aguarde 15 minutos.")
 		return
 	}
-	b := make([]byte, 20)
-	if _, e := rand.Read(b); e != nil {
-		fail(w, 500, "AUTH_ERROR", "Tente novamente.")
+	// A password-only session may only enroll its first passkey.
+	if !s.Verified && s.User.PasskeyCount > 0 {
+		fail(w, 409, "PASSKEY_ALREADY_ENROLLED", "Confirme sua passkey atual antes de cadastrar outra.")
 		return
 	}
-	secret := base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(b)
-	encrypted, e := seal(m.Secret, secret)
-	if e != nil {
-		fail(w, 500, "AUTH_ERROR", "Tente novamente.")
-		return
-	}
-	tag, e := m.Store.Pool().Exec(r.Context(), `UPDATE auth_sessions SET pending_secret=$2,pending_expires=now()+interval '10 minutes' WHERE token_hash=$1 AND created_at>now()-interval '10 minutes'`, s.Hash, encrypted)
-	if e != nil {
+	credentials, err := m.loadCredentials(r.Context(), s.User.ID)
+	if err != nil {
 		fail(w, 503, "AUTH_UNAVAILABLE", "Tente novamente.")
 		return
 	}
-	if tag.RowsAffected() != 1 {
-		fail(w, 403, "REAUTH_REQUIRED", "Saia e entre novamente antes de configurar o autenticador.")
+	user := webauthnUser{user: s.User, credentials: credentials}
+	creation, session, err := m.wa.BeginRegistration(user, webauthn.WithAuthenticatorSelection(protocol.AuthenticatorSelection{
+		ResidentKey:      protocol.ResidentKeyRequirementDiscouraged,
+		UserVerification: protocol.VerificationRequired,
+	}))
+	if err != nil {
+		fail(w, 400, "PASSKEY_REGISTRATION_FAILED", "Não foi possível cadastrar a passkey. Tente novamente.")
 		return
 	}
-	uri := "otpauth://totp/" + url.PathEscape("Telefonia:"+s.User.Username) + "?" + url.Values{"secret": {secret}, "issuer": {"Telefonia"}, "algorithm": {"SHA1"}, "digits": {"6"}, "period": {"30"}}.Encode()
-	png, e := qrcode.Encode(uri, qrcode.Medium, 256)
-	if e != nil {
+	if err = m.saveChallenge(r.Context(), s.Hash, "register", s.User.ID, session); err != nil {
+		fail(w, 503, "AUTH_UNAVAILABLE", "Tente novamente.")
+		return
+	}
+	reply(w, 200, map[string]any{"options": creation})
+}
+
+func (m *Manager) registerFinish(w http.ResponseWriter, r *http.Request) {
+	s, ok := m.require(w, r)
+	if !ok {
+		return
+	}
+	if m.limited(r.Context(), "passkey-register:"+s.User.ID, 10) {
+		fail(w, 429, "PASSKEY_LIMIT", "Muitas tentativas. Aguarde 15 minutos.")
+		return
+	}
+	// Re-check at finish time: a password-only session must never add a second
+	// credential if one was enrolled concurrently after BeginRegistration.
+	if !s.Verified && s.User.PasskeyCount > 0 {
+		fail(w, 409, "PASSKEY_ALREADY_ENROLLED", "Confirme sua passkey atual antes de cadastrar outra.")
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
+	session, err := m.consumeChallenge(r.Context(), s.Hash, "register")
+	if err != nil {
+		fail(w, 400, "PASSKEY_REGISTRATION_FAILED", "Não foi possível cadastrar a passkey. Tente novamente.")
+		return
+	}
+	credentials, err := m.loadCredentials(r.Context(), s.User.ID)
+	if err != nil {
+		fail(w, 503, "AUTH_UNAVAILABLE", "Tente novamente.")
+		return
+	}
+	user := webauthnUser{user: s.User, credentials: credentials}
+	credential, err := m.wa.FinishRegistration(user, *session, r)
+	if err != nil {
+		fail(w, 400, "PASSKEY_REGISTRATION_FAILED", "Não foi possível cadastrar a passkey. Tente novamente.")
+		return
+	}
+	credentialID := base64.RawURLEncoding.EncodeToString(credential.ID)
+	raw, err := json.Marshal(credential)
+	if err != nil {
 		fail(w, 500, "AUTH_ERROR", "Tente novamente.")
 		return
 	}
-	reply(w, 200, map[string]string{"secret": secret, "uri": uri, "qr": base64.StdEncoding.EncodeToString(png)})
+	tx, err := m.Store.Pool().Begin(r.Context())
+	if err != nil {
+		fail(w, 503, "AUTH_UNAVAILABLE", "Tente novamente.")
+		return
+	}
+	defer tx.Rollback(r.Context())
+	// Serialize first-time enrollment per user so two concurrent password-only
+	// sessions cannot each register a different passkey.
+	if _, err = tx.Exec(r.Context(), `SELECT pg_advisory_xact_lock(hashtext($1))`, "webauthn-register:"+s.User.ID); err != nil {
+		fail(w, 503, "AUTH_UNAVAILABLE", "Tente novamente.")
+		return
+	}
+	if !s.Verified {
+		var existing int
+		if err = tx.QueryRow(r.Context(), `SELECT count(*)::int FROM auth_webauthn_credentials WHERE user_id=$1 AND rp_id=$2`, s.User.ID, m.RPID).Scan(&existing); err != nil {
+			fail(w, 503, "AUTH_UNAVAILABLE", "Tente novamente.")
+			return
+		}
+		if existing > 0 {
+			fail(w, 409, "PASSKEY_ALREADY_ENROLLED", "Confirme sua passkey atual antes de cadastrar outra.")
+			return
+		}
+	}
+	tag, err := tx.Exec(r.Context(), `INSERT INTO auth_webauthn_credentials(credential_id,user_id,rp_id,name,credential) VALUES($1,$2,$3,$4,$5) ON CONFLICT (credential_id) DO NOTHING`, credentialID, s.User.ID, m.RPID, "Passkey", raw)
+	if err != nil {
+		fail(w, 503, "AUTH_UNAVAILABLE", "Tente novamente.")
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		fail(w, 409, "PASSKEY_ALREADY_ENROLLED", "Esta passkey já está cadastrada.")
+		return
+	}
+	var count int
+	if err = tx.QueryRow(r.Context(), `SELECT count(*)::int FROM auth_webauthn_credentials WHERE user_id=$1 AND rp_id=$2`, s.User.ID, m.RPID).Scan(&count); err != nil {
+		fail(w, 503, "AUTH_UNAVAILABLE", "Tente novamente.")
+		return
+	}
+	codes := []string{}
+	if count == 1 {
+		for i := 0; i < 8; i++ {
+			code, err := newRecoveryCode()
+			if err != nil {
+				fail(w, 500, "AUTH_ERROR", "Tente novamente.")
+				return
+			}
+			codes = append(codes, code)
+			if _, err = tx.Exec(r.Context(), `INSERT INTO auth_recovery_codes(user_id,code_hash) VALUES($1,$2)`, s.User.ID, recoveryCodeHash(code)); err != nil {
+				fail(w, 503, "AUTH_UNAVAILABLE", "Tente novamente.")
+				return
+			}
+		}
+	}
+	token, err := m.elevateTx(r.Context(), tx, s, "passkey_registered")
+	if err != nil {
+		fail(w, 503, "AUTH_UNAVAILABLE", "Tente novamente.")
+		return
+	}
+	if err = tx.Commit(r.Context()); err != nil {
+		fail(w, 503, "AUTH_UNAVAILABLE", "Tente novamente.")
+		return
+	}
+	m.cookie(w, token, 12*3600)
+	s.Hash = digest(token)
+	s.Verified = true
+	reply(w, 200, map[string]any{"ok": true, "recovery_codes": codes})
 }
-func (m *Manager) confirm(w http.ResponseWriter, r *http.Request) { m.checkMFA(w, r, true) }
-func (m *Manager) verify(w http.ResponseWriter, r *http.Request)  { m.checkMFA(w, r, false) }
-func (m *Manager) checkMFA(w http.ResponseWriter, r *http.Request, enroll bool) {
+
+func (m *Manager) loginBegin(w http.ResponseWriter, r *http.Request) {
 	s, ok := m.require(w, r)
 	if !ok {
+		return
+	}
+	if m.limited(r.Context(), "passkey-login:"+s.User.ID, 20) {
+		fail(w, 429, "PASSKEY_LIMIT", "Muitas tentativas. Aguarde 15 minutos.")
+		return
+	}
+	if s.Verified {
+		fail(w, 409, "ALREADY_VERIFIED", "A sessão já está verificada.")
+		return
+	}
+	if s.User.PasskeyCount == 0 {
+		fail(w, 409, "PASSKEY_NOT_ENROLLED", "Cadastre uma passkey para continuar.")
+		return
+	}
+	credentials, err := m.loadCredentials(r.Context(), s.User.ID)
+	if err != nil {
+		fail(w, 503, "AUTH_UNAVAILABLE", "Tente novamente.")
+		return
+	}
+	user := webauthnUser{user: s.User, credentials: credentials}
+	assertion, session, err := m.wa.BeginLogin(user, webauthn.WithUserVerification(protocol.VerificationRequired))
+	if err != nil {
+		fail(w, 400, "PASSKEY_LOGIN_FAILED", "Não foi possível validar a passkey.")
+		return
+	}
+	if err = m.saveChallenge(r.Context(), s.Hash, "login", s.User.ID, session); err != nil {
+		fail(w, 503, "AUTH_UNAVAILABLE", "Tente novamente.")
+		return
+	}
+	reply(w, 200, map[string]any{"options": assertion})
+}
+
+func (m *Manager) loginFinish(w http.ResponseWriter, r *http.Request) {
+	s, ok := m.require(w, r)
+	if !ok {
+		return
+	}
+	if s.Verified {
+		fail(w, 409, "ALREADY_VERIFIED", "A sessão já está verificada.")
+		return
+	}
+	if m.limited(r.Context(), "passkey-login:"+s.User.ID, 20) {
+		fail(w, 429, "PASSKEY_LIMIT", "Muitas tentativas. Aguarde 15 minutos.")
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
+	session, err := m.consumeChallenge(r.Context(), s.Hash, "login")
+	if err != nil {
+		fail(w, 401, "PASSKEY_LOGIN_FAILED", "Não foi possível validar a passkey.")
+		return
+	}
+	credentials, err := m.loadCredentials(r.Context(), s.User.ID)
+	if err != nil {
+		fail(w, 503, "AUTH_UNAVAILABLE", "Tente novamente.")
+		return
+	}
+	user := webauthnUser{user: s.User, credentials: credentials}
+	credential, err := m.wa.FinishLogin(user, *session, r)
+	if err != nil {
+		fail(w, 401, "PASSKEY_LOGIN_FAILED", "Não foi possível validar a passkey.")
+		return
+	}
+	raw, err := json.Marshal(credential)
+	if err != nil {
+		fail(w, 500, "AUTH_ERROR", "Tente novamente.")
+		return
+	}
+	tag, err := m.Store.Pool().Exec(r.Context(), `UPDATE auth_webauthn_credentials SET credential=$3,last_used_at=now() WHERE credential_id=$1 AND user_id=$2`, base64.RawURLEncoding.EncodeToString(credential.ID), s.User.ID, raw)
+	if err != nil || tag.RowsAffected() != 1 {
+		fail(w, 401, "PASSKEY_LOGIN_FAILED", "Não foi possível validar a passkey.")
+		return
+	}
+	if !m.markVerified(w, r, s, "passkey_verified") {
+		return
+	}
+	m.sessionReply(w, s)
+}
+
+func (m *Manager) recoveryVerify(w http.ResponseWriter, r *http.Request) {
+	s, ok := m.require(w, r)
+	if !ok {
+		return
+	}
+	if s.Verified {
+		fail(w, 409, "ALREADY_VERIFIED", "A sessão já está verificada.")
+		return
+	}
+	if m.limited(r.Context(), "recovery:"+s.User.ID, 10) {
+		fail(w, 429, "RECOVERY_LIMIT", "Muitas tentativas. Aguarde 15 minutos.")
 		return
 	}
 	var in struct {
@@ -297,99 +617,130 @@ func (m *Manager) checkMFA(w http.ResponseWriter, r *http.Request, enroll bool) 
 	if !body(w, r, &in) {
 		return
 	}
-	if m.limited(r.Context(), "mfa:"+s.User.ID, 10) {
-		fail(w, 429, "MFA_LIMIT", "Muitas tentativas. Aguarde 15 minutos.")
+	tag, err := m.Store.Pool().Exec(r.Context(), `DELETE FROM auth_recovery_codes WHERE user_id=$1 AND code_hash=$2`, s.User.ID, recoveryCodeHash(in.Code))
+	if err != nil {
+		fail(w, 503, "AUTH_UNAVAILABLE", "Tente novamente.")
 		return
 	}
-	tx, e := m.Store.Pool().Begin(r.Context())
-	if e != nil {
+	if tag.RowsAffected() != 1 {
+		fail(w, 401, "INVALID_RECOVERY_CODE", "Código de recuperação inválido ou já utilizado.")
+		return
+	}
+	if !m.markVerified(w, r, s, "recovery_verified") {
+		return
+	}
+	m.sessionReply(w, s)
+}
+
+type credentialInfo struct {
+	ID         string     `json:"id"`
+	Name       string     `json:"name"`
+	CreatedAt  time.Time  `json:"created_at"`
+	LastUsedAt *time.Time `json:"last_used_at"`
+}
+
+func (m *Manager) listCredentials(w http.ResponseWriter, r *http.Request) {
+	s, ok := m.require(w, r)
+	if !ok {
+		return
+	}
+	if m.NeedsMFA(s) {
+		fail(w, 403, "MFA_REQUIRED", "Confirme sua identidade com uma passkey na página de segurança da conta e entre novamente.")
+		return
+	}
+	rows, err := m.Store.Pool().Query(r.Context(), `SELECT credential_id,name,created_at,last_used_at FROM auth_webauthn_credentials WHERE user_id=$1 ORDER BY created_at`, s.User.ID)
+	if err != nil {
+		fail(w, 503, "AUTH_UNAVAILABLE", "Tente novamente.")
+		return
+	}
+	defer rows.Close()
+	out := []credentialInfo{}
+	for rows.Next() {
+		var item credentialInfo
+		if err = rows.Scan(&item.ID, &item.Name, &item.CreatedAt, &item.LastUsedAt); err != nil {
+			fail(w, 503, "AUTH_UNAVAILABLE", "Tente novamente.")
+			return
+		}
+		out = append(out, item)
+	}
+	if err = rows.Err(); err != nil {
+		fail(w, 503, "AUTH_UNAVAILABLE", "Tente novamente.")
+		return
+	}
+	reply(w, 200, map[string]any{"credentials": out})
+}
+
+func (m *Manager) deleteCredential(w http.ResponseWriter, r *http.Request) {
+	s, ok := m.require(w, r)
+	if !ok {
+		return
+	}
+	if m.NeedsMFA(s) {
+		fail(w, 403, "MFA_REQUIRED", "Confirme sua identidade com uma passkey na página de segurança da conta e entre novamente.")
+		return
+	}
+	id := chi.URLParam(r, "id")
+	tx, err := m.Store.Pool().Begin(r.Context())
+	if err != nil {
 		fail(w, 503, "AUTH_UNAVAILABLE", "Tente novamente.")
 		return
 	}
 	defer tx.Rollback(r.Context())
-	var encrypted string
-	var last int64
-	e = tx.QueryRow(r.Context(), `SELECT mfa_secret,mfa_last_step FROM auth_users WHERE id=$1 AND enabled AND version=$2 FOR UPDATE`, s.User.ID, s.User.Version).Scan(&encrypted, &last)
-	if e != nil {
-		fail(w, 401, "UNAUTHORIZED", "Entre novamente.")
-		return
-	}
-	if enroll {
-		if encrypted != "" {
-			fail(w, 409, "MFA_ENROLLED", "Autenticador já configurado.")
-			return
-		}
-		e = tx.QueryRow(r.Context(), `SELECT pending_secret FROM auth_sessions WHERE token_hash=$1 AND pending_expires>now()`, s.Hash).Scan(&encrypted)
-		if e != nil || encrypted == "" {
-			fail(w, 400, "MFA_SETUP_EXPIRED", "Inicie novamente a configuração.")
-			return
-		}
-	}
-	secret, e := unseal(m.Secret, encrypted)
-	if e != nil {
-		fail(w, 503, "MFA_UNAVAILABLE", "Não foi possível ler o autenticador. Contate o administrador.")
-		return
-	}
-	step, valid := verifyTOTP(secret, strings.TrimSpace(in.Code), time.Now(), last)
-	if !valid && !enroll {
-		result, err := tx.Exec(r.Context(), `DELETE FROM auth_recovery_codes WHERE user_id=$1 AND code_hash=$2`, s.User.ID, recoveryCodeHash(in.Code))
-		if err == nil && result.RowsAffected() == 1 {
-			valid = true
-			step = last
-		}
-	}
-	if !valid {
-		fail(w, 401, "INVALID_OTP", "Código inválido, expirado ou já utilizado.")
-		return
-	}
-	codes := []string{}
-	if enroll {
-		for i := 0; i < 8; i++ {
-			code, err := newRecoveryCode()
-			if err != nil {
-				fail(w, 500, "AUTH_ERROR", "Tente novamente.")
-				return
-			}
-			codes = append(codes, code)
-			if _, e = tx.Exec(r.Context(), `INSERT INTO auth_recovery_codes(user_id,code_hash) VALUES($1,$2)`, s.User.ID, recoveryCodeHash(code)); e != nil {
-				fail(w, 503, "AUTH_UNAVAILABLE", "Tente novamente.")
-				return
-			}
-		}
-	}
-	var version int64
-	e = tx.QueryRow(r.Context(), `UPDATE auth_users SET mfa_secret=$2,mfa_last_step=$3,version=version+CASE WHEN $4 THEN 1 ELSE 0 END WHERE id=$1 RETURNING version`, s.User.ID, encrypted, step, enroll).Scan(&version)
-	if e == nil && enroll {
-		_, e = tx.Exec(r.Context(), `DELETE FROM auth_sessions WHERE user_id=$1 AND token_hash<>$2`, s.User.ID, s.Hash)
-	}
-	// Rotate the session token on elevation; the old cookie immediately loses access.
-	token, tokenErr := randomToken()
-	if tokenErr != nil {
-		fail(w, 500, "AUTH_ERROR", "Tente novamente.")
-		return
-	}
-	var result interface{ RowsAffected() int64 }
-	if e == nil {
-		result, e = tx.Exec(r.Context(), `UPDATE auth_sessions SET token_hash=$2,mfa_verified=true,pending_secret='',pending_expires=NULL,user_version=$3 WHERE token_hash=$1 AND expires_at>now()`, s.Hash, digest(token), version)
-		if e == nil && result.RowsAffected() != 1 {
-			e = pgx.ErrNoRows
-		}
-	}
-	if e != nil || tx.Commit(r.Context()) != nil {
+	// Lock the user's credentials so two concurrent deletes cannot remove the last one.
+	rows, err := tx.Query(r.Context(), `SELECT credential_id FROM auth_webauthn_credentials WHERE user_id=$1 FOR UPDATE`, s.User.ID)
+	if err != nil {
 		fail(w, 503, "AUTH_UNAVAILABLE", "Tente novamente.")
 		return
 	}
-	m.cookie(w, token, 12*3600)
-	m.event(r.Context(), s.User.ID, "mfa_verified")
-	reply(w, 200, map[string]any{"ok": true, "recovery_codes": codes})
+	count := 0
+	exists := false
+	for rows.Next() {
+		var credentialID string
+		if err = rows.Scan(&credentialID); err != nil {
+			rows.Close()
+			fail(w, 503, "AUTH_UNAVAILABLE", "Tente novamente.")
+			return
+		}
+		count++
+		if credentialID == id {
+			exists = true
+		}
+	}
+	rows.Close()
+	if err = rows.Err(); err != nil {
+		fail(w, 503, "AUTH_UNAVAILABLE", "Tente novamente.")
+		return
+	}
+	if !exists {
+		fail(w, 404, "PASSKEY_NOT_FOUND", "Passkey não encontrada.")
+		return
+	}
+	if m.Production && count <= 1 {
+		fail(w, 409, "LAST_PASSKEY", "Cadastre outra passkey antes de remover a última.")
+		return
+	}
+	if _, err = tx.Exec(r.Context(), `DELETE FROM auth_webauthn_credentials WHERE credential_id=$1 AND user_id=$2`, id, s.User.ID); err != nil {
+		fail(w, 503, "AUTH_UNAVAILABLE", "Tente novamente.")
+		return
+	}
+	if _, err = tx.Exec(r.Context(), `INSERT INTO auth_events(user_id,event) VALUES($1,'passkey_removed')`, s.User.ID); err != nil {
+		fail(w, 503, "AUTH_UNAVAILABLE", "Tente novamente.")
+		return
+	}
+	if err = tx.Commit(r.Context()); err != nil {
+		fail(w, 503, "AUTH_UNAVAILABLE", "Tente novamente.")
+		return
+	}
+	reply(w, 200, map[string]bool{"ok": true})
 }
+
 func (m *Manager) password(w http.ResponseWriter, r *http.Request) {
 	s, ok := m.require(w, r)
 	if !ok {
 		return
 	}
 	if m.NeedsMFA(s) {
-		fail(w, 403, "MFA_REQUIRED", "Confirme o autenticador.")
+		fail(w, 403, "MFA_REQUIRED", "Confirme sua identidade com uma passkey antes de alterar a senha.")
 		return
 	}
 	var in struct {

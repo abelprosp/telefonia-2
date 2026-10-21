@@ -7,13 +7,13 @@ case "${1:-}" in
   init-admin)
     [ "$#" -eq 3 ] || { echo "Uso: $0 init-admin USUARIO EMAIL" >&2; exit 1; }
     ;;
-  reset-password|reset-mfa)
+  reset-password|reset-mfa|reset-passkeys)
     [ "$#" -eq 2 ] || { echo "Uso: $0 $1 USUARIO" >&2; exit 1; }
     ;;
-  *) echo "Comandos: init-admin, reset-password, reset-mfa" >&2; exit 1 ;;
+  *) echo "Comandos: init-admin, reset-password, reset-mfa, reset-passkeys" >&2; exit 1 ;;
 esac
 compose=(docker compose -f docker-compose.yml -f docker-compose.prod.yml)
-if [ "$1" = reset-mfa ]; then
+if [ "$1" = reset-mfa ] || [ "$1" = reset-passkeys ]; then
   "${compose[@]}" run --rm --no-deps -T --pull never connect-api auth "$@"
 else
   read -r -s -p "Nova senha (mínimo 12 caracteres): " auth_password

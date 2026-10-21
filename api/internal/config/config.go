@@ -23,6 +23,8 @@ type Config struct {
 	ObjectStorageMaxObjectBytes     int64
 	ObjectStorageMaxDiskObjectBytes int64
 	CORSOrigins                     []string
+	WebAuthnRPID                    string
+	WebAuthnRPName                  string
 	Port                            string
 	Environment                     string
 	SMTPHost                        string
@@ -81,6 +83,19 @@ func Load() Config {
 		}
 	}
 
+	// WebAuthn binds credentials to a hostname, never to a scheme, port, or path.
+	// Derive it from the first allowed origin when it is not configured explicitly.
+	rpID := strings.ToLower(strings.TrimSpace(os.Getenv("WEBAUTHN_RP_ID")))
+	if rpID == "" && len(origins) > 0 {
+		if u, err := url.Parse(origins[0]); err == nil {
+			rpID = strings.ToLower(u.Hostname())
+		}
+	}
+	rpName := strings.TrimSpace(os.Getenv("WEBAUTHN_RP_NAME"))
+	if rpName == "" {
+		rpName = "Telefonia"
+	}
+
 	sicrediPublicURL := strings.TrimRight(strings.TrimSpace(os.Getenv("SICREDI_PUBLIC_API_URL")), "/")
 	if sicrediPublicURL == "" {
 		if rd := strings.TrimSpace(os.Getenv("RAILWAY_PUBLIC_DOMAIN")); rd != "" {
@@ -115,6 +130,8 @@ func Load() Config {
 		ObjectStorageMaxObjectBytes:     GetEnvInt64("OBJECT_STORAGE_MAX_OBJECT_BYTES", 512*1024*1024),
 		ObjectStorageMaxDiskObjectBytes: GetEnvInt64("OBJECT_STORAGE_MAX_DISK_OBJECT_BYTES", 2*1024*1024*1024),
 		CORSOrigins:                     origins,
+		WebAuthnRPID:                    rpID,
+		WebAuthnRPName:                  rpName,
 		Port:                            port,
 		Environment:                     env,
 		SMTPHost:                        strings.TrimSpace(os.Getenv("SMTP_HOST")),
@@ -185,6 +202,9 @@ func (c Config) Validate() error {
 			return fmt.Errorf("CORS_ORIGINS must not contain wildcards")
 		}
 	}
+	if err := c.validateWebAuthn(); err != nil {
+		return err
+	}
 	if !c.IsProduction() {
 		return nil
 	}
@@ -206,6 +226,32 @@ func (c Config) Validate() error {
 		u, err := url.Parse(origin)
 		if err != nil || u.Scheme != "https" || u.Host == "" || strings.Contains(origin, "*") || u.User != nil || u.Path != "" || u.RawQuery != "" || u.Fragment != "" {
 			return fmt.Errorf("CORS_ORIGINS must contain exact HTTPS origins")
+		}
+	}
+	return nil
+}
+
+// WebAuthn requires a bare hostname that is a suffix of every frontend origin.
+func (c Config) validateWebAuthn() error {
+	rpID := strings.TrimSpace(c.WebAuthnRPID)
+	if rpID == "" {
+		return fmt.Errorf("WEBAUTHN_RP_ID is required (set it or configure CORS_ORIGINS)")
+	}
+	if strings.ContainsAny(rpID, "/:") || strings.ContainsAny(rpID, " \t\r\n") {
+		return fmt.Errorf("WEBAUTHN_RP_ID must be a hostname without scheme, port, path, or spaces")
+	}
+	if c.IsProduction() && (net.ParseIP(rpID) != nil || strings.EqualFold(rpID, "localhost")) {
+		return fmt.Errorf("WEBAUTHN_RP_ID must be a public DNS name in production")
+	}
+	rpID = strings.ToLower(rpID)
+	for _, origin := range c.CORSOrigins {
+		u, err := url.Parse(origin)
+		if err != nil || u.Hostname() == "" {
+			return fmt.Errorf("CORS_ORIGINS must contain valid origins")
+		}
+		host := strings.ToLower(u.Hostname())
+		if host != rpID && !strings.HasSuffix(host, "."+rpID) {
+			return fmt.Errorf("WEBAUTHN_RP_ID must match the hostname of every CORS origin")
 		}
 	}
 	return nil

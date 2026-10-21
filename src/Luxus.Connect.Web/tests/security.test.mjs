@@ -1,3 +1,4 @@
+/* global DOMException, globalThis */
 import assert from 'node:assert/strict';
 import { after, test } from 'node:test';
 import { JSDOM } from 'jsdom';
@@ -6,9 +7,9 @@ import {
   authNetworkMessage
 } from '../src/lib/auth-response.ts';
 
-test('expired sessions return to login while invalid OTPs and passwords remain retryable', () => {
+test('expired sessions return to login while invalid recovery codes and passwords remain retryable', () => {
   assert.equal(isExpiredSession(401, 'UNAUTHORIZED'), true);
-  assert.equal(isExpiredSession(401, 'INVALID_OTP'), false);
+  assert.equal(isExpiredSession(401, 'INVALID_RECOVERY_CODE'), false);
   assert.equal(isExpiredSession(401, 'INVALID_CREDENTIALS'), false);
   assert.equal(isExpiredSession(429, 'MFA_LIMIT'), false);
   assert.equal(isExpiredSession(503, 'AUTH_UNAVAILABLE'), false);

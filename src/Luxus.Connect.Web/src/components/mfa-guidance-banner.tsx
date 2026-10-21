@@ -24,11 +24,12 @@ export function MfaGuidanceBanner() {
       <div className="min-w-0 flex-1">
         <p className="font-medium">
           {privileged
-            ? 'Configure o autenticador desta conta'
-            : 'Ative a autenticação em dois fatores'}
+            ? 'Configure uma passkey para esta conta'
+            : 'Ative a proteção com passkey'}
         </p>
         <p className="text-muted-foreground mt-1">
-          Configure um aplicativo autenticador na segurança da sua conta.
+          Cadastre uma passkey na segurança da sua conta e entre com digital,
+          Face ID ou Windows Hello.
         </p>
       </div>
       <a

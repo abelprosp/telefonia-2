@@ -26,7 +26,7 @@
 ### Login e segurança
 
 O Telefonia usa autenticação própria: usuário e senha, Argon2id, sessões em
-cookie HttpOnly e MFA por aplicativo autenticador. Não exige um provedor de identidade externo.
+cookie HttpOnly e MFA por passkey (WebAuthn). Não exige um provedor de identidade externo.
 Consulte [a migração, configuração e recuperação de contas](docs/AUTH_LOCAL.md).
 A migração preserva IDs, empresas e vínculos, mas exige novas senhas.
 
@@ -56,8 +56,8 @@ O backend é uma **API REST em Go** (binário único, ~15 MB) com o mesmo contra
 
 | Área | Tecnologias |
 | ---- | ----------- |
-| **Backend** | Go 1.22, chi, pgx, RabbitMQ (amqp), AWS SDK v2 (S3/R2) |
-| **Auth** | Argon2id, sessões revogáveis no PostgreSQL, TOTP |
+| **Backend** | Go 1.26, chi, pgx, RabbitMQ (amqp), AWS SDK v2 (S3/R2) |
+| **Auth** | Argon2id, sessões revogáveis no PostgreSQL, passkeys WebAuthn |
 | **Frontend** | Vite, React, TypeScript, TanStack Router, TanStack Query, Tailwind, shadcn/ui |
 | **Object storage** | API compatível com S3 (URLs pré-assinadas, importação de faturas) |
 | **Containerização** | Docker, Docker Compose; produção: nginx no `connect-web` (TLS, `/api`) |
@@ -66,7 +66,7 @@ O backend é uma **API REST em Go** (binário único, ~15 MB) com o mesmo contra
 
 ### Pré-requisitos
 
-- [Go 1.22+](https://go.dev/dl/)
+- [Go 1.26+](https://go.dev/dl/)
 - [Docker + Docker Compose](https://www.docker.com/products/docker-desktop/) (plugin v2)
 - [Git](https://git-scm.com/downloads)
 - [Node.js 22](https://nodejs.org/) (para o frontend local)
@@ -166,7 +166,7 @@ go run ./cmd/api
 
 A API exige `DATABASE_URL`, `AUTH_SECRET` persistente e `CORS_ORIGINS` com a origem exata da interface. Gere a chave com `python3 scripts/configure-local-auth.py`. O frontend usa `VITE_API_URL=/api` e `VITE_STORAGE_BUCKET_NAME`; não coloque segredos em variáveis `VITE_*`.
 
-O login usa usuário, senha e MFA TOTP na própria aplicação. Para configurar o primeiro administrador, importar contas offline e recuperar acesso, consulte [AUTH_LOCAL.md](docs/AUTH_LOCAL.md).
+O login usa usuário, senha e passkey (WebAuthn) na própria aplicação. Para configurar o primeiro administrador, importar contas offline e recuperar acesso, consulte [AUTH_LOCAL.md](docs/AUTH_LOCAL.md).
 
 Na VPS, nginx encaminha a interface para `127.0.0.1:3005` e `/api/` para `127.0.0.1:8010`.
 

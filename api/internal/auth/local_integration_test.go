@@ -2,6 +2,8 @@ package auth_test
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -34,7 +36,7 @@ func TestLocalSessionKeepsTenantAndRolesOnProtectedAPIs(t *testing.T) {
 		t.Fatal(e)
 	}
 	defer st.Pool().Exec(ctx, `DELETE FROM auth_users WHERE id=$1`, user.ID)
-	local, e := localauth.New(st, strings.Repeat("a", 64), true, []string{"https://telefonia.example"})
+	local, e := localauth.New(st, strings.Repeat("a", 64), true, []string{"https://telefonia.example"}, "telefonia.example", "Telefonia")
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -60,6 +62,19 @@ func TestLocalSessionKeepsTenantAndRolesOnProtectedAPIs(t *testing.T) {
 		t.Fatal(w.Body.String())
 	}
 	cookie := w.Result().Cookies()[0]
+	// Production passwords only create a pending session; protected routes stay blocked.
+	req = httptest.NewRequest("GET", "https://telefonia.example/operation", nil)
+	req.AddCookie(cookie)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != 403 {
+		t.Fatalf("pending session reached protected route: %d", w.Code)
+	}
+	// Simulate a completed passkey ceremony by marking the session verified.
+	tokenHash := sha256.Sum256([]byte(cookie.Value))
+	if _, e = st.Pool().Exec(ctx, `UPDATE auth_sessions SET mfa_verified=true WHERE token_hash=$1`, hex.EncodeToString(tokenHash[:])); e != nil {
+		t.Fatal(e)
+	}
 	for _, test := range []struct {
 		method, path, origin string
 		cookie               bool

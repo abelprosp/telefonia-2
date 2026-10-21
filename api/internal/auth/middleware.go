@@ -21,7 +21,7 @@ type Middleware struct {
 }
 
 var errOrigin = errors.New("origem não permitida")
-var errMFA = errors.New("confirme o autenticador para continuar")
+var errMFA = errors.New("confirme sua identidade com uma passkey para continuar")
 
 func NewMiddleware(cfg config.Config, logger *slog.Logger, local *localauth.Manager) (*Middleware, error) {
 	return &Middleware{cfg: cfg, logger: logger, local: local}, nil
@@ -37,16 +37,16 @@ func (m *Middleware) Authenticate(next http.Handler) http.Handler {
 				return
 			}
 			if errors.Is(err, errMFA) {
-				httputil.WriteFail(w, http.StatusForbidden, notifications.N("MFA_REQUIRED", "Confirme o autenticador para continuar."))
+				httputil.WriteFail(w, http.StatusForbidden, notifications.N("MFA_REQUIRED", "Confirme sua identidade com uma passkey na página de segurança da conta e entre novamente."))
 				return
 			}
 			httputil.WriteFail(w, http.StatusUnauthorized, notifications.N("UNAUTHORIZED", err.Error()))
 			return
 		}
 		u := UserFromContext(req.Context())
-		if m.cfg.IsProduction() && (IsMaster(req.Context()) || IsFinancial(req.Context())) &&
-			(u == nil || !MFAVerifiedFromClaims(u.Acr, u.Amr)) && strings.TrimSuffix(r.URL.Path, "/") != "/v1/me" {
-			httputil.WriteFail(w, http.StatusForbidden, notifications.N("MFA_REQUIRED", "Confirme sua identidade com autenticação de dois fatores na página de segurança da conta e entre novamente."))
+		// Defense in depth: production MFA applies to every account, not only privileged roles.
+		if m.cfg.IsProduction() && (u == nil || !MFAVerifiedFromClaims(u.Acr, u.Amr)) && strings.TrimSuffix(r.URL.Path, "/") != "/v1/me" {
+			httputil.WriteFail(w, http.StatusForbidden, notifications.N("MFA_REQUIRED", "Confirme sua identidade com uma passkey na página de segurança da conta e entre novamente."))
 			return
 		}
 		next.ServeHTTP(w, req)
@@ -83,8 +83,8 @@ func (m *Middleware) authenticateRequest(r *http.Request, required bool) (*http.
 	}
 	u := session.User
 	amr := []string{"pwd"}
-	if session.Verified && u.MFASecret != "" {
-		amr = append(amr, "otp")
+	if session.Verified {
+		amr = append(amr, "passkey")
 	}
 	ctx := WithUser(r.Context(), &User{ID: u.ID, Username: u.Username, Email: u.Email, Name: strings.TrimSpace(u.FirstName + " " + u.LastName), Roles: u.Roles, Document: u.Document, Amr: amr})
 	ctx = WithOrganization(ctx, &Organization{ID: u.OrganizationID, Name: u.OrganizationName})
@@ -117,9 +117,9 @@ func (m *Middleware) requireRole(next http.Handler, check func(context.Context) 
 			return
 		}
 		u := UserFromContext(r.Context())
-		if m.cfg.IsProduction() && (IsMaster(r.Context()) || IsFinancial(r.Context())) &&
-			(u == nil || !MFAVerifiedFromClaims(u.Acr, u.Amr)) {
-			httputil.WriteFail(w, http.StatusForbidden, notifications.N("MFA_REQUIRED", "Confirme sua identidade com autenticação de dois fatores na página de segurança da conta e entre novamente."))
+		// Defense in depth: production MFA applies to every account, not only privileged roles.
+		if m.cfg.IsProduction() && (u == nil || !MFAVerifiedFromClaims(u.Acr, u.Amr)) {
+			httputil.WriteFail(w, http.StatusForbidden, notifications.N("MFA_REQUIRED", "Confirme sua identidade com uma passkey na página de segurança da conta e entre novamente."))
 			return
 		}
 		next.ServeHTTP(w, r)
@@ -139,7 +139,7 @@ func (m *Middleware) RequirePartner(next http.Handler) http.Handler {
 func MFAVerifiedFromClaims(acr string, amr []string) bool {
 	for _, item := range amr {
 		switch strings.ToLower(strings.TrimSpace(item)) {
-		case "otp", "mfa", "totp", "hwk":
+		case "otp", "mfa", "totp", "hwk", "passkey", "webauthn":
 			return true
 		}
 	}

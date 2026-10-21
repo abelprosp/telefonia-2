@@ -1,15 +1,27 @@
 import { useState, type FormEvent } from 'react';
 
-import { Copy, Download, Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import { browserSupportsWebAuthn } from '@simplewebauthn/browser';
+import {
+  Copy,
+  Download,
+  Eye,
+  EyeOff,
+  Fingerprint,
+  KeyRound,
+  ShieldCheck
+} from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { authRequest, useAuth } from '@/providers/auth';
+import { passkeyErrorMessage, useAuth } from '@/providers/auth';
 
-export function MfaSetup({ onComplete }: { onComplete: () => Promise<void> }) {
-  const [setup, setSetup] = useState<{ secret: string; qr: string }>();
-  const [code, setCode] = useState('');
+export function PasskeySetup({
+  onComplete
+}: {
+  onComplete: () => Promise<void>;
+}) {
+  const auth = useAuth();
   const [codes, setCodes] = useState<string[]>();
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -21,11 +33,19 @@ export function MfaSetup({ onComplete }: { onComplete: () => Promise<void> }) {
     try {
       await action();
     } catch (e) {
-      setError((e as Error).message);
+      setError(passkeyErrorMessage(e));
     } finally {
       setBusy(false);
     }
   };
+  if (!browserSupportsWebAuthn())
+    return (
+      <p role="alert" className="text-destructive text-sm">
+        Este navegador ou dispositivo não suporta passkeys. Use um navegador
+        moderno ou outro dispositivo para entrar com digital, Face ID ou Windows
+        Hello.
+      </p>
+    );
   if (codes)
     return (
       <div className="space-y-4">
@@ -87,86 +107,25 @@ export function MfaSetup({ onComplete }: { onComplete: () => Promise<void> }) {
   return (
     <div className="space-y-4">
       <p className="text-sm">
-        Configure uma vez. Nos próximos acessos, informe o código de seis
-        dígitos do Google Authenticator, Microsoft Authenticator ou outro
-        autenticador. O código funciona mesmo sem internet no celular.
+        Use a digital, o Face ID, o Windows Hello ou uma chave de segurança.
+        Nada de código para digitar.
       </p>
-      {!setup ? (
-        <Button
-          disabled={busy}
-          onClick={() =>
-            void run(async () => setSetup(await authRequest('mfa/setup', {})))
-          }
-        >
-          Configurar autenticador
-        </Button>
-      ) : (
-        <>
-          <p className="text-sm">
-            1. No autenticador, adicione uma conta e escaneie este QR code.
-          </p>
-          <img
-            src={`data:image/png;base64,${setup.qr}`}
-            alt="QR code para configurar o autenticador"
-            className="size-56"
-          />
-          <Label htmlFor="mfa-secret">Chave para adicionar manualmente</Label>
-          <Input
-            id="mfa-secret"
-            readOnly
-            value={setup.secret}
-            className="font-mono"
-          />
-          <p className="text-muted-foreground text-xs">
-            Se estiver no mesmo celular, copie a chave acima e adicione uma
-            conta manualmente. Nunca compartilhe esta chave ou o QR code.
-          </p>
-          <form
-            className="space-y-3"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void run(async () => {
-                const result = await authRequest<{ recovery_codes: string[] }>(
-                  'mfa/confirm',
-                  { code }
-                );
-                setSetup(undefined);
-                setCode('');
-                setCodes(result.recovery_codes);
-              });
-            }}
-          >
-            <Label htmlFor="mfa-enroll-code">
-              2. Digite o código que aparece no aplicativo
-            </Label>
-            <Input
-              id="mfa-enroll-code"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              pattern="[0-9]{6}"
-              maxLength={6}
-              required
-              autoFocus
-              value={code}
-              onChange={(e) =>
-                setCode(e.target.value.replace(/\D/g, '').slice(0, 6))
-              }
-            />
-            <Button disabled={busy}>Confirmar autenticador</Button>
-          </form>
-          <Button
-            variant="ghost"
-            disabled={busy}
-            onClick={() => {
-              setSetup(undefined);
-              setCode('');
-              setError('');
-            }}
-          >
-            Reiniciar configuração
-          </Button>
-        </>
-      )}
+      <Button
+        className="w-full"
+        autoFocus
+        disabled={busy}
+        onClick={() =>
+          void run(async () => {
+            const result = await auth.registerPasskey();
+            if (result.recovery_codes.length > 0)
+              setCodes(result.recovery_codes);
+            else await onComplete();
+          })
+        }
+      >
+        <Fingerprint className="size-4" aria-hidden />
+        {busy ? 'Cadastrando passkey…' : 'Cadastrar passkey'}
+      </Button>
       {error && (
         <p role="alert" className="text-destructive text-sm">
           {error}
@@ -180,28 +139,35 @@ export function LocalLogin() {
   const auth = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [code, setCode] = useState('');
+  const [recoveryCode, setRecoveryCode] = useState('');
+  const [useRecovery, setUseRecovery] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [useRecovery, setUseRecovery] = useState(false);
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
+  const run = async (action: () => Promise<void>) => {
     setBusy(true);
     setError('');
     try {
-      if (auth.isAuthenticated) {
-        await authRequest('mfa/verify', { code: code.trim() });
-        await auth.refresh();
-      } else {
-        await auth.login(username, password);
-        setPassword('');
-      }
+      await action();
     } catch (e) {
-      setError((e as Error).message);
+      setError(e instanceof Error ? e.message : 'Não foi possível continuar.');
     } finally {
       setBusy(false);
     }
+  };
+  const submitPassword = (e: FormEvent) => {
+    e.preventDefault();
+    void run(async () => {
+      await auth.login(username, password);
+      setPassword('');
+    });
+  };
+  const submitRecovery = (e: FormEvent) => {
+    e.preventDefault();
+    void run(async () => {
+      await auth.verifyRecoveryCode(recoveryCode);
+      setRecoveryCode('');
+    });
   };
   return (
     <main className="bg-muted/30 flex min-h-screen w-full items-center justify-center p-4">
@@ -210,16 +176,20 @@ export function LocalLogin() {
           <ShieldCheck className="text-primary mb-3 size-8" aria-hidden />
           <h1 className="text-2xl font-semibold">
             {auth.isAuthenticated
-              ? auth.mfaEnrolled
-                ? 'Confirme seu acesso'
-                : 'Configure a segurança da conta'
+              ? auth.mfaRequired
+                ? auth.mfaEnrolled
+                  ? 'Confirme seu acesso'
+                  : 'Cadastre sua passkey'
+                : 'Sessão ativa'
               : 'Entrar no Telefonia'}
           </h1>
           <p className="text-muted-foreground mt-2 text-sm">
             {auth.isAuthenticated
-              ? auth.mfaEnrolled
-                ? 'Abra seu aplicativo autenticador para continuar.'
-                : 'Proteja seu acesso com um autenticador no celular.'
+              ? auth.mfaRequired
+                ? auth.mfaEnrolled
+                  ? 'Use sua passkey para continuar.'
+                  : 'Proteja seu acesso com uma passkey. Use a digital, o Face ID ou o Windows Hello.'
+                : 'Sua sessão já está autenticada.'
               : 'Use seu usuário e senha. Tudo é feito aqui no Telefonia.'}
           </p>
         </div>
@@ -228,111 +198,122 @@ export function LocalLogin() {
             Sua sessão expirou. Entre novamente para continuar.
           </p>
         )}
-        {auth.isAuthenticated && !auth.mfaEnrolled ? (
-          <MfaSetup onComplete={auth.refresh} />
-        ) : (
-          <form onSubmit={(e) => void submit(e)} className="space-y-4">
-            {auth.isAuthenticated ? (
-              <>
-                <Label htmlFor="login-otp">
-                  {useRecovery
-                    ? 'Código de recuperação'
-                    : 'Código do autenticador'}
-                </Label>
-                <Input
-                  id="login-otp"
-                  autoComplete="one-time-code"
-                  required
-                  key={useRecovery ? 'recovery' : 'totp'}
-                  autoFocus
-                  inputMode={useRecovery ? 'text' : 'numeric'}
-                  pattern={useRecovery ? undefined : '[0-9]{6}'}
-                  maxLength={useRecovery ? 64 : 6}
-                  placeholder={
-                    useRecovery ? 'Cole um código guardado' : '000000'
-                  }
-                  aria-describedby="mfa-code-help"
-                  value={code}
-                  onChange={(e) =>
-                    setCode(
-                      useRecovery
-                        ? e.target.value
-                        : e.target.value.replace(/\D/g, '').slice(0, 6)
-                    )
-                  }
-                />
-                <p id="mfa-code-help" className="text-muted-foreground text-xs">
-                  {useRecovery
-                    ? 'Cada código de recuperação funciona uma única vez.'
-                    : 'O código muda a cada 30 segundos. Se não funcionar, ative a data e a hora automáticas no celular.'}
-                </p>
+        {auth.isAuthenticated && auth.mfaRequired ? (
+          auth.mfaEnrolled ? (
+            <div className="space-y-4">
+              <Button
+                className="w-full"
+                autoFocus
+                disabled={busy}
+                onClick={() =>
+                  void run(async () => {
+                    await auth.loginWithPasskey();
+                  })
+                }
+              >
+                <Fingerprint className="size-4" aria-hidden />
+                {busy ? 'Verificando…' : 'Entrar com passkey'}
+              </Button>
+              {useRecovery ? (
+                <form onSubmit={submitRecovery} className="space-y-3">
+                  <Label htmlFor="recovery-code">Código de recuperação</Label>
+                  <Input
+                    id="recovery-code"
+                    autoComplete="one-time-code"
+                    required
+                    autoFocus
+                    maxLength={64}
+                    aria-describedby="recovery-code-help"
+                    value={recoveryCode}
+                    onChange={(e) => setRecoveryCode(e.target.value)}
+                  />
+                  <p
+                    id="recovery-code-help"
+                    className="text-muted-foreground text-xs"
+                  >
+                    Cada código de recuperação funciona uma única vez.
+                  </p>
+                  <Button className="w-full" disabled={busy}>
+                    <KeyRound className="size-4" aria-hidden />
+                    {busy ? 'Verificando…' : 'Usar código de recuperação'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="h-auto px-0 text-sm"
+                    disabled={busy}
+                    onClick={() => {
+                      setUseRecovery(false);
+                      setRecoveryCode('');
+                      setError('');
+                    }}
+                  >
+                    Voltar para a passkey
+                  </Button>
+                </form>
+              ) : (
                 <Button
                   type="button"
                   variant="link"
                   className="h-auto px-0 text-sm"
                   onClick={() => {
-                    setUseRecovery(!useRecovery);
-                    setCode('');
+                    setUseRecovery(true);
                     setError('');
                   }}
                 >
-                  {useRecovery
-                    ? 'Usar o aplicativo autenticador'
-                    : 'Perdi o celular. Usar código de recuperação'}
+                  Não consigo usar a passkey
                 </Button>
-              </>
-            ) : (
-              <>
-                <Label htmlFor="login-user">Usuário</Label>
-                <Input
-                  id="login-user"
-                  autoComplete="username"
-                  autoCapitalize="none"
-                  spellCheck={false}
-                  autoFocus
-                  required
-                  maxLength={128}
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                />
-                <Label htmlFor="login-password">Senha</Label>
-                <div className="relative">
-                  <Input
-                    id="login-password"
-                    type={showPassword ? 'text' : 'password'}
-                    className="pr-12"
-                    autoComplete="current-password"
-                    required
-                    maxLength={256}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute top-0 right-0"
-                    aria-label={
-                      showPassword ? 'Ocultar senha' : 'Mostrar senha'
-                    }
-                    aria-pressed={showPassword}
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? (
-                      <EyeOff className="size-4" aria-hidden />
-                    ) : (
-                      <Eye className="size-4" aria-hidden />
-                    )}
-                  </Button>
-                </div>
-              </>
-            )}
+              )}
+            </div>
+          ) : (
+            <PasskeySetup onComplete={auth.refresh} />
+          )
+        ) : auth.isAuthenticated ? (
+          <p className="text-sm">Sua sessão já está autenticada.</p>
+        ) : (
+          <form onSubmit={submitPassword} className="space-y-4">
+            <Label htmlFor="login-user">Usuário</Label>
+            <Input
+              id="login-user"
+              autoComplete="username"
+              autoCapitalize="none"
+              spellCheck={false}
+              autoFocus
+              required
+              maxLength={128}
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+            />
+            <Label htmlFor="login-password">Senha</Label>
+            <div className="relative">
+              <Input
+                id="login-password"
+                type={showPassword ? 'text' : 'password'}
+                className="pr-12"
+                autoComplete="current-password"
+                required
+                maxLength={256}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute top-0 right-0"
+                aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                aria-pressed={showPassword}
+                onClick={() => setShowPassword(!showPassword)}
+              >
+                {showPassword ? (
+                  <EyeOff className="size-4" aria-hidden />
+                ) : (
+                  <Eye className="size-4" aria-hidden />
+                )}
+              </Button>
+            </div>
             <Button className="w-full" disabled={busy}>
-              {busy
-                ? 'Verificando…'
-                : auth.isAuthenticated
-                  ? 'Confirmar e entrar'
-                  : 'Continuar'}
+              {busy ? 'Verificando…' : 'Continuar'}
             </Button>
           </form>
         )}

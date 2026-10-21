@@ -145,7 +145,7 @@ func TestOfflineImportAcceptsExportAndKeepsApplicationRoles(t *testing.T) {
 		if u.ID != id || u.OrganizationID != org || u.OrganizationName != "Company" || u.Document != "52998224725" || strings.Join(u.Roles, ",") != "user,sales" {
 			t.Fatalf("identity, organization or roles changed: %+v", u)
 		}
-		if u.PasswordHash != "" || u.MFASecret != "" {
+		if u.PasswordHash != "" || u.PasskeyCount != 0 {
 			t.Fatal("import assigned credentials")
 		}
 	}
