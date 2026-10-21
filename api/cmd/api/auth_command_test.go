@@ -4,12 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/google/uuid"
-	"github.com/luxus-connect/telefonia/api/internal/config"
-	"github.com/luxus-connect/telefonia/api/internal/keycloak"
 	"github.com/luxus-connect/telefonia/api/internal/localauth"
 	"github.com/luxus-connect/telefonia/api/internal/store"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
@@ -36,55 +32,41 @@ func TestLegacyImportPreservesIdentityTenantAndLocalCredentials(t *testing.T) {
 	for _, testID := range []string{unassignedID, foreignID} {
 		defer st.Pool().Exec(ctx, `DELETE FROM auth_users WHERE id=$1`, testID)
 	}
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		switch {
-		case r.URL.Path == "/realms/master/protocol/openid-connect/token":
-			json.NewEncoder(w).Encode(map[string]any{"access_token": "test-admin-token", "expires_in": 300})
-		case r.URL.Path == "/admin/realms/luxus/users":
-			if r.URL.Query().Get("first") != "0" || r.URL.Query().Get("max") != "100" {
-				t.Error("migration pagination missing")
-			}
-			attrs := map[string][]string{"document": {"52998224725"}}
-			if !missingOrg {
-				attrs["organization_id"] = []string{org}
-			}
-			records := []keycloak.UserRecord{{ID: id, Username: name, Email: "legacy@example.com", Enabled: true, Attributes: attrs}}
-			if bulk {
-				records = append(records, keycloak.UserRecord{ID: unassignedID, Username: "unassigned-" + unassignedID, Email: "unassigned@example.com", Enabled: true}, keycloak.UserRecord{ID: foreignID, Username: "foreign-" + foreignID, Email: "foreign@example.com", Enabled: true, Attributes: map[string][]string{"organization_id": {foreignOrg}}})
-			}
-			json.NewEncoder(w).Encode(records)
-		case r.URL.Path == "/admin/realms/luxus/clients":
-			if r.URL.Query().Get("clientId") != "connect-cli" {
-				t.Error("foreign application roles requested")
-			}
-			json.NewEncoder(w).Encode([]map[string]string{{"id": "connect-client", "clientId": "connect-cli"}})
-		case strings.HasSuffix(r.URL.Path, "/role-mappings/realm"), strings.HasSuffix(r.URL.Path, "/role-mappings/realm/composite"):
-			json.NewEncoder(w).Encode([]map[string]string{{"name": "user"}})
-		case strings.HasSuffix(r.URL.Path, "/role-mappings/clients/connect-client/composite"):
-			json.NewEncoder(w).Encode([]map[string]string{{"name": "sales"}})
-		default:
-			t.Errorf("unexpected migration request %s", r.URL)
-			http.NotFound(w, r)
+	file := t.TempDir() + "/users.json"
+	writeUsers := func() {
+		attrs := map[string][]string{"document": {"52998224725"}}
+		if !missingOrg {
+			attrs["organization_id"] = []string{org}
 		}
-	}))
-	defer server.Close()
-	cfg := config.Config{KeycloakAuthServerURL: server.URL, KeycloakRealm: "luxus", KeycloakResource: "connect-cli", KeycloakAdminUsername: "admin", KeycloakAdminPassword: "test-only"}
-	if e := importLegacyAccounts(ctx, st, cfg); e == nil {
+		records := []importedAccount{{ID: id, Username: name, Email: "legacy@example.com", Enabled: true, Attributes: attrs, ClientRoles: map[string][]string{"connect-cli": {"sales"}, "foreign-client": {"master"}}}}
+		if bulk {
+			records = append(records, importedAccount{ID: unassignedID, Username: "unassigned-" + unassignedID, Enabled: true}, importedAccount{ID: foreignID, Username: "foreign-" + foreignID, Enabled: true, OrganizationID: foreignOrg})
+		}
+		raw, err := json.Marshal(map[string]any{"users": records})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(file, raw, 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeUsers()
+	if e := importAccountsFile(ctx, st, file, ""); e == nil {
 		t.Fatal("missing tenant silently assigned")
 	}
 	u, _ := st.LocalUserByID(ctx, id)
 	if u != nil {
 		t.Fatal("partial migration after missing tenant")
 	}
-	if e := importLegacyAccounts(ctx, st, cfg, name+"="+org); e != nil {
+	if e := importAccountsFile(ctx, st, file, "", name+"="+org); e != nil {
 		t.Fatal(e)
 	}
 	missingOrg = false
-	if e := importLegacyAccounts(ctx, st, cfg, name+"="+uuid.NewString()); e == nil {
+	writeUsers()
+	if e := importAccountsFile(ctx, st, file, "", name+"="+uuid.NewString()); e == nil {
 		t.Fatal("explicit assignment overwrote an existing tenant")
 	}
-	if e := importLegacyAccounts(ctx, st, cfg, "misspelled-user="+org); e == nil {
+	if e := importAccountsFile(ctx, st, file, "", "misspelled-user="+org); e == nil {
 		t.Fatal("unknown explicit assignment ignored")
 	}
 	u, e = st.LocalUserByID(ctx, id)
@@ -99,7 +81,7 @@ func TestLegacyImportPreservesIdentityTenantAndLocalCredentials(t *testing.T) {
 	if e = st.UpdateLocalUser(ctx, u); e != nil {
 		t.Fatal(e)
 	}
-	if e = importLegacyAccounts(ctx, st, cfg); e != nil {
+	if e = importAccountsFile(ctx, st, file, ""); e != nil {
 		t.Fatal(e)
 	}
 	u, _ = st.LocalUserByID(ctx, id)
@@ -107,8 +89,9 @@ func TestLegacyImportPreservesIdentityTenantAndLocalCredentials(t *testing.T) {
 		t.Fatal("repeat import overwrote local credentials")
 	}
 	bulk = true
+	writeUsers()
 	fallback := uuid.NewString()
-	if e = importLegacyAccountsWithDefault(ctx, st, cfg, fallback); e != nil {
+	if e = importAccountsFile(ctx, st, file, fallback); e != nil {
 		t.Fatal(e)
 	}
 	unassigned, _ := st.LocalUserByID(ctx, unassignedID)
@@ -140,8 +123,59 @@ func TestParseOrganizationAssignmentsRejectsAmbiguity(t *testing.T) {
 
 func TestBatchOrganizationRejectsInvalidDestination(t *testing.T) {
 	for _, id := range []string{"invalid", uuid.Nil.String()} {
-		if e := importLegacyAccountsWithDefault(context.Background(), nil, config.Config{}, id); e == nil || !strings.Contains(e.Error(), "UUID") {
+		if _, e := readImportedAccounts(strings.NewReader("[]"), id); e == nil || !strings.Contains(e.Error(), "UUID") {
 			t.Fatal("invalid destination was not rejected before importing")
 		}
+	}
+}
+
+func TestOfflineImportAcceptsExportAndKeepsApplicationRoles(t *testing.T) {
+	id, org := uuid.NewString(), uuid.NewString()
+	record := importedAccount{ID: id, Username: "existing", Enabled: true, Attributes: map[string][]string{
+		"organization": {`{"company":{"id":"` + org + `","name":["Company"]}}`},
+		"document":     {"52998224725"},
+	}, RealmRoles: []string{"user"}, ClientRoles: map[string][]string{"connect-cli": {"sales", "sales"}, "unrelated": {"master"}}}
+	for _, value := range []any{[]importedAccount{record}, map[string]any{"users": []importedAccount{record}}} {
+		data, _ := json.Marshal(value)
+		users, err := readImportedAccounts(strings.NewReader(string(data)), "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		u := users[0]
+		if u.ID != id || u.OrganizationID != org || u.OrganizationName != "Company" || u.Document != "52998224725" || strings.Join(u.Roles, ",") != "user,sales" {
+			t.Fatalf("identity, organization or roles changed: %+v", u)
+		}
+		if u.PasswordHash != "" || u.MFASecret != "" {
+			t.Fatal("import assigned credentials")
+		}
+	}
+}
+
+func TestOfflineImportValidatesEntireFileBeforeWriting(t *testing.T) {
+	id, org := uuid.NewString(), uuid.NewString()
+	valid := `{"id":"` + id + `","username":"one","organizationId":"` + org + `","enabled":true}`
+	for _, raw := range []string{
+		``, `[]`, `{}`, `null`, `[` + valid + `] {}`,
+		`[` + valid + `,` + valid + `]`,
+		`[{"id":"invalid","username":"one","organizationId":"` + org + `"}]`,
+		`[{"id":"` + id + `","username":"with space","organizationId":"` + org + `"}]`,
+		`[{"id":"` + id + `","username":"one"}]`,
+		`[{"id":"` + id + `","username":"one","attributes":{"organization":["{\"a\":{\"id\":\"` + org + `\"},\"b\":{\"id\":\"` + uuid.NewString() + `\"}}"]}}]`,
+	} {
+		if _, err := readImportedAccounts(strings.NewReader(raw), ""); err == nil {
+			t.Fatalf("invalid import accepted: %s", raw)
+		}
+	}
+	if _, err := readImportedAccounts(strings.NewReader(`[`+valid+`]`), "", "one="+uuid.NewString()); err == nil {
+		t.Fatal("explicit assignment replaced an existing tenant")
+	}
+	if _, err := readImportedAccounts(strings.NewReader(`[`+valid+`]`), "", "missing="+org); err == nil {
+		t.Fatal("unknown explicit assignment accepted")
+	}
+	// A shell-selected default applies only to accounts with no tenant.
+	other := uuid.NewString()
+	users, err := readImportedAccounts(strings.NewReader(`[`+valid+`,{"id":"`+uuid.NewString()+`","username":"two"}]`), other)
+	if err != nil || users[0].OrganizationID != org || users[1].OrganizationID != other {
+		t.Fatal("batch assignment changed a known tenant", err)
 	}
 }

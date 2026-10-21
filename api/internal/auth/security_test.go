@@ -6,20 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/luxus-connect/telefonia/api/internal/config"
 )
-
-func TestClientRolesCannotGrantPrivilegesAcrossApplications(t *testing.T) {
-	claims := jwt.MapClaims{"resource_access": map[string]interface{}{
-		"other-app":   map[string]interface{}{"roles": []interface{}{"master", "admin"}},
-		"connect-cli": map[string]interface{}{"roles": []interface{}{"sales"}},
-	}}
-	roles := extractRoles(claims, "connect-cli")
-	if len(roles) != 1 || roles[0] != "sales" {
-		t.Fatalf("unexpected roles: %v", roles)
-	}
-}
 
 func TestCommercialWritesCannotAdministerOperations(t *testing.T) {
 	for _, test := range []struct {

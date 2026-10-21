@@ -15,10 +15,6 @@ type Config struct {
 	IntakeOrgID                     string
 	DatabaseURL                     string
 	RabbitMQURL                     string
-	KeycloakRealm                   string
-	KeycloakAuthServerURL           string
-	KeycloakPublicAuthServerURL     string
-	KeycloakResource                string
 	ObjectStorageServiceURL         string
 	ObjectStoragePublicURL          string
 	ObjectStorageAccessKeyID        string
@@ -29,8 +25,6 @@ type Config struct {
 	CORSOrigins                     []string
 	Port                            string
 	Environment                     string
-	KeycloakAdminUsername           string
-	KeycloakAdminPassword           string
 	SMTPHost                        string
 	SMTPPort                        int
 	SMTPUser                        string
@@ -113,10 +107,6 @@ func Load() Config {
 		IntakeOrgID:                     strings.TrimSpace(os.Getenv("TELEFONIA_INTAKE_ORG_ID")),
 		DatabaseURL:                     dbURL,
 		RabbitMQURL:                     os.Getenv("RABBITMQ_URL"),
-		KeycloakRealm:                   os.Getenv("KEYCLOAK_REALM"),
-		KeycloakAuthServerURL:           strings.TrimRight(os.Getenv("KEYCLOAK_AUTH_SERVER_URL"), "/"),
-		KeycloakPublicAuthServerURL:     strings.TrimRight(firstNonEmpty(os.Getenv("KEYCLOAK_PUBLIC_AUTH_SERVER_URL"), os.Getenv("KEYCLOAK_AUTH_SERVER_URL")), "/"),
-		KeycloakResource:                os.Getenv("KEYCLOAK_RESOURCE"),
 		ObjectStorageServiceURL:         objectStorageServiceURL,
 		ObjectStoragePublicURL:          objectStoragePublicURL,
 		ObjectStorageAccessKeyID:        os.Getenv("OBJECT_STORAGE_ACCESS_KEY_ID"),
@@ -127,8 +117,6 @@ func Load() Config {
 		CORSOrigins:                     origins,
 		Port:                            port,
 		Environment:                     env,
-		KeycloakAdminUsername:           firstNonEmpty(os.Getenv("KEYCLOAK_ADMIN_USERNAME"), "admin"),
-		KeycloakAdminPassword:           os.Getenv("KEYCLOAK_ADMIN_PASSWORD"),
 		SMTPHost:                        strings.TrimSpace(os.Getenv("SMTP_HOST")),
 		SMTPPort:                        GetEnvInt("SMTP_PORT", 587),
 		SMTPUser:                        strings.TrimSpace(os.Getenv("SMTP_USER")),

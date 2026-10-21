@@ -178,7 +178,7 @@ func firstOrganization(orgs map[string]organizationClaimEntry) (*Organization, e
 }
 
 // NormalizeOrganization fills a missing org ID from alias/name heuristics.
-// Keycloak Organizations claims usually look like {"alias":{"name":["..."]}}
+// Historical organization attributes look like {"alias":{"name":["..."]}}
 // without a nested "id"; newer user attributes embed id in the JSON value.
 func NormalizeOrganization(org *Organization) *Organization {
 	if org == nil {

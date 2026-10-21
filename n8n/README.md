@@ -18,11 +18,11 @@ No ambiente da API:
 
 ```
 FINANCIAL_AGENT_API_KEY=<chave longa e aleatória>
-FINANCIAL_AGENT_ORG_ID=<UUID da organização no Keycloak>
+FINANCIAL_AGENT_ORG_ID=<UUID da organização no Telefonia>
 FINANCIAL_AGENT_PUBLIC_URL=https://sua-api.exemplo.com
 ```
 
-`FINANCIAL_AGENT_ORG_ID` é o mesmo `organization` do token Keycloak (UUID da org). Sem isso o agente não enxerga clientes nem faturas.
+`FINANCIAL_AGENT_ORG_ID` é o `organization_id` da conta local (UUID da empresa). Sem isso o agente não enxerga clientes nem faturas.
 
 ## 2. Variáveis no n8n
 

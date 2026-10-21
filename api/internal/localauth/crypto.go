@@ -55,6 +55,36 @@ func randomToken() (string, error) {
 	_, err := rand.Read(b)
 	return base64.RawURLEncoding.EncodeToString(b), err
 }
+
+// Recovery codes have 128 bits of entropy but avoid mixed-case URL characters,
+// making them easier to transcribe from a printed or saved copy.
+func newRecoveryCode() (string, error) {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	value := strings.ToUpper(hex.EncodeToString(b))
+	return value[:8] + "-" + value[8:16] + "-" + value[16:24] + "-" + value[24:], nil
+}
+
+// Only normalize the new hexadecimal format. Old, case-sensitive base64url
+// codes remain valid verbatim, including their hyphens and underscores.
+func recoveryCodeHash(code string) string {
+	code = strings.TrimSpace(code)
+	normalized := strings.Map(func(r rune) rune {
+		switch r {
+		case '-', ' ', '\t', '\r', '\n':
+			return -1
+		}
+		return r
+	}, code)
+	if len(normalized) == 32 {
+		if _, err := hex.DecodeString(normalized); err == nil {
+			code = strings.ToUpper(normalized)
+		}
+	}
+	return digest(code)
+}
 func digest(value string) string { s := sha256.Sum256([]byte(value)); return hex.EncodeToString(s[:]) }
 func seal(secret, plaintext string) (string, error) {
 	key := sha256.Sum256([]byte(secret))

@@ -8,7 +8,7 @@ import (
 func TestLocalAuthRequiresOnlySecretAndFrontendOrigin(t *testing.T) {
 	c := Config{DatabaseURL: "postgres://local-test", AuthSecret: "01234567890123456789012345678901", CORSOrigins: []string{"http://localhost:5173"}}
 	if err := c.Validate(); err != nil {
-		t.Fatalf("local auth incorrectly requires Keycloak: %v", err)
+		t.Fatalf("local auth unexpectedly requires an external identity provider: %v", err)
 	}
 	invalid := c
 	invalid.AuthSecret = ""
@@ -36,7 +36,7 @@ func TestDatabaseCredentialsRoundTrip(t *testing.T) {
 }
 
 func TestProductionRejectsInvalidStorageInsteadOfChangingDomain(t *testing.T) {
-	c := Config{AuthSecret: "01234567890123456789012345678901", CORSOrigins: []string{"https://app.example"}, Environment: "Production", DatabaseURL: "postgres://db", KeycloakRealm: "luxus", KeycloakResource: "connect-cli", KeycloakAuthServerURL: "http://keycloak/auth", KeycloakPublicAuthServerURL: "https://auth.example/auth", ObjectStoragePublicURL: "https://storage.example", ObjectStorageAccessKeyID: "application", ObjectStorageSecretKey: "dedicated-secret"}
+	c := Config{AuthSecret: "01234567890123456789012345678901", CORSOrigins: []string{"https://app.example"}, Environment: "Production", DatabaseURL: "postgres://db", ObjectStoragePublicURL: "https://storage.example", ObjectStorageAccessKeyID: "application", ObjectStorageSecretKey: "dedicated-secret"}
 	if err := c.Validate(); err != nil {
 		t.Fatal(err)
 	}

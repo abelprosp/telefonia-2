@@ -26,7 +26,7 @@
 ### Login e segurança
 
 O Telefonia usa autenticação própria: usuário e senha, Argon2id, sessões em
-cookie HttpOnly e MFA por aplicativo autenticador. Não depende do Keycloak.
+cookie HttpOnly e MFA por aplicativo autenticador. Não exige um provedor de identidade externo.
 Consulte [a migração, configuração e recuperação de contas](docs/AUTH_LOCAL.md).
 A migração preserva IDs, empresas e vínculos, mas exige novas senhas.
 
@@ -146,10 +146,9 @@ go run ./cmd/api
 | **connect-api**     | 8002 (HTTP)               | API Go                                                    |
 | **connect-web**     | 3000 → 80 (override)      | SPA estática ou base nginx                                |
 | **connect-web-dev** | 5173 (perfil `dev`)       | Vite HMR                                                  |
-| **postgres**        | 5432                      | Dados transacionais (`luxus_connect_dev`, `luxus_kc_dev`) |
+| **postgres**        | 5432                      | Dados transacionais (`luxus_connect_dev`) |
 | **rabbitmq**        | 5672, 15672 (UI)          | Mensagens                                                 |
 | **seq**             | 81 (UI), 5341 (ingestão)  | Logs                                                      |
-| **keycloak**        | 8081, 8443                | SSO / admin                                               |
 
 ## URLs úteis (local)
 
@@ -159,44 +158,25 @@ go run ./cmd/api
 | Health              | `http://localhost:8002/health`                                        |
 | Seq                 | `http://localhost:81`                                                 |
 | RabbitMQ Management | `http://localhost:15672` (credenciais do `.env`)                      |
-| Keycloak Admin      | `http://localhost:8081/auth` — utilizador `admin`, password `KC_ADMIN_PWD` |
 | Vite (perfil dev)   | `http://localhost:5173`                                               |
 
 **Importação de faturas (async):** upload para storage S3-compatível (URL pré-assinada), depois `POST /v1/provider-invoices` com `storage_bucket` e `storage_object_key`; estado em `GET /v1/provider-invoices/{id}`.
 
-## Configuração Keycloak
+## Configuração de login
 
-Os valores **realm**, **client** e **URL do servidor** têm de estar alinhados entre **API**, **frontend** (`VITE_*`) e **realm no Keycloak**.
+A API exige `DATABASE_URL`, `AUTH_SECRET` persistente e `CORS_ORIGINS` com a origem exata da interface. Gere a chave com `python3 scripts/configure-local-auth.py`. O frontend usa `VITE_API_URL=/api` e `VITE_STORAGE_BUCKET_NAME`; não coloque segredos em variáveis `VITE_*`.
 
-### API via Docker Compose (`docker-compose.override.yml`)
+O login usa usuário, senha e MFA TOTP na própria aplicação. Para configurar o primeiro administrador, importar contas offline e recuperar acesso, consulte [AUTH_LOCAL.md](docs/AUTH_LOCAL.md).
 
-Variáveis injetadas no contentor `connect-api`:
-
-- `KEYCLOAK_REALM=luxus`
-- `KEYCLOAK_AUTH_SERVER_URL=http://keycloak:8080/auth`
-- `KEYCLOAK_RESOURCE=connect-cli`
-
-### Frontend (`src/Luxus.Connect.Web`)
-
-Variáveis obrigatórias: `VITE_API_URL`, `VITE_AUTH_URL`, `VITE_CLIENT_ID`,
-`VITE_STORAGE_BUCKET_NAME` (ver [`src/Luxus.Connect.Web/src/env.ts`](src/Luxus.Connect.Web/src/env.ts)).
-O client OIDC é público; não coloque segredos em `VITE_*`.
-
-### Produção (VPS)
-
-Keycloak fica atrás do nginx em **`/auth`**; a API em **`/api`**. O nginx do
-Ubuntu encaminha para frontend `:3005`, API `:8002` e Keycloak `:8081`.
-Variáveis em [`docker-compose.prod.yml`](docker-compose.prod.yml).
-
-**Temas Keycloak:** volume `./resources/theme/` → `/opt/keycloak/themes/` (ver imagem no `docker-compose.yml`).
+Na VPS, nginx encaminha a interface para `127.0.0.1:3005` e `/api/` para `127.0.0.1:8010`.
 
 ## Deploy em VPS
 
-Guia passo a passo (TLS Let’s Encrypt, `.env`, Keycloak, nginx): **[`docs/DEPLOY_VPS.md`](docs/DEPLOY_VPS.md)**.
+Guia passo a passo (TLS, `.env`, autenticação própria, nginx): **[`docs/DEPLOY_VPS.md`](docs/DEPLOY_VPS.md)**.
 
 Resumo:
 
-1. Copiar [`docker/env.deploy.example`](docker/env.deploy.example) para `.env` e preencher (incl. `KC_CLIENT_SECRET` e object storage).
+1. Copiar [`docker/env.deploy.example`](docker/env.deploy.example) para `.env` e preencher (incluindo credenciais de banco e object storage).
 2. Colocar `fullchain.pem` e `privkey.pem` em `docker/ssl/<FQDN>/`.
 3. Na raiz: `./docker-up.sh prod` (usa `docker-compose.yml` + `docker-compose.prod.yml`).
 4. Garantir schema PostgreSQL aplicado (ver `db/migrations/`).

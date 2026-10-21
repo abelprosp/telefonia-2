@@ -8,6 +8,7 @@ import {
 } from 'react';
 
 import { env } from '@/env';
+import { authNetworkMessage, isExpiredSession } from '@/lib/auth-response';
 import { queryClient } from '@/lib/query-client';
 
 export type SessionUser = {
@@ -35,7 +36,9 @@ async function loadSession(): Promise<Session | undefined> {
       cache: 'no-store',
       signal: AbortSignal.timeout(15000)
     }
-  );
+  ).catch((error: unknown) => {
+    throw new Error(authNetworkMessage(error));
+  });
   if (response.status === 401) return undefined;
   if (!response.ok)
     throw new Error('Não foi possível verificar a sessão. Tente novamente.');
@@ -52,14 +55,22 @@ export async function authRequest<T = Record<string, never>>(
       method: data === undefined ? 'GET' : 'POST',
       credentials: 'include',
       signal: AbortSignal.timeout(15000),
+      cache: 'no-store',
       headers: { 'Content-Type': 'application/json' },
       body: data === undefined ? undefined : JSON.stringify(data)
     }
-  );
-  const result = await response.json();
+  ).catch((error: unknown) => {
+    throw new Error(authNetworkMessage(error));
+  });
+  const result = await response.json().catch(() => undefined);
+  if (isExpiredSession(response.status, result?.messages?.[0]?.code)) {
+    window.dispatchEvent(new Event('telefonia:session-expired'));
+    throw new Error('Sua sessão expirou. Entre novamente para continuar.');
+  }
   if (!response.ok)
     throw new Error(
-      result.messages?.[0]?.message || 'Não foi possível acessar sua conta.'
+      result?.messages?.[0]?.message ||
+        'Não foi possível acessar sua conta. Tente novamente.'
     );
   return result as T;
 }
@@ -70,17 +81,19 @@ type AuthState = {
   error?: Error;
   mfaRequired: boolean;
   mfaEnrolled: boolean;
+  sessionExpired: boolean;
   login: (username: string, password: string) => Promise<void>;
   refresh: () => Promise<void>;
-  signinRedirect: () => Promise<void>;
   removeUser: () => Promise<void>;
-  signoutRedirect: () => Promise<void>;
+  expireSession: () => void;
+  logout: () => Promise<void>;
 };
 const Context = createContext<AuthState | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session>();
   const [isLoading, setLoading] = useState(true);
   const [error, setError] = useState<Error>();
+  const [sessionExpired, setSessionExpired] = useState(false);
   const refresh = useCallback(async () => {
     setSession(await loadSession());
     setError(undefined);
@@ -105,12 +118,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryClient.clear();
     setSession(await authRequest<Session>('login', { username, password }));
     setError(undefined);
+    setSessionExpired(false);
   };
   const removeUser = useCallback(async () => {
     queryClient.clear();
     setSession(undefined);
     setError(undefined);
   }, []);
+  const expireSession = useCallback(() => {
+    void removeUser();
+    setSessionExpired(true);
+  }, [removeUser]);
+  useEffect(() => {
+    window.addEventListener('telefonia:session-expired', expireSession);
+    return () =>
+      window.removeEventListener('telefonia:session-expired', expireSession);
+  }, [expireSession]);
   const logout = async () => {
     await authRequest('logout', {});
     await removeUser();
@@ -125,11 +148,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         error,
         mfaRequired: session?.mfa_required ?? false,
         mfaEnrolled: session?.mfa_enrolled ?? false,
+        sessionExpired,
         login,
         refresh,
-        signinRedirect: removeUser,
         removeUser,
-        signoutRedirect: logout
+        expireSession,
+        logout
       }}
     >
       {children}

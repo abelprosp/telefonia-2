@@ -11,7 +11,6 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/luxus-connect/telefonia/api/internal/auth"
 	"github.com/luxus-connect/telefonia/api/internal/httputil"
-	"github.com/luxus-connect/telefonia/api/internal/keycloak"
 	"github.com/luxus-connect/telefonia/api/internal/localauth"
 	"github.com/luxus-connect/telefonia/api/internal/models"
 	"github.com/luxus-connect/telefonia/api/internal/notifications"
@@ -71,45 +70,12 @@ func rolesForProfile(profile string) ([]string, error) {
 	}
 }
 
-func toListUser(u keycloak.UserRecord) models.ListOrganizationUserResponse {
-	fullName := strings.TrimSpace(strings.TrimSpace(u.FirstName + " " + u.LastName))
+func localListUser(u store.LocalUser) models.ListOrganizationUserResponse {
+	fullName := strings.TrimSpace(u.FirstName + " " + u.LastName)
 	if fullName == "" {
 		fullName = u.Username
 	}
-
-	orgID := ""
-	orgName := ""
-	if u.Attributes != nil {
-		if orgAttr, ok := u.Attributes["organization"]; ok && len(orgAttr) > 0 {
-			if parsed, err := auth.ParseOrganizationClaim(orgAttr[0]); err == nil && parsed != nil {
-				parsed = auth.NormalizeOrganization(parsed)
-				orgID = parsed.ID
-				orgName = parsed.Name
-			}
-		}
-		if orgID == "" {
-			if ids, ok := u.Attributes["organization_id"]; ok && len(ids) > 0 {
-				orgID = strings.TrimSpace(ids[0])
-			}
-		}
-	}
-
-	return models.ListOrganizationUserResponse{
-		ID:               u.ID,
-		Username:         u.Username,
-		Email:            u.Email,
-		FirstName:        u.FirstName,
-		LastName:         u.LastName,
-		FullName:         fullName,
-		Profile:          profileFromRoles(u.Roles),
-		Enabled:          u.Enabled,
-		OrganizationID:   orgID,
-		OrganizationName: orgName,
-	}
-}
-
-func localListUser(u store.LocalUser) models.ListOrganizationUserResponse {
-	return models.ListOrganizationUserResponse{ID: u.ID, Username: u.Username, Email: u.Email, FirstName: u.FirstName, LastName: u.LastName, FullName: strings.TrimSpace(u.FirstName + " " + u.LastName), Profile: profileFromRoles(u.Roles), Enabled: u.Enabled, OrganizationID: u.OrganizationID, OrganizationName: u.OrganizationName}
+	return models.ListOrganizationUserResponse{ID: u.ID, Username: u.Username, Email: u.Email, FirstName: u.FirstName, LastName: u.LastName, FullName: fullName, Profile: profileFromRoles(u.Roles), Enabled: u.Enabled, OrganizationID: u.OrganizationID, OrganizationName: u.OrganizationName}
 }
 func validateLocalIdentity(username, email string) error {
 	address, err := mail.ParseAddress(email)

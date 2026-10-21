@@ -92,6 +92,6 @@ func TestPasswordChangeCannotUseAdminReset(t *testing.T) {
 	password := "new-password"
 	svc := &Service{}
 	if _, err := svc.UpdateCurrentUserProfile(context.Background(), models.UpdateUserProfileInput{NewPassword: &password}); err == nil {
-		t.Fatal("password change must require the Keycloak account flow")
+		t.Fatal("password change must require the authenticated account security flow")
 	}
 }

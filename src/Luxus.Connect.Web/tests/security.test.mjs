@@ -1,6 +1,29 @@
 import assert from 'node:assert/strict';
 import { after, test } from 'node:test';
 import { JSDOM } from 'jsdom';
+import {
+  isExpiredSession,
+  authNetworkMessage
+} from '../src/lib/auth-response.ts';
+
+test('expired sessions return to login while invalid OTPs and passwords remain retryable', () => {
+  assert.equal(isExpiredSession(401, 'UNAUTHORIZED'), true);
+  assert.equal(isExpiredSession(401, 'INVALID_OTP'), false);
+  assert.equal(isExpiredSession(401, 'INVALID_CREDENTIALS'), false);
+  assert.equal(isExpiredSession(429, 'MFA_LIMIT'), false);
+  assert.equal(isExpiredSession(503, 'AUTH_UNAVAILABLE'), false);
+});
+
+test('authentication connection failures provide a useful Portuguese message', () => {
+  assert.match(
+    authNetworkMessage(new DOMException('', 'TimeoutError')),
+    /demorou/
+  );
+  assert.match(
+    authNetworkMessage(new TypeError('Failed to fetch')),
+    /Sem conexão/
+  );
+});
 
 const dom = new JSDOM('<!doctype html><html><body></body></html>');
 globalThis.window = dom.window;

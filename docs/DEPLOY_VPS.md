@@ -1,176 +1,37 @@
-> Autenticação atual: [login próprio e migração de contas](AUTH_LOCAL.md). As instruções de Keycloak abaixo são históricas e não se aplicam ao login atual.
+# Deploy na VPS
 
-# Deploy em VPS (Docker Compose — produção)
+A autenticação é própria do Telefonia, com senha, sessões HttpOnly e MFA TOTP. A configuração de contas e recuperação está em [AUTH_LOCAL.md](AUTH_LOCAL.md).
 
-Guia consolidado para publicar **Luxus Connect** na VPS Hostinger com
-`docker-compose.yml` + `docker-compose.prod.yml`. O domínio público é
-**`telefonia.redobrai.online`**. O nginx do Ubuntu escuta 80/443 e encaminha
-para frontend `:3005`, API `:8002` e Keycloak `:8081`; publicamente, Keycloak
-fica em **`/auth`** e a API em **`/api`**.
+## Configuração
 
----
+Use Docker Compose v2, DNS apontando para a VPS e nginx no host com TLS. O nginx encaminha `/api/` para `127.0.0.1:8010` e a interface para `127.0.0.1:3005`. O MinIO usa `127.0.0.1:19000` para o proxy de objetos. Não publique bancos ou painéis administrativos na internet.
 
-## Pré-requisitos na VPS
+Configure `.env` a partir de `docker/env.deploy.example`, preservando credenciais e volumes existentes. Defina `PUBLIC_ORIGIN=https://telefonia.redobrai.online`, credenciais dedicadas de Postgres, RabbitMQ e MinIO e imagens de produção fixadas por digest. A chave persistente de autenticação é gerada por `configure-local-auth.py`.
 
-- **Docker** e **Docker Compose** (plugin v2).
-- **Git** (ou outro meio de levar o código).
-- Portas **80** e **443** abertas no firewall (e **22** para SSH).
-- **DNS**: `telefonia.redobrai.online` deve resolver para o IP público desta máquina.
+## Atualizar
 
----
-
-## Variáveis de ambiente (`.env` na raiz do repositório)
-
-Copia `docker/env.deploy.example` para `.env` na raiz e preenche. Variáveis usadas pelo compose de produção incluem:
-
-| Área                           | Variáveis (exemplos)                                                                             |
-| ------------------------------ | ------------------------------------------------------------------------------------------------ |
-| PostgreSQL                     | `POSTGRES_USER`, `POSTGRES_PASSWORD`                                                             |
-| Seq                            | `SEQ_PWD_HASH` (hash inicial do Seq, não a senha em texto)                                       |
-| Keycloak                       | `KC_ADMIN_PWD`, `KC_DB_USERNAME`, `KC_DB_PASSWORD`                                               |
-| RabbitMQ                       | `RMQ_USER`, `RMQ_PWD`                                                                            |
-| API / Keycloak client          | `KC_CLIENT_SECRET` (igual ao secret do client `connect-cli` no realm)                            |
-| Object storage (S3-compatible) | `OBJECT_STORAGE_SERVICE_URL`, `OBJECT_STORAGE_ACCESS_KEY_ID`, `OBJECT_STORAGE_SECRET_ACCESS_KEY` |
-
-**Não commits** o `.env` nem segredos no Git.
-
----
-
-## Certificados TLS (Let’s Encrypt + Certbot)
-
-O nginx do Ubuntu usa diretamente:
-
-`/etc/letsencrypt/live/telefonia.redobrai.online/`
-
-O nginx do host usa diretamente os certificados do Certbot nesse caminho.
-
-### Emitir certificado (modo `standalone`)
-
-1. **Liberta a porta 80** — nada pode estar à escuta no 80 (para o Certbot levantar o servidor temporário). Para a stack Docker:
-
-   ```bash
-   docker compose -f docker-compose.yml -f docker-compose.prod.yml down
-   ```
-
-2. Garante que o **DNS** (`A` para o IP da VPS) está correto.
-
-3. **IPv6 (AAAA):** se existir registo **AAAA** a apontar para **outro** servidor, o Let’s Encrypt pode validar por IPv6 e receber **404**. Corrige o `AAAA` para esta VPS, remove-o se só usas IPv4, ou usa desafio **DNS-01**.
-
-4. Emite o certificado (ajusta o domínio e inclui `www` só se tiveres DNS para isso):
-
-   ```bash
-   sudo certbot certonly --standalone -d telefonia.redobrai.online
-   ```
-
-5. Copia (ou cria **symlinks**) para a pasta que o Docker monta:
-
-   ```bash
-   sudo nginx -t && sudo systemctl reload nginx
-   ```
-
-6. Volta a subir a stack (secção seguinte).
-
-### Renovação
-
-Teste: `sudo certbot renew --dry-run`. Após renovação real, execute
-`sudo nginx -t && sudo systemctl reload nginx`.
-
----
-
-## Subir a stack em produção
-
-Na **raiz do repositório**:
+Antes de atualizar, faça backup dos dados e do `.env`. As migrações SQL são aplicadas pela API durante a inicialização.
 
 ```bash
-chmod +x docker-up.sh
-./docker-up.sh prod
+cd ~/telefonia-2
+git pull --ff-only
+python3 scripts/configure-local-auth.py
+bash docker-up.sh prod
+bash scripts/setup-vps-nginx.sh
+docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
+curl -fsS https://telefonia.redobrai.online/api/health
 ```
 
-- Usa **apenas** `docker-compose.yml` + `docker-compose.prod.yml`.
-- **Não** ativa o perfil `dev`: o serviço **`connect-web-dev`** (Vite) **não** sobe em produção.
+`docker-up.sh` recompila as imagens e recria os serviços alterados. Não é necessário executar `down`. Use `DOCKER_PULL_POLICY=never` somente quando as imagens das dependências já estiverem disponíveis localmente.
 
-Para desenvolvimento local, o script usa `COMPOSE_PROFILES=dev` (exceto com alvo
-`prod`) e o `docker-compose.override.yml` define as portas locais.
+## Contas e MFA
 
----
+Siga [o guia de autenticação](AUTH_LOCAL.md) para criar o primeiro administrador, importar contas offline ou recuperar senha/MFA. Não crie uma conta nova para substituir outra existente sem avaliar seus vínculos com clientes e vendas.
 
-## Migrações (PostgreSQL)
-
-Com o Postgres acessível (container em execução ou connection string correta):
+## Diagnóstico
 
 ```bash
-./scripts/apply-migrations.sh
+docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail 80 connect-api connect-web
 ```
 
-Ajusta ambiente/connection string conforme o README principal do repositório se o script assumir `localhost`.
-
----
-
-## Keycloak (primeira vez / após mudar domínio)
-
-- Admin: URL base com path `/auth`: `https://telefonia.redobrai.online/auth`.
-- Realm **`luxus`**, client público **`connect-cli`**.
-- **Valid redirect URIs** / **Web origins** devem incluir `https://telefonia.redobrai.online/*`.
-- O access token deve incluir o claim **`organization`** (estrutura esperada pela SPA). Sem isso, o login no Keycloak até funciona, mas a app não marca sessão e não redireciona para a home. Configura um **protocol mapper** (ou similar) no client `connect-cli` para emitir esse claim.
-
-Se o volume do Keycloak foi criado **antes** de configurar o path `/auth`, pode ser necessário rever o realm ou o volume na primeira subida com o novo esquema.
-
----
-
-## Domínio e ficheiros a manter coerentes
-
-Se alterares o FQDN, atualiza de forma consistente:
-
-- `docker-compose.prod.yml` — `KC_HOSTNAME`, `CORS_ORIGINS`, args de build `VITE_API_URL` / `VITE_AUTH_URL`
-- `docker/nginx/telefonia.redobrai.online.conf` — `server_name`, certificados e upstreams
-- Certificados em `/etc/letsencrypt/live/<hostname>/`
-- Rebuild obrigatório do **`connect-web`** após mudar `VITE_*`
-
----
-
-## Verificação rápida
-
-- Front: `https://telefonia.redobrai.online`
-- API: rotas sob `https://telefonia.redobrai.online/api/v1/...`
-- Logs: `docker compose -f docker-compose.yml -f docker-compose.prod.yml logs connect-api --tail=100`
-
----
-
-## Arquitetura resumida (produção)
-
-- **nginx do Ubuntu** expõe **80** (redirect para HTTPS) e **443** (TLS); faz proxy de `/auth/` e `/realms/` para Keycloak, de **`/api/`** para a API e serve o frontend em `:3005`.
-- **connect-api** é publicado em `127.0.0.1:8002`; o nginx remove o prefixo `/api` ao encaminhar.
-- **Keycloak** é publicado em `127.0.0.1:8081` e fica atrás do nginx em `/auth`.
-
----
-
-## Problemas frequentes
-
-### Registry indisponível com imagens ainda instaladas
-
-Se o pull falhar e os contêineres anteriores ainda existirem, use:
-
-```bash
-python3 scripts/pin-local-images.py &&
-docker compose -f docker-compose.yml -f docker-compose.prod.yml config --quiet &&
-DOCKER_PULL_POLICY=never bash docker-up.sh prod
-```
-
-O script exige os quatro contêineres, inclusive `minio-init.connect.luxus`
-(pode estar parado), e verifica as imagens antes de alterar o `.env`.
-Cria backup com permissão 600 e preserva as demais variáveis.
-Se algum contêiner ou imagem estiver ausente, interrompe sem alterar o `.env`.
-Não use `down` antes dessa recuperação nem remova as imagens do cache.
-O procedimento mantém as versões existentes; atualizações de segurança exigem
-depois imagens verificadas e acessíveis.
-
-Um ID local `sha256:...` difere de um digest de manifesto
-`registry/imagem@sha256:...`: não acrescente um registry ao ID local.
-
-| Sintoma                         | O que verificar                                                                                                    |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| Certbot **404** no desafio ACME | Porta **80** ocupada; registo **AAAA** a apontar para outro sítio; domínio ainda a apontar para hospedagem antiga. |
-| nginx não arranca               | Execute `sudo nginx -t`; confirme certificados e upstreams `:3005`, `:8002`, `:8081`.                              |
-| CORS / login                    | `CORS_ORIGINS`, URLs `VITE_*` no build do web, realm Keycloak e redirects.                                         |
-
-Para detalhes funcionais, ver [Documento de Especificação Funcional-v2.md](./Documento%20de%20Especificação%20Funcional-v2.md).
+Para erro de login, confira a origem HTTPS exata em `PUBLIC_ORIGIN`, o cookie da sessão e a configuração do proxy. Para erro MFA, confira a hora do celular e use um código de recuperação se necessário. Para 502, verifique os serviços e as portas do proxy. Não compartilhe logs com senhas, tokens ou cookies.

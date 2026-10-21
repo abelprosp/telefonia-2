@@ -68,6 +68,41 @@ func TestEncryptedMFARejectsWrongKeyAndTampering(t *testing.T) {
 		t.Fatal("invalid envelope accepted")
 	}
 }
+
+func TestRecoveryCodeFormattingAndLegacyCompatibility(t *testing.T) {
+	a, err := newRecoveryCode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := newRecoveryCode()
+	if err != nil || a == b {
+		t.Fatal("recovery codes must be independently random", err)
+	}
+	groups := strings.Split(a, "-")
+	if len(groups) != 4 {
+		t.Fatal("recovery code must contain four groups")
+	}
+	for _, group := range groups {
+		if len(group) != 8 || strings.Trim(group, "0123456789ABCDEF") != "" {
+			t.Fatal("unexpected recovery code alphabet or length")
+		}
+	}
+	for _, formatted := range []string{a, strings.ToLower(a), strings.ReplaceAll(a, "-", ""), " \n" + strings.ReplaceAll(a, "-", " \t") + "\n"} {
+		if recoveryCodeHash(formatted) != recoveryCodeHash(a) {
+			t.Fatal("formatted recovery code did not match")
+		}
+	}
+	legacy := "aBcDef-ghij_Klmnopqrstuvwxyz01234567890123456"
+	if recoveryCodeHash(" "+legacy+"\n") != digest(legacy) {
+		t.Fatal("old recovery code was changed")
+	}
+	if recoveryCodeHash(strings.ToUpper(legacy)) == digest(legacy) {
+		t.Fatal("old recovery codes must remain case-sensitive")
+	}
+	if recoveryCodeHash("123456") == recoveryCodeHash(a) {
+		t.Fatal("short code matched a recovery code")
+	}
+}
 func TestCookieCSRFAndPrivilegedMFA(t *testing.T) {
 	m := &Manager{Production: true, Origins: []string{"https://telefonia.example"}}
 	w := httptest.NewRecorder()

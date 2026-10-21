@@ -15,10 +15,16 @@ No monorepo, em **`../old`**, está a **versão anterior do frontend em Next.js*
 
 ## Variáveis de ambiente
 
-Copie `.env.example` para `.env`. Obrigatórios para o cliente: `VITE_API_URL`, `VITE_AUTH_URL` (ver `src/env.ts`).
+Copie `.env.example` para `.env`. Obrigatórios para o cliente: `VITE_API_URL`, `VITE_STORAGE_BUCKET_NAME` (ver `src/env.ts`).
 
 Alinhar `VITE_API_URL` com a API Go (ex.: `http://localhost:8002`) e CORS
 para a origem do Vite.
+
+## Login e autenticação em dois fatores
+
+O login usa a API do Telefonia e uma sessão em cookie HttpOnly. Não há provedor externo nem tokens persistidos no navegador. Em produção, publique frontend e API com HTTPS na mesma origem.
+
+O usuário entra com senha e confirma o código de seis dígitos de um aplicativo autenticador. No primeiro acesso que exige MFA, o próprio Telefonia apresenta o QR code, a chave manual e os códigos de recuperação. Guarde estes códigos em local seguro: cada um funciona uma única vez. A tela de login permite alternar entre o autenticador e um código de recuperação.
 
 ## shadcn/ui
 

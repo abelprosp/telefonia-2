@@ -9,7 +9,7 @@ cd api
 go run ./cmd/api
 ```
 
-Variáveis obrigatórias: `DATABASE_URL`, `KEYCLOAK_REALM`, `KEYCLOAK_AUTH_SERVER_URL`, `KEYCLOAK_RESOURCE`.
+Variáveis obrigatórias: `DATABASE_URL`, `AUTH_SECRET`, `CORS_ORIGINS`.
 
 Opcionais: `RABBITMQ_URL`, `OBJECT_STORAGE_*`, `CORS_ORIGINS`, `PORT` (default 8080), `ENVIRONMENT`.
 
@@ -21,7 +21,7 @@ Opcionais: `RABBITMQ_URL`, `OBJECT_STORAGE_*`, `CORS_ORIGINS`, `PORT` (default 8
 | `internal/handlers` | Rotas HTTP |
 | `internal/services` | Regras de negócio |
 | `internal/store` | PostgreSQL (pgx) |
-| `internal/auth` | JWT Keycloak |
+| `internal/auth` | Sessões locais, autorização e isolamento por empresa |
 | `internal/importservice` | Importação de faturas VIVO |
 | `internal/vivo` | Parser de ficheiros VIVO (ISO-8859-1) |
 | `internal/messaging` | RabbitMQ |

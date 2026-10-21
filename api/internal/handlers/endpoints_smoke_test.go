@@ -430,15 +430,7 @@ func TestAllRegisteredRoutesDoNotPanic(t *testing.T) {
 		t.Fatal("expected chi mux")
 	}
 	missing := uuid.NewString()
-	skipPrefixes := []string{
-		"/setup/keycloak",
-	}
 	err := chi.Walk(r, func(method, route string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {
-		for _, p := range skipPrefixes {
-			if strings.HasPrefix(route, p) {
-				return nil
-			}
-		}
 		path := route
 		path = strings.ReplaceAll(path, "{id}", missing)
 		path = strings.ReplaceAll(path, "{planId}", missing)

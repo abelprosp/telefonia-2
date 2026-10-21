@@ -332,7 +332,7 @@ func (m *Manager) checkMFA(w http.ResponseWriter, r *http.Request, enroll bool) 
 	}
 	step, valid := verifyTOTP(secret, strings.TrimSpace(in.Code), time.Now(), last)
 	if !valid && !enroll {
-		result, err := tx.Exec(r.Context(), `DELETE FROM auth_recovery_codes WHERE user_id=$1 AND code_hash=$2`, s.User.ID, digest(strings.TrimSpace(in.Code)))
+		result, err := tx.Exec(r.Context(), `DELETE FROM auth_recovery_codes WHERE user_id=$1 AND code_hash=$2`, s.User.ID, recoveryCodeHash(in.Code))
 		if err == nil && result.RowsAffected() == 1 {
 			valid = true
 			step = last
@@ -345,13 +345,13 @@ func (m *Manager) checkMFA(w http.ResponseWriter, r *http.Request, enroll bool) 
 	codes := []string{}
 	if enroll {
 		for i := 0; i < 8; i++ {
-			code, err := randomToken()
+			code, err := newRecoveryCode()
 			if err != nil {
 				fail(w, 500, "AUTH_ERROR", "Tente novamente.")
 				return
 			}
 			codes = append(codes, code)
-			if _, e = tx.Exec(r.Context(), `INSERT INTO auth_recovery_codes(user_id,code_hash) VALUES($1,$2)`, s.User.ID, digest(code)); e != nil {
+			if _, e = tx.Exec(r.Context(), `INSERT INTO auth_recovery_codes(user_id,code_hash) VALUES($1,$2)`, s.User.ID, recoveryCodeHash(code)); e != nil {
 				fail(w, 503, "AUTH_UNAVAILABLE", "Tente novamente.")
 				return
 			}

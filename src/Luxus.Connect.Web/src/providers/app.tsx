@@ -9,7 +9,6 @@ import {
 
 import { QueryClientProvider } from '@tanstack/react-query';
 
-
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import {
@@ -51,7 +50,7 @@ export const AppProvider = ({
   storageKey = 'luxus-connect',
   ...props
 }: AppProviderProps) => {
-  const { removeUser, user } = useAuth();
+  const { expireSession, user } = useAuth();
 
   // Disponibiliza os papéis às guardas de navegação; a API valida a sessão.
   useLayoutEffect(() => {
@@ -84,10 +83,10 @@ export const AppProvider = ({
 
   useEffect(() => {
     const unregister = registerUnauthorizedHandler(() => {
-      void removeUser();
+      expireSession();
     });
     return unregister;
-  }, [removeUser]);
+  }, [expireSession]);
 
   const value = {
     theme,

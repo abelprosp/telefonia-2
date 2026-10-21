@@ -1,15 +1,18 @@
-# Autenticação própria do Telefonia
+# Login e MFA do Telefonia
 
-O login e a gestão de usuários usam a API Go e o PostgreSQL existentes.
-O Keycloak não participa do arranque, login, permissões, MFA ou recuperação.
-Não é necessário configurar realm, client, redirect URI, SMTP ou outro serviço.
+O Telefonia autentica usuários na API Go e no PostgreSQL existentes. Não exige realm, client, servidor de identidade, SMTP ou serviço pago.
 
-## Atualizar a VPS existente
+## Login diário
 
-Faça backup do banco antes de aplicar a migração `035_local_auth.sql`.
-Os clientes, vendas e demais registros existentes são mantidos.
-O login antigo será encerrado: o token do Keycloak deixa de autorizar a API.
-Guarde também o banco antigo `luxus_kc_dev` e o `.env` para recuperação.
+1. Entre com usuário e senha no próprio Telefonia.
+2. Se a conta usa MFA, informe o código de seis dígitos do seu aplicativo autenticador.
+3. No primeiro acesso de uma conta privilegiada em produção, escaneie o QR code no Google Authenticator, Microsoft Authenticator, 1Password ou outro aplicativo TOTP. Confirme o primeiro código e guarde os códigos de recuperação em local protegido.
+
+O aplicativo autenticador funciona sem internet. Os códigos mudam a cada 30 segundos; mantenha a hora do celular automática. Se perder o aparelho, escolha a opção de código de recuperação. Cada código só pode ser utilizado uma vez.
+
+## Configurar a VPS
+
+Faça backup do PostgreSQL e do `.env` antes de atualizar. As tabelas de clientes e vendas e os usuários locais existentes são preservados.
 
 ```bash
 cd ~/telefonia-2
@@ -18,150 +21,85 @@ python3 scripts/configure-local-auth.py
 docker compose -f docker-compose.yml -f docker-compose.prod.yml build connect-api connect-web
 ```
 
-A configuração gera `AUTH_SECRET` somente quando ausente, preservando o resto
-do `.env`. Guarde esse arquivo em backup protegido: a chave cifra os segredos
-do autenticador. Não troque a chave a cada deploy.
+A configuração cria `AUTH_SECRET` somente se estiver ausente e preserva as demais variáveis. Guarde essa chave junto do backup protegido: ela cifra os segredos MFA. Não a regenere a cada deploy. `PUBLIC_ORIGIN` deve ser a origem HTTPS do site, sem caminho; o Compose a usa para `CORS_ORIGINS`.
 
-### Preservar contas antigas
+### Primeiro administrador ou recuperação de acesso
 
-Antes de parar o contêiner antigo do Keycloak, execute:
-
-```bash
-python3 scripts/migrate-keycloak-users.py
-```
-
-O comando consulta o provedor antigo somente durante essa importação.
-Preserva IDs, empresa, perfis, status e documento de cada usuário para manter
-os vínculos de vendedores, parceiros, portal e auditoria.
-É transacional, paginado e pode ser repetido: contas locais existentes não são
-sobrescritas. Contas sem empresa válida interrompem a importação; corrija esses
-vínculos na origem antes de tentar novamente. Usuários sem papel operacional
-ficam com acesso de portal, sem receber privilégios por padrão.
-
-Para uma conta sem organização, é possível escolher sua empresa somente durante
-a migração, sem editar o Keycloak. Exemplo, se `arturabel` pertence à Luxus padrão:
-
-```bash
-python3 scripts/migrate-keycloak-users.py \
-  --assign-org arturabel=00000000-0000-0000-0000-000000000001
-```
-
-Repita `--assign-org USUARIO=UUID` para outras contas sem empresa, escolhendo
-individualmente o destino correto. Vínculos existentes de outra empresa não
-são sobrescritos. Um nome não encontrado interrompe sem importação parcial.
-
-Se todas as contas sem empresa pertencerem à mesma organização, escolha
-explicitamente esse destino para o lote inteiro. Exemplo para a Luxus padrão:
-
-```bash
-python3 scripts/migrate-keycloak-users.py \
-  --assign-unassigned-to 00000000-0000-0000-0000-000000000001
-```
-
-Isso resolve todas as contas sem empresa de uma vez. Contas que já possuem
-organização continuam na empresa original. `--assign-org` tem prioridade para
-exceções individuais. Sem essas opções, a migração continua recusando contas
-sem vínculo, em vez de escolher uma empresa automaticamente.
-
-Senhas e autenticadores antigos não são copiados. Defina uma nova senha para
-cada conta importada, começando pelo seu administrador (substitua `SEU_USUARIO`):
-
-```bash
-bash scripts/local-auth-admin.sh reset-password SEU_USUARIO
-```
-
-O script lê e confirma a senha sem exibi-la ou colocá-la no histórico do shell.
-Se a senha administrativa do Keycloak foi alterada desde o bootstrap, a importação
-pode falhar; informe a senha atual via `read -rs KEYCLOAK_ADMIN_PASSWORD`,
-`export KEYCLOAK_ADMIN_PASSWORD`, repita e depois execute
-`unset KEYCLOAK_ADMIN_PASSWORD`. Essa credencial não é necessária depois.
-
-### Instalação sem contas antigas
-
-Se não houver contas para importar, crie o primeiro administrador:
+Se ainda não há administrador local:
 
 ```bash
 bash scripts/local-auth-admin.sh init-admin admin admin@SUA-EMPRESA.com.br
 ```
 
-Não existe usuário ou senha universal. `init-admin` recusa criar outro
-administrador quando já existe um; para recuperar acesso use `reset-password`.
-
-### Aplicar e verificar
+Para uma conta já existente:
 
 ```bash
-DOCKER_PULL_POLICY=never bash docker-up.sh prod
+bash scripts/local-auth-admin.sh reset-password SEU_USUARIO
+```
+
+A senha é solicitada sem exibição e não entra no histórico do shell. Use pelo menos 12 caracteres. O primeiro administrador só é criado em uma instalação sem administrador; não existe senha universal.
+
+Se o autenticador e todos os códigos de recuperação se perderem:
+
+```bash
+bash scripts/local-auth-admin.sh reset-mfa SEU_USUARIO
+```
+
+O reset encerra sessões e exige novo cadastro do autenticador. Não há endpoint público para esse reset.
+
+### Importação offline de contas antigas
+
+Se as contas já foram importadas, não repita a migração: use a mesma conta local. Para contas ainda ausentes, utilize um arquivo JSON de exportação de usuários, sem conectar o Telefonia ao provedor antigo:
+
+```bash
+python3 scripts/import-local-users.py /root/backup/users.json
+```
+
+A importação preserva UUIDs, empresas e vínculos e não sobrescreve contas locais existentes. Senhas e autenticadores da origem não são copiados. Defina uma senha local depois da importação. Para contas sem empresa, escolha explicitamente o vínculo correto:
+
+```bash
+python3 scripts/import-local-users.py /root/backup/users.json \
+  --assign-org SEU_USUARIO=00000000-0000-0000-0000-000000000001
+```
+
+`--assign-unassigned-to UUID` atribui um destino explícito às contas sem empresa do lote. Contas com empresa já definida mantêm esse vínculo; exceções individuais usam `--assign-org`. Proteja o arquivo exportado e remova a cópia temporária após validar a importação.
+
+### Aplicar a atualização
+
+```bash
+bash docker-up.sh prod
 bash scripts/setup-vps-nginx.sh
 curl -fsS https://telefonia.redobrai.online/api/health
 ```
 
-O modo `never` pressupõe que as imagens das dependências já estejam no cache.
-O deploy não executa `down` e preserva contêineres antigos para migração/rollback.
-Abra o site e entre com a nova senha. Contas Master e Financeiro precisam
-cadastrar o autenticador pelo QR code na primeira entrada de produção.
-Guarde os oito códigos de recuperação exibidos: cada um só funciona uma vez.
-Após confirmar o acesso e as permissões, o Keycloak antigo pode ser parado:
+Se precisar reutilizar imagens de dependências já disponíveis localmente, use `DOCKER_PULL_POLICY=never bash docker-up.sh prod`. O deploy recompila API e interface, sem executar `down` ou apagar volumes. Abra o site e faça login novamente. A atualização não para nem apaga automaticamente contêineres ou bancos antigos: valide primeiro o acesso local e seus backups.
+
+Depois de confirmar login, MFA e permissões na versão nova, pare o contêiner legado, caso ele ainda exista na VPS:
 
 ```bash
 docker stop keycloak.connect.luxus
 ```
 
-Não apague o banco/volume antigo antes de validar a migração e seu backup.
-Reverter o código exige restaurar também a configuração anterior; as novas
-tabelas de autenticação não removem os dados antigos do Keycloak.
+O serviço não faz parte do Compose atual. Preserve os backups antigos até validar a migração; não remova volumes durante o deploy.
 
-## Uso diário e recuperação
+## Proteções
 
-- Crie, desative ou redefina senhas de outras contas em **Usuários** (Master).
-- Troque sua senha em **Configurações → Segurança da conta**, informando a senha atual.
-- Alterar senha, perfil, empresa, status ou dados da conta encerra suas sessões.
-- O administrador não pode remover seu próprio acesso pela tela de usuários.
-- Para perda do autenticador, use um código de recuperação na tela de login.
-- Se todos os códigos se perderem, o operador autorizado da VPS pode executar:
+- Senhas com Argon2id e salt individual; mínimo de 12 caracteres e máximo de 256 bytes.
+- Sessões opacas revogáveis, com hash no banco e cookie HttpOnly, Secure e SameSite=Strict em produção.
+- Expiração absoluta de 12 horas; expiração por inatividade de 30 minutos. Sessão pendente de MFA vale dez minutos.
+- TOTP cifrado com AES-GCM; proteção contra repetição de códigos e códigos de recuperação de uso único.
+- MFA obrigatório para administradores e financeiro em produção; MFA configurado continua exigido nos logins seguintes.
+- Escritas exigem Origin exato; sem curingas em CORS_ORIGINS.
+- Limites persistidos de tentativas; troca de senha/perfil/status invalida sessões.
+- Recuperação administrativa pela VPS, sem envio de senha ou código por e-mail.
 
-```bash
-bash scripts/local-auth-admin.sh reset-password SEU_USUARIO
-bash scripts/local-auth-admin.sh reset-mfa SEU_USUARIO
-```
+Frontend e API devem usar a mesma origem, com API em `/api`. As chaves de integrações não autorizam login nem gestão de usuários.
 
-O reset do MFA encerra as sessões e exige novo cadastro do autenticador.
-Não há endpoint público de reset, cadastro público ou envio de senha por e-mail.
-
-## Proteções implementadas
-
-- Argon2id com salt aleatório individual (19 MiB, duas iterações, uma lane).
-- Senha de 12 caracteres no mínimo, até 256 bytes; sem truncamento silencioso.
-- Sessão opaca de 256 bits; somente o hash SHA-256 fica no banco.
-- Cookie `__Host-telefonia_session`, `Secure`, `HttpOnly`, `SameSite=Strict`, sem Domain.
-- Expiração absoluta de 12 horas e por inatividade de 30 minutos.
-- Sessão sem MFA pendente expira em dez minutos e não autoriza operações.
-- Token rotacionado após MFA; TOTP e códigos de recuperação resistem a reenvio.
-- TOTP cifrado com AES-GCM; códigos de recuperação armazenados somente como hash.
-- Limites persistidos de tentativas por conta, sessão e peer; quatro operações
-  simultâneas nas rotas de autenticação. Respostas de senha incorreta não revelam
-  se o usuário existe ou está desativado.
-- Escritas por cookie exigem `Origin` exato em `CORS_ORIGINS`; não use curingas.
-- Papéis e empresa são lidos do banco em cada requisição; alterações de conta
-  invalidam sessões na mesma transação, com proteção contra alterações concorrentes.
-- Eventos de login, MFA e recuperação registrados sem senhas, tokens ou códigos.
-
-`CORS_ORIGINS` já usa `PUBLIC_ORIGIN` no Compose de produção. Frontend e API
-devem estar no mesmo site; a configuração padrão usa `/api` no mesmo domínio.
-Integrações de intake e agente continuam com suas chaves e organização fixada;
-essas chaves não autorizam o login nem a gestão de usuários.
-
-Referências: [OWASP: senhas](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html),
-[sessões](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html),
-[CSRF](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html).
-
-## Testes locais
-
-Use um PostgreSQL descartável com as migrações de `db/migrations` aplicadas:
+## Testes
 
 ```bash
-AUTH_TEST_DATABASE_URL=postgres://... go test ./internal/localauth -count=1
+cd api
+go test ./...
 ```
 
-A suíte cobre login, QR de cadastro, confirmação, repetição de TOTP, uso único
-de recuperação, CSRF, rotação do cookie, logout, expiração e desativação da conta.
-Nunca aponte os testes para o banco de produção.
+Para a suíte de autenticação com banco, configure `AUTH_TEST_DATABASE_URL` com um PostgreSQL descartável com as migrações aplicadas. Nunca use o banco de produção nos testes.

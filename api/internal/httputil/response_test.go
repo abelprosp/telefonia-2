@@ -28,7 +28,7 @@ func TestHandleServiceError_WrappedAppError(t *testing.T) {
 
 func TestHandleServiceError_Unavailable(t *testing.T) {
 	rec := httptest.NewRecorder()
-	HandleServiceError(rec, UnavailableError(notifications.N("KEYCLOAK_ADMIN_UNAVAILABLE", "User management is not configured.")))
+	HandleServiceError(rec, UnavailableError(notifications.N("AUTH_UNAVAILABLE", "User management is not configured.")))
 	if rec.Code != http.StatusServiceUnavailable {
 		t.Fatalf("expected 503, got %d", rec.Code)
 	}

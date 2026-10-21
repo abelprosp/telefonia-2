@@ -1145,7 +1145,7 @@ type UpdateSaleInput struct {
 	Notes              *string `json:"notes"`
 }
 
-// --- Organization users (Keycloak) ---
+// --- Organization users (native authentication) ---
 
 type ListOrganizationUserResponse struct {
 	ID               string `json:"id"`

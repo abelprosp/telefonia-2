@@ -6,8 +6,8 @@ import (
 
 	"github.com/luxus-connect/telefonia/api/internal/auth"
 	"github.com/luxus-connect/telefonia/api/internal/httputil"
-	"github.com/luxus-connect/telefonia/api/internal/keycloak"
 	"github.com/luxus-connect/telefonia/api/internal/notifications"
+	"github.com/luxus-connect/telefonia/api/internal/store"
 )
 
 func TestRequireCallerOrganization_rejectsMissing(t *testing.T) {
@@ -44,21 +44,17 @@ func TestRequireCallerOrganization_acceptsUUID(t *testing.T) {
 	}
 }
 
-func TestToListUser_readsOrganizationAttributes(t *testing.T) {
+func TestLocalListUser_preservesOrganization(t *testing.T) {
 	orgID := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-	u := keycloak.UserRecord{
-		ID:       "user-1",
-		Username: "acme",
-		Enabled:  true,
-		Roles:    []string{auth.RoleMaster, auth.RoleUser},
-		Attributes: map[string][]string{
-			"organization": {
-				`{"acme":{"id":"` + orgID + `","name":["Acme Telecom"]}}`,
-			},
-			"organization_id": {orgID},
-		},
+	u := store.LocalUser{
+		ID:               "user-1",
+		Username:         "acme",
+		Enabled:          true,
+		Roles:            []string{auth.RoleMaster, auth.RoleUser},
+		OrganizationID:   orgID,
+		OrganizationName: "Acme Telecom",
 	}
-	item := toListUser(u)
+	item := localListUser(u)
 	if item.OrganizationID != orgID {
 		t.Fatalf("expected org id %s, got %s", orgID, item.OrganizationID)
 	}
@@ -70,26 +66,24 @@ func TestToListUser_readsOrganizationAttributes(t *testing.T) {
 func TestListOrganizationUsers_filtersByCallerOrg(t *testing.T) {
 	caller := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 	other := "bbbbbbbb-bbbb-cccc-dddd-eeeeeeeeeeee"
-	users := []keycloak.UserRecord{
+	users := []store.LocalUser{
 		{
 			ID: "1", Username: "a", Enabled: true, Roles: []string{auth.RoleMaster},
-			Attributes: map[string][]string{"organization_id": {caller}},
+			OrganizationID: caller,
 		},
 		{
 			ID: "2", Username: "b", Enabled: true, Roles: []string{auth.RoleMaster},
-			Attributes: map[string][]string{"organization_id": {other}},
+			OrganizationID: other,
 		},
 		{
 			ID: "3", Username: "c", Enabled: true, Roles: []string{auth.RoleEmployee},
-			Attributes: map[string][]string{
-				"organization": {`{"x":{"id":"` + caller + `","name":["Same"]}}`},
-			},
+			OrganizationID: caller, OrganizationName: "Same",
 		},
 	}
 
 	var kept []string
 	for _, u := range users {
-		item := toListUser(u)
+		item := localListUser(u)
 		if item.OrganizationID == caller {
 			kept = append(kept, item.Username)
 		}
@@ -107,9 +101,9 @@ func TestUpdateOrganizationUser_forbiddenAcrossOrgs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	target := toListUser(keycloak.UserRecord{
+	target := localListUser(store.LocalUser{
 		ID: "x", Username: "foreign", Enabled: true,
-		Attributes: map[string][]string{"organization_id": {other}},
+		OrganizationID: other,
 	})
 	if target.OrganizationID == callerOrg.ID {
 		t.Fatal("fixture broken")

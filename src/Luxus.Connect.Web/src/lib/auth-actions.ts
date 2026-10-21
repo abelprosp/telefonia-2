@@ -1,5 +1,3 @@
-export async function performLogout(auth: {
-  signoutRedirect: () => Promise<void>;
-}) {
-  await auth.signoutRedirect();
+export async function performLogout(auth: { logout: () => Promise<void> }) {
+  await auth.logout();
 }

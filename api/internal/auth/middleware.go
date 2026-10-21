@@ -7,9 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
-	"sync"
 
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/luxus-connect/telefonia/api/internal/config"
 	"github.com/luxus-connect/telefonia/api/internal/httputil"
 	"github.com/luxus-connect/telefonia/api/internal/localauth"
@@ -138,92 +136,6 @@ func (m *Middleware) RequirePartner(next http.Handler) http.Handler {
 	})
 }
 
-func extractUser(claims jwt.MapClaims, clientID string) *User {
-	sub, _ := claims["sub"].(string)
-	if sub == "" {
-		if alt, ok := claims["connect_user_id"].(string); ok {
-			sub = alt
-		}
-	}
-	email, _ := claims["email"].(string)
-	name, _ := claims["name"].(string)
-	preferred, _ := claims["preferred_username"].(string)
-
-	return &User{
-		ID:       sub,
-		Email:    email,
-		Name:     name,
-		Username: preferred,
-		Roles:    extractRoles(claims, clientID),
-		Document: extractDocument(claims),
-		Acr:      claimString(claims["acr"]),
-		Amr:      parseRoleSlice(claims["amr"]),
-	}
-}
-
-func claimString(raw any) string {
-	if s, ok := raw.(string); ok {
-		return s
-	}
-	if n, ok := raw.(float64); ok {
-		return fmt.Sprintf("%.0f", n)
-	}
-	return ""
-}
-
-func (m *Middleware) validateTokenIssuerAudience(claims jwt.MapClaims) error {
-	realm := strings.TrimSpace(m.cfg.KeycloakRealm)
-	if realm == "" {
-		return fmt.Errorf("Keycloak realm is not configured")
-	}
-	publicURL := strings.TrimRight(strings.TrimSpace(m.cfg.KeycloakPublicAuthServerURL), "/")
-	if publicURL == "" {
-		publicURL = strings.TrimRight(strings.TrimSpace(m.cfg.KeycloakAuthServerURL), "/")
-	}
-	expectedIssuer := publicURL + "/realms/" + realm
-	// Accept either the public or the internal issuer used by Keycloak behind a reverse proxy.
-	altIssuer := strings.TrimRight(strings.TrimSpace(m.cfg.KeycloakAuthServerURL), "/") + "/realms/" + realm
-	iss := strings.TrimSpace(claimString(claims["iss"]))
-	if iss == "" || (iss != expectedIssuer && iss != altIssuer) {
-		return fmt.Errorf("Invalid token issuer")
-	}
-
-	clientID := strings.TrimSpace(m.cfg.KeycloakResource)
-	if clientID == "" {
-		return fmt.Errorf("Keycloak resource is not configured")
-	}
-	if azp := strings.TrimSpace(claimString(claims["azp"])); azp != "" {
-		if azp != clientID {
-			return fmt.Errorf("Invalid token audience")
-		}
-		return nil
-	}
-	if !audienceContains(claims["aud"], clientID) {
-		return fmt.Errorf("Invalid token audience")
-	}
-	return nil
-}
-
-func audienceContains(raw any, clientID string) bool {
-	switch v := raw.(type) {
-	case string:
-		return strings.TrimSpace(v) == clientID
-	case []any:
-		for _, item := range v {
-			if s, ok := item.(string); ok && strings.TrimSpace(s) == clientID {
-				return true
-			}
-		}
-	case []string:
-		for _, s := range v {
-			if strings.TrimSpace(s) == clientID {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 func MFAVerifiedFromClaims(acr string, amr []string) bool {
 	for _, item := range amr {
 		switch strings.ToLower(strings.TrimSpace(item)) {
@@ -238,80 +150,7 @@ func MFAVerifiedFromClaims(acr string, amr []string) bool {
 	return false
 }
 
-func extractDocument(claims jwt.MapClaims) string {
-	keys := []string{"cpf_cnpj", "document", "cpf", "cnpj", "tax_id"}
-	for _, k := range keys {
-		if v, ok := claims[k].(string); ok {
-			digits := onlyDigits(v)
-			if len(digits) == 11 || len(digits) == 14 {
-				return digits
-			}
-		}
-	}
-	return ""
-}
-
-func onlyDigits(s string) string {
-	var b strings.Builder
-	for _, r := range s {
-		if r >= '0' && r <= '9' {
-			b.WriteRune(r)
-		}
-	}
-	return b.String()
-}
-
-func extractRoles(claims jwt.MapClaims, clientID string) []string {
-	seen := make(map[string]struct{})
-	var roles []string
-	add := func(items []string) {
-		for _, r := range items {
-			if r == "" {
-				continue
-			}
-			if _, ok := seen[r]; ok {
-				continue
-			}
-			seen[r] = struct{}{}
-			roles = append(roles, r)
-		}
-	}
-
-	add(parseRoleSlice(claims["roles"]))
-
-	if realmAccess, ok := claims["realm_access"].(map[string]interface{}); ok {
-		add(parseRoleSlice(realmAccess["roles"]))
-	}
-
-	if resourceAccess, ok := claims["resource_access"].(map[string]interface{}); ok {
-		if client, ok := resourceAccess[clientID].(map[string]interface{}); ok {
-			add(parseRoleSlice(client["roles"]))
-		}
-	}
-
-	return roles
-}
-
-func parseRoleSlice(raw any) []string {
-	switch v := raw.(type) {
-	case []interface{}:
-		out := make([]string, 0, len(v))
-		for _, item := range v {
-			if s, ok := item.(string); ok {
-				out = append(out, s)
-			}
-		}
-		return out
-	case []string:
-		return v
-	default:
-		return nil
-	}
-}
-
 // BackgroundContext returns a context with org for background jobs.
-var bgMu sync.Mutex
-
 func BackgroundContext(orgID string) context.Context {
 	ctx := context.Background()
 	return WithOrganization(ctx, &Organization{ID: orgID})

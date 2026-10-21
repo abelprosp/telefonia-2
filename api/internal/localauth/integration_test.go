@@ -111,7 +111,7 @@ func TestPostgresLoginMFARecoveryRevocationAndExpiry(t *testing.T) {
 		t.Fatal("replayed TOTP accepted")
 	}
 	pending := login()
-	w = call("mfa/verify", map[string]string{"code": recovery.Codes[0]}, pending, origin)
+	w = call("mfa/verify", map[string]string{"code": strings.ToLower(strings.ReplaceAll(recovery.Codes[0], "-", " "))}, pending, origin)
 	if w.Code != 200 {
 		t.Fatalf("recovery: %s", w.Body)
 	}
@@ -120,6 +120,20 @@ func TestPostgresLoginMFARecoveryRevocationAndExpiry(t *testing.T) {
 	w = call("mfa/verify", map[string]string{"code": recovery.Codes[0]}, pending, origin)
 	if w.Code != 401 {
 		t.Fatal("recovery reused")
+	}
+	// Existing installations retain their original case-sensitive recovery codes.
+	legacy, err := randomToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = st.Pool().Exec(ctx, `INSERT INTO auth_recovery_codes(user_id,code_hash) VALUES($1,$2)`, user.ID, digest(legacy)); err != nil {
+		t.Fatal(err)
+	}
+	if w = call("mfa/verify", map[string]string{"code": legacy}, pending, origin); w.Code != 200 {
+		t.Fatalf("legacy recovery: %s", w.Body)
+	}
+	if w = call("logout", map[string]string{}, w.Result().Cookies()[0], origin); w.Code != 200 {
+		t.Fatal("legacy recovery logout failed")
 	}
 	if w = call("logout", map[string]string{}, verified, "https://evil.example"); w.Code != 403 {
 		t.Fatal("logout CSRF accepted")
