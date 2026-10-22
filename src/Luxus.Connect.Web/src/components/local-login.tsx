@@ -233,7 +233,7 @@ export function LocalLogin() {
                   >
                     Cada código de recuperação funciona uma única vez.
                   </p>
-                  <Button className="w-full" disabled={busy}>
+                  <Button type="submit" className="w-full" disabled={busy}>
                     <KeyRound className="size-4" aria-hidden />
                     {busy ? 'Verificando…' : 'Usar código de recuperação'}
                   </Button>
@@ -312,7 +312,7 @@ export function LocalLogin() {
                 )}
               </Button>
             </div>
-            <Button className="w-full" disabled={busy}>
+            <Button type="submit" className="w-full" disabled={busy}>
               {busy ? 'Verificando…' : 'Continuar'}
             </Button>
           </form>

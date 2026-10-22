@@ -90,7 +90,9 @@ export function AccountSecurity() {
           value={confirm}
           onChange={(e) => setConfirm(e.target.value)}
         />
-        <Button disabled={busy}>Alterar senha</Button>
+        <Button type="submit" disabled={busy}>
+          Alterar senha
+        </Button>
         {error && (
           <p role="alert" className="text-destructive text-sm">
             {error}
